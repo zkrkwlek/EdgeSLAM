@@ -25,8 +25,9 @@ namespace EdgeSLAM {
 		void CreateNewMapPoints(Map* map, KeyFrame* targetKF);
 		void SearchInNeighbors(Map* map, KeyFrame* targetKF);
 		void KeyFrameCulling(Map* map, KeyFrame* targetKF);
+		
 		// Thread Synch
-		void RequestStop();
+		/*void RequestStop();
 		bool stopRequested();
 		bool Stop();
 		bool isStopped();
@@ -40,7 +41,7 @@ namespace EdgeSLAM {
 		bool CheckFinish();
 		void SetFinish();
 		void RequestFinish();
-		bool isFinished();
+		bool isFinished();*/
 		
 	public:
 		std::mutex mMutexStop;

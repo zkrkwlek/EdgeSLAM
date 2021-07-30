@@ -10,6 +10,7 @@
 #include <KeyFrame.h>
 #include <MapPoint.h>
 #include <Visualizer.h>
+#include <Segmentator.h>
 
 
 namespace EdgeSLAM {
@@ -29,12 +30,13 @@ namespace EdgeSLAM {
 	ORBVocabulary* Frame::mpVoc;*/
 	void SLAM::Init() {
 		LoadVocabulary();
+		Segmentator::Init();
 		pool = new ThreadPool::ThreadPool(16);
 		mpInitializer = new Initializer();
 		mpTracker = new Tracker();
 		mpFeatureTracker = new FlannFeatureTracker(1000);
 		mpLocalMapper = new LocalMapper();
-		mpLoopCloser = new LoopCloser(mpDBoWVoc, true);
+		mpLoopCloser = new LoopCloser();
 		mpVisualizer = new Visualizer(this);
 
 		//set method
@@ -65,7 +67,12 @@ namespace EdgeSLAM {
 		mpVisualizer->SetMap(GetMap(name));
 		mpVisualizer->AddUser(GetUser(user));
 	}
-
+	void SLAM::ProcessSegmentation(std::string user,int id) {
+		pool->EnqueueJob(Segmentator::ProcessSegmentation, pool, this, user, id);
+	}
+	void SLAM::ProcessDepthEstimation(std::string user, int id) {
+		pool->EnqueueJob(Segmentator::ProcessDepthEstimation, pool, this, user, id);
+	}
 	//////////////////Multi User and Map
 	void SLAM::CreateMap(std::string name) {
 		auto pNewMap = new Map(mpDBoWVoc);

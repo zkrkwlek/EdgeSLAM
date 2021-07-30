@@ -11,6 +11,13 @@
 #include <mutex>
 
 namespace EdgeSLAM {
+
+	const unsigned char FLAG_IMG = 0x1;
+	const unsigned char FLAG_KP = 0x2;
+	const unsigned char FLAG_DESC = 0x4;
+	const unsigned char FLAG_SEG = 0x8;
+	const unsigned char FLAG_DEPTH = 0x8;
+
 	class Camera;
 	class CameraPose;
 	class FeatureDetector;
@@ -28,6 +35,7 @@ namespace EdgeSLAM {
 		void reset_map_points();
 		void check_replaced_map_points();
 	public:
+		int mnKeyFrameId;
 		int N;
 		cv::Mat K, D;
 		float fx, fy, cx, cy, invfx, invfy;
@@ -96,6 +104,15 @@ namespace EdgeSLAM {
 		bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
 	private:
 		std::mutex mMutexFeatures;
+	/////FLAG
+	public:
+		bool CheckFlag(unsigned char opt);
+		void TurnOnFlag(unsigned char opt);
+		void TurnOffFlag(unsigned char opt);
+	private:
+		int mnFlag;
+		std::mutex mMutexFlag;
+	/////FLAG
 	};
 }
 

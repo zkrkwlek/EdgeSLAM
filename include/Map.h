@@ -8,6 +8,7 @@
 //#include <ORBVocabulary.h>
 #include <mutex>
 #include <atomic>
+#include <LoopClosingTypes.h>
 
 namespace EdgeSLAM {
 	
@@ -21,8 +22,10 @@ namespace EdgeSLAM {
 	class KeyFrameDB;
 	class User;
 	class Map {
+	/*public:
+		typedef std::pair<std::set<KeyFrame*>, int> ConsistentGroup;*/
 	public:
-		Map(DBoW3::Vocabulary* voc);
+		Map(DBoW3::Vocabulary* voc, bool bFixScale = false);
 		//Map(ORBVocabulary* voc);
 		virtual ~Map();
 
@@ -38,14 +41,68 @@ namespace EdgeSLAM {
 		int GetNumKeyFrames();
 		void Delete();
 
+		void InformNewBigChange();
+		int GetLastBigChangeIdx();
+
+	public:
+		std::vector<KeyFrame*> mvpKeyFrameOrigins;
+		DBoW3::Vocabulary* mpVoc;
+		bool mbAbortBA;
+		std::atomic<int> mnNextKeyFrameID, mnNextMapPointID, mnMaxKFid, mnBigChangeIdx;
+		KeyFrameDB* mpKeyFrameDB;
+		
+	public:
+		////Local Mapper thread
 		void InterruptBA() {
 			mbAbortBA = true;
 		}
+		void RequestStop();
+		bool stopRequested();
+		bool Stop();
+		bool isStopped();
+		void Release();
+		bool SetNotStop(bool flag);
+
+		void RequestReset();
+		void ResetIfRequested();
+
+		bool CheckFinish();
+		void SetFinish();
+		void RequestFinish();
+		bool isFinished();
+
+		std::atomic<bool> mbResetRequested;
+		std::atomic<bool> mbFinishRequested;
+		std::atomic<bool> mbFinished;
+		std::atomic<bool> mbStopped;
+		std::atomic<bool> mbStopRequested;
+		std::atomic<bool> mbNotStop;
 
 	public:
-		bool mbAbortBA;
-		std::atomic<int> mnNextKeyFrameID, mnNextMapPointID;;
-		KeyFrameDB* mpKeyFrameDB;
+		////Loop Closing
+		bool isRunningGBA();
+		bool isFinishedGBA();
+
+		KeyFrame* mpMatchedKF;
+		std::vector<ConsistentGroup> mvConsistentGroups;
+		std::vector<KeyFrame*> mvpEnoughConsistentCandidates;
+		std::vector<KeyFrame*> mvpCurrentConnectedKFs;
+		std::vector<MapPoint*> mvpCurrentMatchedPoints;
+		std::vector<MapPoint*> mvpLoopMapPoints;
+		cv::Mat mScw;
+		g2o::Sim3 mg2oScw;
+
+		std::atomic<int> mnLastLoopKFid;
+		std::atomic<bool> mbRunningGBA;
+		std::atomic<bool> mbFinishedGBA;
+		bool mbStopGBA; //for optimization
+		std::mutex mMutexGBA;
+		std::thread* mpThreadGBA;
+		// Fix scale in the stereo/RGB-D case
+		bool mbFixScale;
+		int mnFullBAIdx;
+		////Loop Closing
+
 	private:
 		std::mutex mMutexMPs, mMutexKFs, mMutexLocalMap;
 		std::set<MapPoint*> mspMapPoints;
@@ -55,7 +112,7 @@ namespace EdgeSLAM {
 	public:
 		MapState GetState();
 		void SetState(MapState stat);
-		std::atomic<int> mnNumMappingFrames;
+		std::atomic<int> mnNumMappingFrames, mnNumLoopClosingFrames;
 		std::list<MapPoint*> mlpNewMPs;
 	private:
 		MapState mState;

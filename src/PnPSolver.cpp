@@ -26,11 +26,11 @@ namespace EdgeSLAM {
 				{
 					const cv::KeyPoint &kp = F->mvKeysUn[i];
 
-					mvP2D.push_back(kp.pt);
-					mvSigma2.push_back(F->mvLevelSigma2[kp.octave]);
+					mvP2D.push_back((cv::Point2d)kp.pt);
+					mvSigma2.push_back((double)F->mvLevelSigma2[kp.octave]);
 
 					cv::Mat Pos = pMP->GetWorldPos();
-					mvP3Dw.push_back(cv::Point3f(Pos.at<float>(0), Pos.at<float>(1), Pos.at<float>(2)));
+					mvP3Dw.push_back(cv::Point3d(Pos.at<float>(0), Pos.at<float>(1), Pos.at<float>(2)));
 
 					mvKeyPointIndices.push_back(i);
 					mvAllIndices.push_back(idx);
@@ -44,10 +44,10 @@ namespace EdgeSLAM {
 		ccs = cv::Mat::zeros(4, 3, CV_64FC1);
 
 		// Set camera calibration parameters
-		fu = F->fx;
-		fv = F->fy;
-		uc = F->cx;
-		vc = F->cy;
+		fu = (double)F->fx;
+		fv = (double)F->fy;
+		uc = (double)F->cx;
+		vc = (double)F->cy;
 
 		SetRansacParameters();
 	}
@@ -58,7 +58,7 @@ namespace EdgeSLAM {
 		delete[] pcs;
 	}
 
-	void PnPSolver::SetRansacParameters(double probability, int minInliers, int maxIterations, int minSet, float epsilon, float th2)
+	void PnPSolver::SetRansacParameters(double probability, int minInliers, int maxIterations, int minSet, double epsilon, double th2)
 	{
 		mRansacProb = probability;
 		mRansacMinInliers = minInliers;
@@ -78,8 +78,8 @@ namespace EdgeSLAM {
 			nMinInliers = minSet;
 		mRansacMinInliers = nMinInliers;
 
-		if (mRansacEpsilon<(float)mRansacMinInliers / N)
-			mRansacEpsilon = (float)mRansacMinInliers / N;
+		if (mRansacEpsilon<(double)mRansacMinInliers / N)
+			mRansacEpsilon = (double)mRansacMinInliers / N;
 
 		// Set RANSAC iterations according to probability, epsilon, and max iterations
 		int nIterations;
@@ -121,6 +121,7 @@ namespace EdgeSLAM {
 
 		std::random_device rn;
 		std::mt19937_64 rnd(rn());
+		std::uniform_int_distribution<int> range(0, mvAllIndices.size() - 1);
 
 		int nCurrentIterations = 0;
 		while (mnIterations<mRansacMaxIts || nCurrentIterations<nIterations)
@@ -129,26 +130,25 @@ namespace EdgeSLAM {
 			mnIterations++;
 			reset_correspondences();
 			vAvailableIndices = mvAllIndices;
-			std::uniform_int_distribution<int> range(0, vAvailableIndices.size() - 1);
+			
 
 			// Get min set of points
 			for (short i = 0; i < mRansacMinSet; ++i)
 			{
 				int randi = range(rnd);
 				int idx = vAvailableIndices[randi];
-
 				add_correspondence(mvP3Dw[idx].x, mvP3Dw[idx].y, mvP3Dw[idx].z, mvP2D[idx].x, mvP2D[idx].y);
 
 				vAvailableIndices[randi] = vAvailableIndices.back();
 				vAvailableIndices.pop_back();
 			}
-
+			
 			// Compute camera pose
 			compute_pose(mRi, mti);
-
+			
 			// Check inliers
 			CheckInliers();
-
+			
 			if (mnInliersi >= mRansacMinInliers)
 			{
 				// If it is the best solution so far, save it
@@ -177,10 +177,10 @@ namespace EdgeSLAM {
 					}
 					return mRefinedTcw.clone();
 				}
-
 			}
+			
 		}
-
+		std::cout << mnIterations << " " << mnBestInliers << " " << mRansacMaxIts << " " << mRansacMinInliers << std::endl;
 		if (mnIterations >= mRansacMaxIts)
 		{
 			bNoMore = true;
@@ -253,23 +253,23 @@ namespace EdgeSLAM {
 
 		for (int i = 0; i<N; i++)
 		{
-			cv::Point3f P3Dw = mvP3Dw[i];
-			cv::Point2f P2D = mvP2D[i];
-
-			cv::Mat X = mRi*cv::Mat(P3Dw);
-
-			float Xc = X.at<float>(0);
-			float Yc = X.at<float>(1);
-			float invZc = 1 / X.at<float>(2);;
+			cv::Point3d P3Dw = mvP3Dw[i];
+			cv::Point2d P2D = mvP2D[i];
+			cv::Mat tempX = cv::Mat(P3Dw);
+			cv::Mat X = mRi*tempX;
+			
+			double Xc = X.at<double>(0);
+			double Yc = X.at<double>(1);
+			double invZc = 1 / X.at<double>(2);;
 
 			double ue = uc + fu * Xc * invZc;
 			double ve = vc + fv * Yc * invZc;
 
-			float distX = P2D.x - ue;
-			float distY = P2D.y - ve;
+			double distX = P2D.x - ue;
+			double distY = P2D.y - ve;
 
-			float error2 = distX*distX + distY*distY;
-
+			double error2 = distX*distX + distY*distY;
+			//std::cout << Xc << " " << Yc << " " << invZc << " " << ue << " " << ve << "=" << distX << ", " << distY << "=" << error2 << " " << mvMaxError[i] << std::endl;
 			if (error2<mvMaxError[i])
 			{
 				mvbInliersi[i] = true;
@@ -280,6 +280,7 @@ namespace EdgeSLAM {
 				mvbInliersi[i] = false;
 			}
 		}
+		std::cout << mnInliersi << std::endl;
 	}
 
 
@@ -329,23 +330,21 @@ namespace EdgeSLAM {
 		for (int j = 0; j < 3; j++)
 			cws.at<double>(0, j) /= number_of_correspondences;
 
-
 		// Take C1, C2, and C3 from PCA on the reference points:
 		cv::Mat PWO = cv::Mat::zeros(number_of_correspondences, 3, CV_64FC1);
 		cv::Mat PW0tPW0 = cv::Mat::zeros(3, 3, CV_64FC1);
-		cv::Mat DC		= cv::Mat::zeros(3, 1, CV_64FC1);
-		cv::Mat UCt		= cv::Mat::zeros(3, 3, CV_64FC1);
+		cv::Mat DC;// = cv::Mat::zeros(3, 1, CV_64FC1);
+		cv::Mat UCt;// = cv::Mat::zeros(3, 3, CV_64FC1);
+		cv::Mat vt;
 		
 		for (int i = 0; i < number_of_correspondences; i++)
 			for (int j = 0; j < 3; j++)
 			{
 				PWO.at<double>(i, j) = pws[3 * i + j] - cws.at<double>(0, j);
 			}
-
+		
 		cv::mulTransposed(PWO, PW0tPW0, true);
-
-		cv::SVD::compute(PW0tPW0, DC, UCt, cv::Mat(), cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
-
+		cv::SVD::compute(PW0tPW0, DC, UCt, vt, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
 		for (int i = 1; i < 4; i++) {
 			double k = sqrt(DC.at<double>(i-1) / number_of_correspondences);
 			for (int j = 0; j < 3; j++){
@@ -412,25 +411,24 @@ namespace EdgeSLAM {
 		}
 	}
 
-	double PnPSolver::compute_pose(cv::Mat R, cv::Mat t)
+	double PnPSolver::compute_pose(cv::Mat& R, cv::Mat& t)
 	{
 		choose_control_points();
 		compute_barycentric_coordinates();
-
 		cv::Mat M = cv::Mat::zeros(2 * number_of_correspondences, 12, CV_64F);
 
 		for (int i = 0; i < number_of_correspondences; i++)
 			fill_M(M, 2 * i, alphas + 4 * i, us[2 * i], us[2 * i + 1]);
-
 		cv::Mat MtM = cv::Mat::zeros(12, 12, CV_64FC1);
-		cv::Mat D = cv::Mat::zeros(12, 1, CV_64FC1);
-		cv::Mat Ut = cv::Mat::zeros(12, 12, CV_64FC1);
+		cv::Mat D;// = cv::Mat::zeros(12, 1, CV_64FC1);
+		cv::Mat Ut;// = cv::Mat::zeros(12, 12, CV_64FC1);
+		cv::Mat vt;
 		cv::mulTransposed(M, MtM, true);
-		cv::SVD::compute(MtM, D, Ut, cv::Mat(), cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
+		cv::SVD::compute(MtM, D, Ut, vt, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
 		
 		cv::Mat L_6x10 = cv::Mat::zeros(6, 10, CV_64FC1);
 		cv::Mat Rho = cv::Mat::zeros(6, 1, CV_64FC1);
-
+		
 		compute_L_6x10(Ut, L_6x10);
 		compute_rho(Rho);
 
@@ -442,6 +440,7 @@ namespace EdgeSLAM {
 		/*double Betas[4][4], rep_errors[4];
 		double Rs[4][3][3], ts[4][3];*/
 
+		std::cout << L_6x10 << " " << Rho.t() << std::endl;
 		find_betas_approx_1(L_6x10, Rho, Betas[1]);
 		gauss_newton(L_6x10, Rho, Betas[1]);
 		rep_errors[1] = compute_R_and_t(Ut, Betas[1], Rs[1], ts[1]);
@@ -453,7 +452,8 @@ namespace EdgeSLAM {
 		find_betas_approx_3(L_6x10, Rho, Betas[3]);
 		gauss_newton(L_6x10, Rho, Betas[3]);
 		rep_errors[3] = compute_R_and_t(Ut, Betas[3], Rs[3], ts[3]);
-
+		std::cout << Betas[1].t() << " " << Betas[2].t() << " " << Betas[3].t() << std::endl;
+		std::cout << rep_errors[1] << " " << rep_errors[2] << " " << rep_errors[3] << std::endl;
 		int N = 1;
 		if (rep_errors[2].at<double>(0) < rep_errors[1].at<double>(0)) N = 2;
 		if (rep_errors[3].at<double>(0) < rep_errors[N].at<double>(0)) N = 3;
@@ -687,16 +687,16 @@ namespace EdgeSLAM {
 
 		for (int i = 0; i < 6; i++) {
 			int idx = 0;
-			l_6x10.at<double>(i, idx++) = dot(dv[0][i], dv[0][i]);
+			l_6x10.at<double>(i, idx++) =		 dot(dv[0][i], dv[0][i]);
 			l_6x10.at<double>(i, idx++) = 2.0f * dot(dv[0][i], dv[1][i]);
-			l_6x10.at<double>(i, idx++) = dot(dv[1][i], dv[1][i]);
+			l_6x10.at<double>(i, idx++) =		 dot(dv[1][i], dv[1][i]);
 			l_6x10.at<double>(i, idx++) = 2.0f * dot(dv[0][i], dv[2][i]);
 			l_6x10.at<double>(i, idx++) = 2.0f * dot(dv[1][i], dv[2][i]);
-			l_6x10.at<double>(i, idx++) = dot(dv[2][i], dv[2][i]);
+			l_6x10.at<double>(i, idx++) =		 dot(dv[2][i], dv[2][i]);
 			l_6x10.at<double>(i, idx++) = 2.0f * dot(dv[0][i], dv[3][i]);
 			l_6x10.at<double>(i, idx++) = 2.0f * dot(dv[1][i], dv[3][i]);
 			l_6x10.at<double>(i, idx++) = 2.0f * dot(dv[2][i], dv[3][i]);
-			l_6x10.at<double>(i, idx++) = dot(dv[3][i], dv[3][i]);
+			l_6x10.at<double>(i, idx++) =		 dot(dv[3][i], dv[3][i]);
 		}
 	}
 
@@ -768,7 +768,7 @@ namespace EdgeSLAM {
 		}
 	}
 
-	void PnPSolver::gauss_newton(cv::Mat L_6x10, cv::Mat Rho, cv::Mat betas)
+	void PnPSolver::gauss_newton(cv::Mat L_6x10, cv::Mat Rho, cv::Mat& betas)
 	{
 		const int iterations_number = 5;
 

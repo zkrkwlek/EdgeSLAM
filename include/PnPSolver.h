@@ -15,8 +15,8 @@ namespace EdgeSLAM {
 		PnPSolver(Frame *F,std::vector<MapPoint*> vpMapPointMatches);
 		virtual ~PnPSolver();
 
-		void SetRansacParameters(double probability = 0.99, int minInliers = 8, int maxIterations = 300, int minSet = 4, float epsilon = 0.4,
-			float th2 = 5.991);
+		void SetRansacParameters(double probability = 0.99, int minInliers = 8, int maxIterations = 300, int minSet = 4, double epsilon = 0.4,
+			double th2 = 5.991);
 
 		cv::Mat find(std::vector<bool> &vbInliers, int &nInliers);
 
@@ -32,7 +32,7 @@ namespace EdgeSLAM {
 		void add_correspondence(const double X, const double Y, const double Z,
 			const double u, const double v);
 
-		double compute_pose(cv::Mat R, cv::Mat t);
+		double compute_pose(cv::Mat& R, cv::Mat& t);
 
 		double reprojection_error(cv::Mat R, cv::Mat t);
 
@@ -53,7 +53,7 @@ namespace EdgeSLAM {
 		void compute_rho(cv::Mat& rho);
 		void compute_L_6x10(cv::Mat Ut,cv::Mat& l_6x10);
 
-		void gauss_newton(cv::Mat L_6x10, cv::Mat Rho, cv::Mat betas);
+		void gauss_newton(cv::Mat L_6x10, cv::Mat Rho, cv::Mat& betas);
 		void compute_A_and_b_gauss_newton(cv::Mat L_6x10, cv::Mat Rho, cv::Mat betas, Eigen::MatrixXd& A, Eigen::VectorXd& b);
 
 		double compute_R_and_t(cv::Mat ut, cv::Mat betas, cv::Mat& R, cv::Mat& t);
@@ -77,11 +77,11 @@ namespace EdgeSLAM {
 		std::vector<MapPoint*> mvpMapPointMatches;
 
 		// 2D Points
-		std::vector<cv::Point2f> mvP2D;
-		std::vector<float> mvSigma2;
+		std::vector<cv::Point2d> mvP2D;
+		std::vector<double> mvSigma2;
 
 		// 3D Points
-		std::vector<cv::Point3f> mvP3Dw;
+		std::vector<cv::Point3d> mvP3Dw;
 
 		// Index in Frame
 		std::vector<size_t> mvKeyPointIndices;
@@ -120,16 +120,16 @@ namespace EdgeSLAM {
 		int mRansacMaxIts;
 
 		// RANSAC expected inliers/total ratio
-		float mRansacEpsilon;
+		double mRansacEpsilon;
 
 		// RANSAC Threshold inlier/outlier. Max error e = dist(P1,T_12*P2)^2
-		float mRansacTh;
+		double mRansacTh;
 
 		// RANSAC Minimun Set used at each iteration
 		int mRansacMinSet;
 
 		// Max square error associated with scale level. Max error = th*th*sigma(level)*sigma(level)
-		std::vector<float> mvMaxError;
+		std::vector<double> mvMaxError;
 	};
 }
 #endif

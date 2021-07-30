@@ -15,6 +15,8 @@
 #include <Optimizer.h>
 #include <PnPSolver.h>
 #include <Visualizer.h>
+#include <Segmentator.h>
+#include <WebAPI.h>
 
 #include <chrono>
 namespace EdgeSLAM {
@@ -49,6 +51,8 @@ namespace EdgeSLAM {
 				trackState = UserState::Success;
 				auto kf1 = system->mpInitializer->mpInitKeyFrame1;
 				auto kf2 = system->mpInitializer->mpInitKeyFrame2;
+				map->mvpKeyFrameOrigins.push_back(kf1);
+				map->mvpKeyFrameOrigins.push_back(kf2);
 				user->mapKeyFrames[kf1->mnId] = kf1;
 				user->mapKeyFrames[kf2->mnId] = kf2;
 				user->mnReferenceKeyFrameID = kf2->mnId;
@@ -59,14 +63,19 @@ namespace EdgeSLAM {
 		}
 		int nInliers = 0;
 		if (mapState == MapState::Initialized) {
+			bool bTrack = false;
 			if (userState == UserState::NotEstimated) {
 				//global localization
 				//set reference keyframe and last keyframe
-				user->mnLastRelocFrameId = frame->mnFrameID;
-
+				frame->reset_map_points();
+				bTrack = system->mpTracker->Relocalization(map, user, frame, system->mpFeatureTracker->min_descriptor_distance);
+				if (bTrack) {
+					user->mnLastRelocFrameId = frame->mnFrameID;
+					trackState = UserState::Success;
+				}
 			}
 			else {
-				bool bTrack = false;
+				
 				if (userState == UserState::Success) {
 					//std::cout << "Tracker::Start" << std::endl;
 					auto f_ref = user->mapFrames[user->mnPrevFrameID];
@@ -78,7 +87,6 @@ namespace EdgeSLAM {
 				}
 				if (userState == UserState::Failed) {
 					frame->reset_map_points();
-					//std::cout << "Tracker::Relocalization" << std::endl;
 					bTrack = system->mpTracker->Relocalization(map, user, frame, system->mpFeatureTracker->min_descriptor_distance);
 					if (bTrack) {
 						user->mnLastRelocFrameId = frame->mnFrameID;
@@ -102,27 +110,33 @@ namespace EdgeSLAM {
 				if (bTrack)
 					trackState = UserState::Success;
 			}
-			if (userState == UserState::Failed) {
-				//subsection relocalization
-				//pose failure handler
-				//set reference keyframe and last keyframe
-				//
-			}
-			if (userState == UserState::Success) {
-
-				
-			}
+			//if (userState == UserState::Failed) {
+			//	//subsection relocalization
+			//	//pose failure handler
+			//	//set reference keyframe and last keyframe
+			//	//
+			//}
+			//if (userState == UserState::Success) {
+			//	
+			//}
 		}
 
 		////update user frame
 		user->SetState(trackState);
 		if (trackState == UserState::Success) {
+
+			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+			std::stringstream ss;
+			ss << "/Store?keyword=Pose&id=" << id << "&src=" << user->userName;
+			auto res = mpAPI->Send(ss.str(), "");
+
 			//pose update
 			user->UpdatePose(frame->GetPose());
 			//check keyframe
 			auto ref = user->mapKeyFrames[user->mnReferenceKeyFrameID];
-			if (system->mpTracker->NeedNewKeyFrame(map, system->mpLocalMapper, frame, ref, nInliers, user->mnLastKeyFrameID.load(), user->mnLastRelocFrameId.load())) {
+			if (user->mbMapping && system->mpTracker->NeedNewKeyFrame(map, system->mpLocalMapper, frame, ref, nInliers, user->mnLastKeyFrameID.load(), user->mnLastRelocFrameId.load())) {
 				system->mpTracker->CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, user);
+				Segmentator::RequestSegmentation(user->userName,frame->mnFrameID);
 			}
 		}
 		user->mapFrames[frame->mnFrameID] = frame;
@@ -132,7 +146,7 @@ namespace EdgeSLAM {
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		float t_test1 = du_test1 / 1000.0;
-		std::cout << id << ", " << frame->mvKeys.size() <<"="<<nInliers<< "=" << t_test1 << std::endl;
+		std::cout <<"Frame = "<<user->userName<<" : "<< id <<", Matches = "<<nInliers<< ", time =" << t_test1 << std::endl;
 
 		if (mapState == MapState::Initialized && userState != UserState::NotEstimated) {
 			for (int i = 0; i < frame->mvKeys.size(); i++) {
@@ -214,18 +228,17 @@ namespace EdgeSLAM {
 			thRadius = 5.0;
 
 		int a = SearchPoints::SearchMapByProjection(cur, vpLocalMPs, thMaxDesc, thMinDesc, thRadius);
-		std::cout << "match local map = " << vpLocalKFs.size() << " " << vpLocalMPs.size() <<", "<<nMatch<< "=" << a << std::endl;
+		//std::cout << "match local map = " << vpLocalKFs.size() << " " << vpLocalMPs.size() <<", "<<nMatch<< "=" << a << std::endl;
 		Optimizer::PoseOptimization(cur);
 		return UpdateFoundPoints(cur);
 	}
 
 	bool Tracker::Relocalization(Map* map, User* user, Frame* cur, float thMinDesc) {
-		std::cout << "Relocalization!!!" << std::endl;
 
 		cur->ComputeBoW();
 
 		std::vector<KeyFrame*> vpCandidateKFs = map->mpKeyFrameDB->DetectRelocalizationCandidates(cur);
-		std::cout << "Candidates = " << vpCandidateKFs.size() << std::endl;
+		
 		if (vpCandidateKFs.empty())
 			return false;
 
@@ -254,7 +267,6 @@ namespace EdgeSLAM {
 			{
 				
 				int nmatches = SearchPoints::SearchFrameByBoW(cur->matcher, pKF, cur, vvpMapPointMatches[i], thMinDesc, 0.75);
-				std::cout << "BoW Match = " << nmatches << std::endl;
 				if (nmatches<15)
 				{
 					vbDiscarded[i] = true;
@@ -269,7 +281,7 @@ namespace EdgeSLAM {
 				}
 			}
 		}
-		std::cout << "SolvePnP::Start" << std::endl;
+		
 		// Alternatively perform some iterations of P4P RANSAC
 		// Until we found a camera pose supported by enough inliers
 		bool bMatch = false;
@@ -285,87 +297,73 @@ namespace EdgeSLAM {
 				std::vector<bool> vbInliers;
 				int nInliers;
 				bool bNoMore;
-				std::cout << "PnP::Iterate::Start" << std::endl;
-				PnPSolver* pSolver = vpPnPsolvers[i];
-				cv::Mat Tcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers);
-				std::cout << "PnP::Iterate::Start" << std::endl;
-				// If Ransac reachs max. iterations discard keyframe
-				if (bNoMore)
-				{
+				
+				if (vvpMapPointMatches[i].size() < 10) {
 					vbDiscarded[i] = true;
 					nCandidates--;
+					continue;
 				}
 
-				// If a Camera Pose is computed, optimize
-				if (!Tcw.empty())
+				cur->SetPose(vpCandidateKFs[i]->GetPose());
+				std::set<MapPoint*> sFound;
+				for (size_t j = 0, jend = vvpMapPointMatches[i].size(); j <jend; j++)
 				{
-					cur->SetPose(Tcw);
+					MapPoint* pMP = vvpMapPointMatches[i][j];
 
-					std::set<MapPoint*> sFound;
-
-					const int np = vbInliers.size();
-
-					for (int j = 0; j<np; j++)
+					if (pMP && !pMP->isBad())
 					{
-						if (vbInliers[j])
-						{
-							cur->mvpMapPoints[j] = vvpMapPointMatches[i][j];
-							sFound.insert(vvpMapPointMatches[i][j]);
-						}
-						else
-							cur->mvpMapPoints[j] = nullptr;
+						cur->mvpMapPoints[j] = vvpMapPointMatches[i][j];
+						sFound.insert(vvpMapPointMatches[i][j]);
 					}
+				}
 
-					int nGood = Optimizer::PoseOptimization(cur);
+				int nGood = Optimizer::PoseOptimization(cur);
+				if (nGood < 10){
+					vbDiscarded[i] = true;
+					nCandidates--;
+					continue;
+				}
+				for (int io = 0; io<cur->N; io++)
+					if (cur->mvbOutliers[io])
+						cur->mvpMapPoints[io] = static_cast<MapPoint*>(NULL);
 
-					if (nGood<10)
-						continue;
-
-					for (int io = 0; io<cur->N; io++)
-						if (cur->mvbOutliers[io])
-							cur->mvpMapPoints[io] = static_cast<MapPoint*>(NULL);
-
-					// If few inliers, search by projection in a coarse window and optimize again
-					if (nGood<50)
+				if (nGood<50)
+				{
+					int nadditional = SearchPoints::SearchFrameByProjection(cur->matcher, cur, vpCandidateKFs[i], sFound, 10, 100);
+					if (nadditional + nGood >= 50)
 					{
-						int nadditional = SearchPoints::SearchFrameByProjection(cur->matcher,cur, vpCandidateKFs[i], sFound, 10, 100);
-						if (nadditional + nGood >= 50)
+						nGood = Optimizer::PoseOptimization(cur);
+
+						// If many inliers but still not enough, search by projection again in a narrower window
+						// the camera has been already optimized with many points
+						if (nGood>30 && nGood<50)
 						{
-							nGood = Optimizer::PoseOptimization(cur);
-
-							// If many inliers but still not enough, search by projection again in a narrower window
-							// the camera has been already optimized with many points
-							if (nGood>30 && nGood<50)
+							sFound.clear();
+							for (int ip = 0; ip<cur->N; ip++)
+								if (cur->mvpMapPoints[ip])
+									sFound.insert(cur->mvpMapPoints[ip]);
+							nadditional = SearchPoints::SearchFrameByProjection(cur->matcher, cur, vpCandidateKFs[i], sFound, 3, 64);
+							// Final optimization
+							if (nGood + nadditional >= 50)
 							{
-								sFound.clear();
-								for (int ip = 0; ip<cur->N; ip++)
-									if (cur->mvpMapPoints[ip])
-										sFound.insert(cur->mvpMapPoints[ip]);
-								nadditional = SearchPoints::SearchFrameByProjection(cur->matcher,cur, vpCandidateKFs[i], sFound, 3, 64);
-								// Final optimization
-								if (nGood + nadditional >= 50)
-								{
-									nGood = Optimizer::PoseOptimization(cur);
+								nGood = Optimizer::PoseOptimization(cur);
 
-									for (int io = 0; io<cur->N; io++)
-										if (cur->mvbOutliers[io])
-											cur->mvpMapPoints[io] = NULL;
-								}
+								for (int io = 0; io<cur->N; io++)
+									if (cur->mvbOutliers[io])
+										cur->mvpMapPoints[io] = NULL;
 							}
 						}
 					}
-
-
-					// If the pose is supported by enough inliers stop ransacs and continue
-					if (nGood >= 50)
-					{
-						bMatch = true;
-						break;
-					}
 				}
+				if (nGood >= 50)
+				{
+					bMatch = true;
+					break;
+				}
+				
+				continue;
 			}
 		}
-		std::cout << "SolvePnP::End" << std::endl;
 		if (!bMatch)
 		{
 			return false;
@@ -375,8 +373,6 @@ namespace EdgeSLAM {
 			user->mnLastRelocFrameId = cur->mnFrameID;
 			return true;
 		}
-
-		return false;
 	}
 
 	int Tracker::UpdateVisiblePoints(Frame* cur, std::vector<MapPoint*> vpLocalMPs) {
@@ -447,7 +443,7 @@ namespace EdgeSLAM {
 			return false;
 
 		// If Local Mapping is freezed by a Loop Closure do not insert keyframes
-		if (mapper->isStopped() || mapper->stopRequested())
+		if (map->isStopped() || map->stopRequested())
 			return false;
 
 		const int nKFs = map->GetNumKeyFrames();
@@ -492,13 +488,13 @@ namespace EdgeSLAM {
 
 	void Tracker::CreateNewKeyFrame(ThreadPool::ThreadPool* pool, SLAM* system, Map* map, LocalMapper* mapper, Frame* cur, User* user)
 	{
-		if (!mapper->SetNotStop(true))
+		if (!map->SetNotStop(true))
 			return;
 		KeyFrame* pKF = new KeyFrame(cur, map);
 		user->mnReferenceKeyFrameID = pKF->mnId;
 		user->mnLastKeyFrameID = cur->mnFrameID;
 		user->mapKeyFrames[pKF->mnId] = pKF;
 		pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, pKF);
-		mapper->SetNotStop(false);
+		map->SetNotStop(false);
 	}
 }

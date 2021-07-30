@@ -123,7 +123,7 @@ namespace EdgeSLAM {
 		if (mBowVec.empty())
 		{
 			std::vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
-			mpVoc->transform(vCurrentDesc, mBowVec, mFeatVec, 6);  // 5 is better
+			mpVoc->transform(vCurrentDesc, mBowVec, mFeatVec, 4);  // 5 is better
 		}
 	}
 
@@ -243,5 +243,19 @@ namespace EdgeSLAM {
 			return false;
 
 		return true;
+	}
+
+	void Frame::TurnOnFlag(unsigned char opt) {
+		std::unique_lock<std::mutex>(mMutexFlag);
+		mnFlag |= opt;
+	}
+	void Frame::TurnOffFlag(unsigned char opt) {
+		std::unique_lock<std::mutex>(mMutexFlag);
+		mnFlag &= ~opt;
+	}
+	bool Frame::CheckFlag(unsigned char opt) {
+		std::unique_lock<std::mutex>(mMutexFlag);
+		unsigned char flag = mnFlag & opt;
+		return flag == opt;
 	}
 }

@@ -22,6 +22,7 @@ namespace EdgeSLAM {
 		mbFirstConnection(true), mpParent(nullptr), mbNotErase(false),
 		mbToBeErased(false), mbBad(false), mpMap(pMap), mpCamera(F->mpCamera)
 	{
+		F->mnKeyFrameId = this->mnId;
 		mGrid.resize(mnGridCols);
 		for (int i = 0; i<mnGridCols; i++)
 		{
@@ -572,7 +573,7 @@ namespace EdgeSLAM {
 		if (mBowVec.empty())
 		{
 			std::vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
-			mpVoc->transform(vCurrentDesc, mBowVec, mFeatVec, 6);  // 5 is better
+			mpVoc->transform(vCurrentDesc, mBowVec, mFeatVec, 4);  // 5 is better
 		}
 	}
 	////DBoW

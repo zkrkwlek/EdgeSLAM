@@ -4,9 +4,15 @@
 #include <MapPoint.h>
 #include <KeyFrameDB.h>
 #include <User.h>
+#include <windows.h>
 
 namespace EdgeSLAM {
-	Map::Map(DBoW3::Vocabulary* voc):mnNumMappingFrames(0), mnNextKeyFrameID(0), mnNextMapPointID(0), mState(MapState::NoImages){
+	Map::Map(DBoW3::Vocabulary* voc, bool bFixScale):mnMaxKFid(0), mnBigChangeIdx(0), mnNumMappingFrames(0), mnNumLoopClosingFrames(0), mnNextKeyFrameID(0), mnNextMapPointID(0), mState(MapState::NoImages), mpVoc(voc),
+		mbResetRequested(false), mbFinishRequested(false), mbFinished(true),
+		mbAbortBA(false), mbStopped(false), mbStopRequested(false), mbNotStop(false),
+		mpMatchedKF(nullptr), mnLastLoopKFid(0), mbRunningGBA(false), mbFinishedGBA(true),
+		mbStopGBA(false), mpThreadGBA(nullptr), mbFixScale(bFixScale), mnFullBAIdx(0)
+	{
 		mpKeyFrameDB = new KeyFrameDB(voc);
 	}
 	/*Map::Map(ORBVocabulary* voc) : mnNumMappingFrames(0), mnNextKeyFrameID(0), mnNextMapPointID(0), mState(MapState::NoImages) {
@@ -52,6 +58,8 @@ namespace EdgeSLAM {
 			mpPrevKF = mpCurrKF;
 			mpCurrKF = pF;*/
 		}
+		if (pF->mnId > mnMaxKFid)
+			mnMaxKFid = pF->mnId;
 	}
 	void Map::RemoveKeyFrame(KeyFrame* pF){
 		std::unique_lock<std::mutex> lock(mMutexKFs);
@@ -83,12 +91,123 @@ namespace EdgeSLAM {
 					delete pKF;
 				}
 			}
+
+			mvpKeyFrameOrigins.clear();
 			mnNextKeyFrameID = 0;
 			mnNextMapPointID = 0;
 			mlpNewMPs.clear();
 			mState = MapState::NoImages;
+
+			//add variable
 		}
 	}
+
+	void Map::InformNewBigChange()
+	{
+		mnBigChangeIdx++;
+	}
+
+	int Map::GetLastBigChangeIdx()
+	{
+		return mnBigChangeIdx.load();
+	}
+
+	//////////////Thread sync
+	void Map::RequestStop()
+	{
+		mbStopRequested = true;
+		mbAbortBA = true;
+	}
+	bool Map::Stop()
+	{
+		if (mbStopRequested && !mbNotStop)
+		{
+			mbStopped = true;
+			return true;
+		}
+		return false;
+	}
+	bool Map::isStopped()
+	{
+		return mbStopped;
+	}
+	bool Map::stopRequested()
+	{
+		return mbStopRequested.load();
+	}
+	bool Map::SetNotStop(bool flag)
+	{
+
+		if (flag && mbStopped)
+			return false;
+		mbNotStop = flag;
+		return true;
+	}
+	void Map::Release()
+	{
+		if (mbFinished)
+			return;
+		mbStopped = false;
+		mbStopRequested = false;
+		/*for (std::list<KeyFrame*>::iterator lit = mlNewKeyFrames.begin(), lend = mlNewKeyFrames.end(); lit != lend; lit++)
+		delete *lit;
+		mlNewKeyFrames.clear();*/
+	}
+	void Map::RequestReset()
+	{
+		{
+			mbResetRequested = true;
+		}
+
+		while (1)
+		{
+			{
+				if (!mbResetRequested)
+					break;
+			}
+			Sleep(3000);
+		}
+	}
+
+	void Map::ResetIfRequested()
+	{
+		if (mbResetRequested)
+		{
+			//mlNewKeyFrames.clear();
+			//mlpRecentAddedMapPoints.clear();
+			mbResetRequested = false;
+		}
+	}
+
+	void Map::RequestFinish()
+	{
+		mbFinishRequested = true;
+	}
+
+	bool Map::CheckFinish()
+	{
+		return mbFinishRequested.load();
+	}
+
+	void Map::SetFinish()
+	{
+		mbFinished = true;
+		mbStopped = true;
+	}
+
+	bool Map::isFinished()
+	{
+		return mbFinished.load();
+	}
+
+	bool Map::isRunningGBA(){
+		return mbRunningGBA.load();
+	}
+	bool Map::isFinishedGBA(){
+		return mbFinishedGBA.load();
+	}
+
+	//////////////Thread sync
 
 	////////////////Local Map
 	LocalMap::LocalMap(){}

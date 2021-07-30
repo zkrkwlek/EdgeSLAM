@@ -9,12 +9,10 @@
 #include <SearchPoints.h>
 #include <Optimizer.h>
 #include <Utils.h>
-#include <windows.h>
 #include <chrono>
 
 namespace EdgeSLAM {
-	LocalMapper::LocalMapper():mbResetRequested(false), mbFinishRequested(false), mbFinished(true), 
-		mbAbortBA(false), mbStopped(false), mbStopRequested(false), mbNotStop(false)
+	LocalMapper::LocalMapper()
 	{}
 	LocalMapper::~LocalMapper(){}
 
@@ -27,7 +25,7 @@ namespace EdgeSLAM {
 		if(map->mnNumMappingFrames == 1)
 			pMapper->SearchInNeighbors(map, targetKF);
 		map->mbAbortBA = false;
-		if (map->mnNumMappingFrames == 1 && !pMapper->stopRequested())
+		if (map->mnNumMappingFrames == 1 && !map->stopRequested())
 		{
 			if (map->GetNumKeyFrames() > 2) {
 				//std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
@@ -438,122 +436,7 @@ namespace EdgeSLAM {
 	}
 
 	////thread process
-	void LocalMapper::RequestStop()
-	{
-		std::unique_lock<std::mutex> lock(mMutexStop);
-		mbStopRequested = true;
-		std::unique_lock<std::mutex> lock2(mMutexNewKFs);
-		mbAbortBA = true;
-	}
 
-	bool LocalMapper::Stop()
-	{
-		std::unique_lock<std::mutex> lock(mMutexStop);
-		if (mbStopRequested && !mbNotStop)
-		{
-			mbStopped = true;
-			return true;
-		}
-
-		return false;
-	}
-
-	bool LocalMapper::isStopped()
-	{
-		std::unique_lock<std::mutex> lock(mMutexStop);
-		return mbStopped;
-	}
-
-	bool LocalMapper::stopRequested()
-	{
-		std::unique_lock<std::mutex> lock(mMutexStop);
-		return mbStopRequested;
-	}
-
-	void LocalMapper::Release()
-	{
-		std::unique_lock<std::mutex> lock(mMutexStop);
-		std::unique_lock<std::mutex> lock2(mMutexFinish);
-		if (mbFinished)
-			return;
-		mbStopped = false;
-		mbStopRequested = false;
-		/*for (std::list<KeyFrame*>::iterator lit = mlNewKeyFrames.begin(), lend = mlNewKeyFrames.end(); lit != lend; lit++)
-			delete *lit;
-		mlNewKeyFrames.clear();*/
-
-	}
-	bool LocalMapper::SetNotStop(bool flag)
-	{
-		std::unique_lock<std::mutex> lock(mMutexStop);
-
-		if (flag && mbStopped)
-			return false;
-
-		mbNotStop = flag;
-
-		return true;
-	}
-
-	void LocalMapper::InterruptBA()
-	{
-		std::cout << "Interrupt!!!!" << std::endl;
-		mbAbortBA = true;
-	}
-
-	void LocalMapper::RequestReset()
-	{
-		{
-			std::unique_lock<std::mutex> lock(mMutexReset);
-			mbResetRequested = true;
-		}
-
-		while (1)
-		{
-			{
-				std::unique_lock<std::mutex> lock2(mMutexReset);
-				if (!mbResetRequested)
-					break;
-			}
-			Sleep(3000);
-		}
-	}
-
-	void LocalMapper::ResetIfRequested()
-	{
-		std::unique_lock<std::mutex> lock(mMutexReset);
-		if (mbResetRequested)
-		{
-			//mlNewKeyFrames.clear();
-			//mlpRecentAddedMapPoints.clear();
-			mbResetRequested = false;
-		}
-	}
-
-	void LocalMapper::RequestFinish()
-	{
-		std::unique_lock<std::mutex> lock(mMutexFinish);
-		mbFinishRequested = true;
-	}
-
-	bool LocalMapper::CheckFinish()
-	{
-		std::unique_lock<std::mutex> lock(mMutexFinish);
-		return mbFinishRequested;
-	}
-
-	void LocalMapper::SetFinish()
-	{
-		std::unique_lock<std::mutex> lock(mMutexFinish);
-		mbFinished = true;
-		std::unique_lock<std::mutex> lock2(mMutexStop);
-		mbStopped = true;
-	}
-
-	bool LocalMapper::isFinished()
-	{
-		std::unique_lock<std::mutex> lock(mMutexFinish);
-		return mbFinished;
-	}
+	
 	////thread process
 }

@@ -28,6 +28,8 @@ namespace EdgeSLAM {
 		void Track(cv::Mat im, int id,User* user, double ts = 0.0);
 		void LoadVocabulary();
 		void InitVisualizer(std::string user,std::string name, int w, int h);
+		void ProcessSegmentation(std::string user, int id);
+		void ProcessDepthEstimation(std::string user, int id);
 	public:
 		ThreadPool::ThreadPool* pool;
 		Initializer* mpInitializer;
