@@ -23,6 +23,7 @@ namespace EdgeSLAM {
 	class FeatureDetector;
 	class FeatureTracker;
 	class MapPoint;
+	class TrackPoint;
 	class Frame {
 	public:
 		Frame();
@@ -30,6 +31,7 @@ namespace EdgeSLAM {
 		Frame(cv::Mat img, Camera* pCam, int id, double time_stamp = 0.0);
 		virtual ~Frame();
 	public:
+		bool is_in_frustum(MapPoint* pMP, TrackPoint* pTP, float viewingCosLimit);
 		bool is_in_frustum(MapPoint* pMP, float viewingCosLimit);
 		bool is_in_image(float x, float y, float z = 1.0);
 		void reset_map_points();
@@ -37,7 +39,7 @@ namespace EdgeSLAM {
 	public:
 		int mnKeyFrameId;
 		int N;
-		cv::Mat K, D;
+		cv::Mat K, D, InvK;
 		float fx, fy, cx, cy, invfx, invfy;
 		bool mbDistorted;
 		int FRAME_GRID_COLS;
@@ -63,13 +65,14 @@ namespace EdgeSLAM {
 		cv::Mat imgColor, imgGray;
 		static FeatureDetector* detector;
 		static FeatureTracker* matcher;
-		CameraPose* mpCamPose;
+		
 		double mdTimeStamp;
-
 		int mnFrameID;
 		std::vector<cv::KeyPoint> mvKeys;
 		std::vector<cv::KeyPoint> mvKeysUn;
 		std::vector<MapPoint*> mvpMapPoints;
+		std::set<MapPoint*> mspMapPoints;
+		std::vector<TrackPoint*> mvpTrackPoints;
 		std::vector<bool> mvbOutliers;
 		cv::Mat mDescriptors;
 		////Ref Frame mpReferenceKF
@@ -85,6 +88,7 @@ namespace EdgeSLAM {
 	public:
 		////implement pose function from CameraPose class
 		Camera* mpCamera;
+		CameraPose* mpCamPose;
 		void SetPose(const cv::Mat &Tcw);
 		cv::Mat GetPose();
 		cv::Mat GetPoseInverse();

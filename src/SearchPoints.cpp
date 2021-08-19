@@ -142,12 +142,7 @@ namespace EdgeSLAM {
 	}
 	int SearchPoints::SearchFrameByBoW(FeatureTracker* pFeatureTracker, KeyFrame* pKF, Frame *F, std::vector<MapPoint*> &vpMapPointMatches, float thMinDesc, float thMatchRatio, bool bCheckOri) {
 		const auto vpMapPointsKF = pKF->GetMapPointMatches();
-
-		int ntemp = 0;
-		for (int i = 0; i < vpMapPointsKF.size(); i++)
-			if (vpMapPointsKF[i])
-				ntemp++;
-		std::cout << "kf = " << ntemp << std::endl;
+		
 		vpMapPointMatches = std::vector<MapPoint*>(F->N, static_cast<MapPoint*>(nullptr));
 
 		const DBoW3::FeatureVector &vFeatVecKF = pKF->mFeatVec;
@@ -642,7 +637,7 @@ namespace EdgeSLAM {
 
 		return nmatches;
 	}
-	int SearchPoints::SearchMapByProjection(Frame *F, const std::vector<MapPoint*> &vpMapPoints, float thMaxDesc, float thMinDesc, float thRadius, float thMatchRatio, bool bCheckOri)
+	int SearchPoints::SearchMapByProjection(Frame *F, const std::vector<MapPoint*> &vpMapPoints, const std::vector<TrackPoint*> &vpTrackPoints, float thMaxDesc, float thMinDesc, float thRadius, float thMatchRatio, bool bCheckOri)
 	{
 		int nmatches = 0;
 		const bool bFactor = thRadius != 1.0;
@@ -650,19 +645,21 @@ namespace EdgeSLAM {
 		for (size_t iMP = 0; iMP<vpMapPoints.size(); iMP++)
 		{
 			MapPoint* pMP = vpMapPoints[iMP];
-			if (!pMP->mbTrackInView || pMP->isBad()){
+			TrackPoint* pTP = vpTrackPoints[iMP];
+
+			if (!pTP->mbTrackInView || pMP->isBad()){
 				continue;
 			}
-			const int &nPredictedLevel = pMP->mnTrackScaleLevel;
+			const int &nPredictedLevel = pTP->mnTrackScaleLevel;
 
 			// The size of the window will depend on the viewing direction
-			float r = RadiusByViewingCos(pMP->mTrackViewCos);
+			float r = RadiusByViewingCos(pTP->mTrackViewCos);
 
 			if (bFactor)
 				r *= thRadius;
 
 			const std::vector<size_t> vIndices =
-				F->GetFeaturesInArea(pMP->mTrackProjX, pMP->mTrackProjY, r*F->mvScaleFactors[nPredictedLevel], nPredictedLevel - 1, nPredictedLevel);
+				F->GetFeaturesInArea(pTP->mTrackProjX, pTP->mTrackProjY, r*F->mvScaleFactors[nPredictedLevel], nPredictedLevel - 1, nPredictedLevel);
 			
 			if (vIndices.empty()){
 				continue;

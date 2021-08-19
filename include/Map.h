@@ -16,6 +16,7 @@ namespace EdgeSLAM {
 		NoImages, NotInitialized, Initialized, NeedNewKeyFrame
 	};
 	class MapPoint;
+	class TrackPoint;
 	class KeyFrame;
 	class Frame;
 	class LocalMap;
@@ -36,6 +37,7 @@ namespace EdgeSLAM {
 		int GetNumMapPoints();
 
 		void AddKeyFrame(KeyFrame* pF);
+		KeyFrame* GetKeyFrame(int id);
 		void RemoveKeyFrame(KeyFrame* pF);
 		std::vector<KeyFrame*> GetAllKeyFrames();
 		int GetNumKeyFrames();
@@ -106,9 +108,18 @@ namespace EdgeSLAM {
 	private:
 		std::mutex mMutexMPs, mMutexKFs, mMutexLocalMap;
 		std::set<MapPoint*> mspMapPoints;
-		std::set<KeyFrame*> mspKeyFrames;
+		std::map<int, KeyFrame*> mmpKeyFrames;
 		LocalMap* mpLocalMap;
 		////local map??
+	////Depth Test
+	public:
+		std::vector<cv::Mat> GetDepthMPs();
+		void ClearDepthMPs();
+		void AddDepthMP(cv::Mat m);
+	private:
+		std::mutex mMutexDepthTest;
+		std::vector<cv::Mat> mvTempMPs;
+	////Depth Test
 	public:
 		MapState GetState();
 		void SetState(MapState stat);
@@ -126,9 +137,9 @@ namespace EdgeSLAM {
 		LocalMap();
 		virtual ~LocalMap();
 	public:
-		virtual void UpdateLocalMap(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs) {}
+		virtual void UpdateLocalMap(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs, std::vector<TrackPoint*>& vpLocalTPs) {}
 		virtual void UpdateLocalKeyFrames(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs) {}
-		virtual void UpdateLocalMapPoitns(Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs) {}
+		virtual void UpdateLocalMapPoitns(Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs, std::vector<TrackPoint*>& vpLocalTPs) {}
 	public:
 		/*std::vector<MapPoint*> mvpLocalMapPoints;
 		std::vector<KeyFrame*> mvpLocalKeyFrames;*/
@@ -227,9 +238,9 @@ namespace EdgeSLAM {
 		LocalCovisibilityMap();
 		virtual ~LocalCovisibilityMap();
 	public:
-		void UpdateLocalMap(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs);
+		void UpdateLocalMap(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs, std::vector<TrackPoint*>& vpLocalTPs);
 		void UpdateLocalKeyFrames(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs);
-		void UpdateLocalMapPoitns(Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs);
+		void UpdateLocalMapPoitns(Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs, std::vector<TrackPoint*>& vpLocalTPs);
 		//void UpdateKeyFrames
 	private:
 

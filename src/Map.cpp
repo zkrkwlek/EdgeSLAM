@@ -51,9 +51,10 @@ namespace EdgeSLAM {
 	}
 
 	void Map::AddKeyFrame(KeyFrame* pF){
+		int id = pF->mnId;
 		std::unique_lock<std::mutex> lock(mMutexKFs);
-		if (!mspKeyFrames.count(pF)) {
-			mspKeyFrames.insert(pF);
+		if (!mmpKeyFrames.count(id)) {
+			mmpKeyFrames[id] = pF;
 			/*pF->mnKeyFrameID = nServerKeyFrameID++;
 			mpPrevKF = mpCurrKF;
 			mpCurrKF = pF;*/
@@ -61,32 +62,45 @@ namespace EdgeSLAM {
 		if (pF->mnId > mnMaxKFid)
 			mnMaxKFid = pF->mnId;
 	}
-	void Map::RemoveKeyFrame(KeyFrame* pF){
+	KeyFrame* Map::GetKeyFrame(int id) {
 		std::unique_lock<std::mutex> lock(mMutexKFs);
-		if (mspKeyFrames.count(pF))
-			mspKeyFrames.erase(pF);
+		if (mmpKeyFrames.count(id))
+			return mmpKeyFrames[id];
+		return nullptr;
+	}
+	void Map::RemoveKeyFrame(KeyFrame* pF){
+		int id = pF->mnId;
+		std::unique_lock<std::mutex> lock(mMutexKFs);
+		if (mmpKeyFrames.count(id))
+			mmpKeyFrames.erase(id);
 	}
 	std::vector<KeyFrame*> Map::GetAllKeyFrames(){
 		std::unique_lock<std::mutex> lock(mMutexKFs);
-		return std::vector<KeyFrame*>(mspKeyFrames.begin(), mspKeyFrames.end());
+		std::vector<KeyFrame*> res;
+		for (auto iter = mmpKeyFrames.begin(), iend = mmpKeyFrames.end(); iter != iend; iter++)
+		{
+			auto pKF = iter->second;
+			res.push_back(pKF);
+		}
+		return std::vector<KeyFrame*>(res.begin(), res.end());
 	}
 	int Map::GetNumKeyFrames(){
 		std::unique_lock<std::mutex> lock(mMutexKFs);
-		return mspKeyFrames.size();
+		return mmpKeyFrames.size();
 	}
 	void Map::Delete(){
 		{
 			{
 				std::unique_lock<std::mutex> lock(mMutexMPs);
-				for (auto iter = mspKeyFrames.begin(), iend = mspKeyFrames.end(); iter != iend; iter++) {
-					delete *iter;
+				for (auto iter = mmpKeyFrames.begin(), iend = mmpKeyFrames.end(); iter != iend; iter++) {
+					delete iter->second;
 				}
 			}
 			{
 				std::unique_lock<std::mutex> lock(mMutexKFs);
-				for (auto iter = mspKeyFrames.begin(), iend = mspKeyFrames.end(); iter != iend; iter++)
+				for (auto iter = mmpKeyFrames.begin(), iend = mmpKeyFrames.end(); iter != iend; iter++)
 				{
-					auto pKF = *iter;
+					auto pKF = iter->second;
 					pKF->reset_map_points();
 					delete pKF;
 				}
@@ -111,6 +125,21 @@ namespace EdgeSLAM {
 	{
 		return mnBigChangeIdx.load();
 	}
+
+	/////Depth test
+	std::vector<cv::Mat> Map::GetDepthMPs() {
+		std::unique_lock<std::mutex> lock(mMutexDepthTest);
+		return std::vector<cv::Mat>(mvTempMPs.begin(), mvTempMPs.end());
+	}
+	void Map::ClearDepthMPs() {
+		std::unique_lock<std::mutex> lock(mMutexDepthTest);
+		mvTempMPs.clear();
+	}
+	void Map::AddDepthMP(cv::Mat m) {
+		std::unique_lock<std::mutex> lock(mMutexDepthTest);
+		mvTempMPs.push_back(m);
+	}
+	/////Depth test
 
 	//////////////Thread sync
 	void Map::RequestStop()
@@ -217,11 +246,9 @@ namespace EdgeSLAM {
 	LocalCovisibilityMap::~LocalCovisibilityMap() {
 
 	}
-	void LocalCovisibilityMap::UpdateLocalMap(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs) {
+	void LocalCovisibilityMap::UpdateLocalMap(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs, std::vector<TrackPoint*>& vpLocalTPs) {
 		UpdateLocalKeyFrames(user, f, vpLocalKFs);
-		//std::cout << "UpdateKF::endl" << std::endl;
-		UpdateLocalMapPoitns(f, vpLocalKFs, vpLocalMPs);
-		//std::cout << "UpdateMP::endl" << std::endl;
+		UpdateLocalMapPoitns(f, vpLocalKFs, vpLocalMPs, vpLocalTPs);
 	}
 	void LocalCovisibilityMap::UpdateLocalKeyFrames(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs) {
 		// Each map point vote for the keyframes in which it has been observed
@@ -239,13 +266,14 @@ namespace EdgeSLAM {
 				f->mvpMapPoints[i] = nullptr;
 			}
 		}
-		//std::cout << "2" << std::endl;
+		
 		if (keyframeCounter.empty())
 			return;
 
 		int max = 0;
 		KeyFrame* pKFmax = static_cast<KeyFrame*>(nullptr);
-		
+		std::set<KeyFrame*> spKFs;
+
 		// All keyframes that observe a map point are included in the local map. Also check which keyframe shares most points
 		for (std::map<KeyFrame*, int>::const_iterator it = keyframeCounter.begin(), itEnd = keyframeCounter.end(); it != itEnd; it++)
 		{
@@ -261,9 +289,8 @@ namespace EdgeSLAM {
 			}
 
 			vpLocalKFs.push_back(it->first);
-			pKF->mnTrackReferenceForFrame = nFrameID;
+			spKFs.insert(pKF);
 		}
-		//std::cout << "3" << std::endl;
 
 		// Include also some not-already-included keyframes that are neighbors to already-included keyframes
 		//for (std::vector<KeyFrame*>::const_iterator itKF = vpLocalKFs.begin(), itEndKF = vpLocalKFs.end(); itKF != itEndKF; itKF++)
@@ -280,14 +307,16 @@ namespace EdgeSLAM {
 			for (std::vector<KeyFrame*>::const_iterator itNeighKF = vNeighs.begin(), itEndNeighKF = vNeighs.end(); itNeighKF != itEndNeighKF; itNeighKF++)
 			{
 				KeyFrame* pNeighKF = *itNeighKF;
-				if (pNeighKF && !pNeighKF->isBad())
+				if (pNeighKF && !pNeighKF->isBad() && !spKFs.count(pNeighKF))
 				{
-					if (pNeighKF->mnTrackReferenceForFrame != nFrameID)
+					spKFs.insert(pNeighKF);
+					break;
+					/*if (pNeighKF->mnTrackReferenceForFrame != nFrameID)
 					{
 						vpLocalKFs.push_back(pNeighKF);
 						pNeighKF->mnTrackReferenceForFrame = nFrameID;
 						break;
-					}
+					}*/
 				}
 			}
 
@@ -295,37 +324,40 @@ namespace EdgeSLAM {
 			for (std::set<KeyFrame*>::const_iterator sit = spChilds.begin(), send = spChilds.end(); sit != send; sit++)
 			{
 				KeyFrame* pChildKF = *sit;
-				if (pChildKF && !pChildKF->isBad())
+				if (pChildKF && !pChildKF->isBad() && !spKFs.count(pChildKF))
 				{
-					if (pChildKF->mnTrackReferenceForFrame != nFrameID)
+					spKFs.insert(pChildKF);
+					break;
+					/*if (pChildKF->mnTrackReferenceForFrame != nFrameID)
 					{
 						vpLocalKFs.push_back(pChildKF);
 						pChildKF->mnTrackReferenceForFrame = nFrameID;
 						break;
-					}
+					}*/
 				}
 			}
 
 			KeyFrame* pParent = pKF->GetParent();
-			if (pParent && !pParent->isBad())
+			if (pParent && !pParent->isBad() && !spKFs.count(pParent))
 			{
-				if (pParent->mnTrackReferenceForFrame != nFrameID)
+				spKFs.insert(pParent);
+				break;
+				/*if (pParent->mnTrackReferenceForFrame != nFrameID)
 				{
 					vpLocalKFs.push_back(pParent);
 					pParent->mnTrackReferenceForFrame = nFrameID;
 					break;
-				}
+				}*/
 			}
 
 		}
-		//std::cout << "4" << std::endl;
 		if (pKFmax)
 		{
 			user->mnReferenceKeyFrameID = pKFmax->mnId;
 		}
-		//std::cout << "5" << std::endl;
 	}
-	void LocalCovisibilityMap::UpdateLocalMapPoitns(Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs){
+	void LocalCovisibilityMap::UpdateLocalMapPoitns(Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs, std::vector<TrackPoint*>& vpLocalTPs){
+		std::set<MapPoint*> spMPs;
 		for (std::vector<KeyFrame*>::const_iterator itKF = vpLocalKFs.begin(), itEndKF = vpLocalKFs.end(); itKF != itEndKF; itKF++)
 		{
 			KeyFrame* pKF = *itKF;
@@ -334,10 +366,12 @@ namespace EdgeSLAM {
 			for (std::vector<MapPoint*>::const_iterator itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
 			{
 				MapPoint* pMP = *itMP;
-				if (!pMP || pMP->isBad() || pMP->mnTrackReferenceForFrame == f->mnFrameID)
+				if (!pMP || pMP->isBad() || spMPs.count(pMP))
 					continue;
 				vpLocalMPs.push_back(pMP);
-				pMP->mnTrackReferenceForFrame = f->mnFrameID;
+				vpLocalTPs.push_back(new TrackPoint());
+				spMPs.insert(pMP);
+				//pMP->mnTrackReferenceForFrame = f->mnFrameID;
 			}
 		}
 	}

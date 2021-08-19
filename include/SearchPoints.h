@@ -12,6 +12,7 @@ namespace EdgeSLAM {
 	class Frame;
 	class KeyFrame;
 	class MapPoint;
+	class TrackPoint;
 	class FeatureTracker;
 	class SearchPoints {
 	public:
@@ -22,7 +23,7 @@ namespace EdgeSLAM {
 		static int SearchFrameByProjection(Frame* prev, Frame* curr, float thMaxDesc, float thMinDesc, float thProjection = 15, bool bCheckOri = true);
 		static int SearchFrameByProjection(FeatureTracker* pFeatureTracker,Frame *pF, KeyFrame *pKF, const std::set<MapPoint*> &sAlreadyFound, const float th, const int ORBdist, bool bCheckOri = true);
 		static int SearchKeyByProjection(FeatureTracker* pFeatureTracker, KeyFrame* pKF, cv::Mat Scw, const std::vector<MapPoint*> &vpPoints, std::vector<MapPoint*> &vpMatched, float thMinDesc, float thRadius = 10.0);
-		static int SearchMapByProjection(Frame *F, const std::vector<MapPoint*> &vpMapPoints, float thMaxDesc, float thMinDesc, float thRadius = 1.0, float thMatchRatio = 0.8, bool bCheckOri = true);
+		static int SearchMapByProjection(Frame *F, const std::vector<MapPoint*> &vpMapPoints, const std::vector<TrackPoint*> &vpTrackPoints, float thMaxDesc, float thMinDesc, float thRadius = 1.0, float thMatchRatio = 0.8, bool bCheckOri = true);
 		static int SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2, cv::Mat F12, std::vector<std::pair<size_t, size_t> > &vMatchedPairs, float thMaxDesc, float thMinDesc, float thRatio = 0.6, bool bCheckOri = false);
 		static int Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, float thMaxDesc, float thMinDesc, const float th = 3.0);
 		static int Fuse(FeatureTracker* pFeatureTracker, KeyFrame *pKF, cv::Mat Scw, const std::vector<MapPoint *> &vpPoints, std::vector<MapPoint *> &vpReplacePoint, float thMinDesc, float thRadius);

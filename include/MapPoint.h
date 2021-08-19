@@ -11,6 +11,23 @@ namespace EdgeSLAM {
 	class Frame;
 	class Map;
 	class FeatureTracker;
+	class TrackPoint {
+	public:
+		TrackPoint();
+		TrackPoint(float x, float y, float angle, float scale);
+		virtual ~TrackPoint();
+	public:
+		float mTrackProjX;
+		float mTrackProjY;
+		float mTrackProjXR;
+		bool mbTrackInView;
+		int mnTrackScaleLevel;
+		float mTrackViewCos;
+		long unsigned int mnTrackReferenceForFrame;
+		long unsigned int mnLastFrameSeen;
+
+	private:
+	};
 	class MapPoint
 	{
 	public:
@@ -64,14 +81,14 @@ namespace EdgeSLAM {
 		int nObs;
 
 		// Variables used by the tracking
-		float mTrackProjX;
+		/*float mTrackProjX;
 		float mTrackProjY;
 		float mTrackProjXR;
 		bool mbTrackInView;
 		int mnTrackScaleLevel;
 		float mTrackViewCos;
 		long unsigned int mnTrackReferenceForFrame;
-		long unsigned int mnLastFrameSeen;
+		long unsigned int mnLastFrameSeen;*/
 
 		// Variables used by local mapping
 		long unsigned int mnBALocalForKF;

@@ -199,6 +199,17 @@ namespace EdgeSLAM {
 					cv::Scalar color = cv::Scalar(0, 0, 0);
 					cv::circle(tempVis, tpt, 2, color, -1);
 				}
+
+				{
+					cv::Scalar color = cv::Scalar(0, 255, 255);
+					auto vDepth = mpMap->GetDepthMPs();
+					for (int i = 0; i < vDepth.size(); i++) {
+						cv::Mat x3D = vDepth[i];
+						cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+						tpt += mVisMidPt;
+						cv::circle(tempVis, tpt, 4, color, -1);
+					}
+				}
 			}
 
 			{
@@ -257,6 +268,9 @@ namespace EdgeSLAM {
 	bool Visualizer::isDoingProcess(){
 		std::unique_lock<std::mutex> lockTemp(mMutexDoingProcess);
 		return mbDoingProcess;
+	}
+	void Visualizer::ResizeImage(cv::Mat src, cv::Mat& dst) {
+		cv::resize(src, dst, cv::Size(mnWidth / 2.0, mnHeight / 2.0));
 	}
 	void Visualizer::SetOutputImage(cv::Mat out, int type){
 		std::unique_lock<std::mutex> lockTemp(mMutexOutput);

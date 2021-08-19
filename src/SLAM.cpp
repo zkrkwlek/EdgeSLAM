@@ -62,6 +62,7 @@ namespace EdgeSLAM {
 		if (bVis)
 			return;
 		bVis = true;
+		
 		mpVisualizer->Init(w, h);
 		mptVisualizer = new std::thread(&EdgeSLAM::Visualizer::Run, mpVisualizer);
 		mpVisualizer->SetMap(GetMap(name));

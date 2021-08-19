@@ -1,7 +1,3 @@
-
-
-
-
 #ifndef EDGE_SLAM_MOTION_MODEL_H
 #define EDGE_SLAM_MOTION_MODEL_H
 #pragma once

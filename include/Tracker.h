@@ -12,6 +12,7 @@ namespace EdgeSLAM {
 	class Frame;
 	class KeyFrame;
 	class MapPoint;
+	class TrackPoint;
 	class LocalMapper;
 	class Map;
 	class Tracker {
@@ -23,9 +24,9 @@ namespace EdgeSLAM {
 		bool TrackWithPrevFrame(Frame* prev, Frame* cur, float thMaxDesc, float thMinDesc);
 		int TrackWithLocalMap(User* user, Frame* cur, float thMaxDesc, float thMinDesc);
 		bool TrackWithKeyFrame(KeyFrame* ref, Frame* cur);
-		bool Relocalization(Map* map, User* user, Frame* cur, float thMinDesc);
+		int Relocalization(Map* map, User* user, Frame* cur, float thMinDesc);
 	private:
-		int UpdateVisiblePoints(Frame* cur, std::vector<MapPoint*> vpLocalMPs);
+		int UpdateVisiblePoints(Frame* cur, std::vector<MapPoint*> vpLocalMPs, std::vector<TrackPoint*> vpLocalTPs);
 		int UpdateFoundPoints(Frame* cur, bool bOnlyTracking = false);
 		bool NeedNewKeyFrame(Map* map, LocalMapper* mapper, Frame* cur, KeyFrame* ref, int nMatchesInliers, int nLastKeyFrameId, int nLastRelocFrameID, bool bOnlyTracking = false, int nMaxFrames = 30, int nMinFrames = 0);
 		void CreateNewKeyFrame(ThreadPool::ThreadPool* pool, SLAM* system, Map* map, LocalMapper* mapper, Frame* cur, User* user);

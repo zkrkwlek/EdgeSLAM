@@ -39,7 +39,7 @@ namespace EdgeSLAM {
 		bool mbMapping;
 
 		std::map<int, Frame*> mapFrames;
-		std::map<int, KeyFrame*> mapKeyFrames;
+		//std::map<int, KeyFrame*> mapKeyFrames;
 		std::atomic<bool> mbProgress;
 		std::atomic<int> mnReferenceKeyFrameID, mnLastKeyFrameID, mnPrevFrameID, mnCurrFrameID, mnLastRelocFrameId;
 	

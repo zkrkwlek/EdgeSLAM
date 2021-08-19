@@ -33,11 +33,12 @@ namespace EdgeSLAM {
 		Frame* frame = new Frame(im, cam, id, ts);
 		user->mnCurrFrameID = frame->mnFrameID;
 
-		std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
+		//std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
 		
 		auto mapState = map->GetState();
 		auto userState = user->GetState();
 		auto trackState = UserState::NotEstimated;
+		int nInliers = 0;
 		if (mapState == MapState::NoImages) {
 			//set reference frame
 			map->SetState(MapState::NotInitialized);
@@ -53,87 +54,131 @@ namespace EdgeSLAM {
 				auto kf2 = system->mpInitializer->mpInitKeyFrame2;
 				map->mvpKeyFrameOrigins.push_back(kf1);
 				map->mvpKeyFrameOrigins.push_back(kf2);
-				user->mapKeyFrames[kf1->mnId] = kf1;
-				user->mapKeyFrames[kf2->mnId] = kf2;
+				/*user->mapKeyFrames[kf1->mnId] = kf1;
+				user->mapKeyFrames[kf2->mnId] = kf2;*/
 				user->mnReferenceKeyFrameID = kf2->mnId;
 				user->mnLastKeyFrameID = frame->mnFrameID;
 				pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf1);
 				pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf2);
+
+				for (int i = 0; i < frame->N; i++)
+				{
+					if (frame->mvpMapPoints[i])
+					{
+						if (!frame->mvbOutliers[i])
+						{
+							nInliers++;
+						}
+					}
+				}
 			}
 		}
-		int nInliers = 0;
 		if (mapState == MapState::Initialized) {
 			bool bTrack = false;
-			if (userState == UserState::NotEstimated) {
+			if (userState == UserState::NotEstimated || userState == UserState::Failed) {
 				//global localization
 				//set reference keyframe and last keyframe
 				frame->reset_map_points();
-				bTrack = system->mpTracker->Relocalization(map, user, frame, system->mpFeatureTracker->min_descriptor_distance);
-				if (bTrack) {
+				nInliers = system->mpTracker->Relocalization(map, user, frame, system->mpFeatureTracker->min_descriptor_distance);
+				if (nInliers >= 50)
+				{
+					bTrack = true;
 					user->mnLastRelocFrameId = frame->mnFrameID;
-					trackState = UserState::Success;
+					//trackState = UserState::Success;
 				}
 			}
 			else {
-				
 				if (userState == UserState::Success) {
 					//std::cout << "Tracker::Start" << std::endl;
 					auto f_ref = user->mapFrames[user->mnPrevFrameID];
 					f_ref->check_replaced_map_points();
 					cv::Mat Tpredict = user->PredictPose();
 					frame->SetPose(Tpredict);
-					//std::cout << "Tracker::PrevFrame" << std::endl;
 					bTrack = system->mpTracker->TrackWithPrevFrame(f_ref, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+					if (!bTrack) {
+						std::cout << "track with reference frame :: start" << std::endl;
+
+						std::cout << "track with reference frame :: end" << std::endl;
+					}
 				}
-				if (userState == UserState::Failed) {
+				/*if (userState == UserState::Failed) {
 					frame->reset_map_points();
-					bTrack = system->mpTracker->Relocalization(map, user, frame, system->mpFeatureTracker->min_descriptor_distance);
-					if (bTrack) {
+					nInliers = system->mpTracker->Relocalization(map, user, frame, system->mpFeatureTracker->min_descriptor_distance);
+					if (nInliers >= 50) {
+						bTrack = true;
 						user->mnLastRelocFrameId = frame->mnFrameID;
 					}
-				}
-				if (bTrack) {
-					//std::cout << "Tracker::LocalMap" << std::endl;
-					nInliers = system->mpTracker->TrackWithLocalMap(user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
-					if (frame->mnFrameID < user->mnLastRelocFrameId + 30 && nInliers < 50) {
-						bTrack = false;
-					}
-					else if (nInliers < 30) {
-						bTrack = false;
-					}
-					else {
-						bTrack = true;
-					}
-				}
-				if(!bTrack)
-					trackState = UserState::Failed;
-				if (bTrack)
-					trackState = UserState::Success;
+				}*/
 			}
-			//if (userState == UserState::Failed) {
-			//	//subsection relocalization
-			//	//pose failure handler
-			//	//set reference keyframe and last keyframe
-			//	//
-			//}
-			//if (userState == UserState::Success) {
-			//	
-			//}
+			if (bTrack) {
+				nInliers = system->mpTracker->TrackWithLocalMap(user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+				if (frame->mnFrameID < user->mnLastRelocFrameId + 30 && nInliers < 50) {
+					bTrack = false;
+				}
+				else if (nInliers < 30) {
+					bTrack = false;
+				}
+				else {
+					bTrack = true;
+				}
+			}
+			if (!bTrack)
+				trackState = UserState::Failed;
+			if (bTrack)
+				trackState = UserState::Success;
 		}
 
 		////update user frame
 		user->SetState(trackState);
 		if (trackState == UserState::Success) {
-
+			
 			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 			std::stringstream ss;
-			ss << "/Store?keyword=Pose&id=" << id << "&src=" << user->userName;
-			auto res = mpAPI->Send(ss.str(), "");
+			ss << "/Store?keyword=Pose&id=" << id << "&src=" << user->userName<<"&type2="<<user->userName;
+			////data
+			cv::Mat T = frame->GetPose();
+			cv::Mat data = cv::Mat::zeros(13 + nInliers * 8, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
+			int nDataIdx = 0;
+			data.at<float>(nDataIdx++) = (float)nInliers;
+			data.at<float>(nDataIdx++) = T.at<float>(0, 0);
+			data.at<float>(nDataIdx++) = T.at<float>(0, 1);
+			data.at<float>(nDataIdx++) = T.at<float>(0, 2);
+			data.at<float>(nDataIdx++) = T.at<float>(1, 0);
+			data.at<float>(nDataIdx++) = T.at<float>(1, 1);
+			data.at<float>(nDataIdx++) = T.at<float>(1, 2);
+			data.at<float>(nDataIdx++) = T.at<float>(2, 0);
+			data.at<float>(nDataIdx++) = T.at<float>(2, 1);
+			data.at<float>(nDataIdx++) = T.at<float>(2, 2);
+			data.at<float>(nDataIdx++) = T.at<float>(0, 3);
+			data.at<float>(nDataIdx++) = T.at<float>(1, 3);
+			data.at<float>(nDataIdx++) = T.at<float>(2, 3);
 
+			for (int i = 0; i < frame->N; i++)
+			{
+				if (frame->mvpMapPoints[i])
+				{
+					if (!frame->mvbOutliers[i])
+					{
+						auto kp = frame->mvKeysUn[i];
+						auto mp = frame->mvpMapPoints[i]->GetWorldPos();
+						int octave = kp.octave;
+						data.at<float>(nDataIdx++) = kp.pt.x;
+						data.at<float>(nDataIdx++) = kp.pt.y;
+						data.at<float>(nDataIdx++) = (float)kp.octave;
+						data.at<float>(nDataIdx++) = kp.angle;
+						data.at<float>(nDataIdx++) = (float)frame->mvpMapPoints[i]->mnId;
+						data.at<float>(nDataIdx++) = mp.at<float>(0);
+						data.at<float>(nDataIdx++) = mp.at<float>(1);
+						data.at<float>(nDataIdx++) = mp.at<float>(2);
+					}
+				}
+			}
+			////data
+			auto res = mpAPI->Send(ss.str(), data.data, data.rows*sizeof(float));
 			//pose update
-			user->UpdatePose(frame->GetPose());
+			user->UpdatePose(T);
 			//check keyframe
-			auto ref = user->mapKeyFrames[user->mnReferenceKeyFrameID];
+			auto ref = map->GetKeyFrame(user->mnReferenceKeyFrameID);
 			if (user->mbMapping && system->mpTracker->NeedNewKeyFrame(map, system->mpLocalMapper, frame, ref, nInliers, user->mnLastKeyFrameID.load(), user->mnLastRelocFrameId.load())) {
 				system->mpTracker->CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, user);
 				Segmentator::RequestSegmentation(user->userName,frame->mnFrameID);
@@ -142,12 +187,12 @@ namespace EdgeSLAM {
 		user->mapFrames[frame->mnFrameID] = frame;
 		user->mnPrevFrameID = frame->mnFrameID;
 		user->mbProgress = false;
-
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		float t_test1 = du_test1 / 1000.0;
 		std::cout <<"Frame = "<<user->userName<<" : "<< id <<", Matches = "<<nInliers<< ", time =" << t_test1 << std::endl;
 
+		////visualization
 		if (mapState == MapState::Initialized && userState != UserState::NotEstimated) {
 			for (int i = 0; i < frame->mvKeys.size(); i++) {
 				auto pMP = frame->mvpMapPoints[i];
@@ -161,11 +206,10 @@ namespace EdgeSLAM {
 					cv::circle(im, frame->mvKeys[i].pt, r, color, -1);
 				}
 			}
-			cv::Mat resized_test;
-			cv::resize(im, resized_test, cv::Size(im.cols / 2, im.rows / 2));
-			system->mpVisualizer->SetOutputImage(resized_test, 0);
+			system->mpVisualizer->ResizeImage(im, im);
+			system->mpVisualizer->SetOutputImage(im, 0);
 		}
-		
+		////visualization
 	}
 	
 	bool Tracker::TrackWithPrevFrame(Frame* prev, Frame* cur, float thMaxDesc, float thMinDesc){
@@ -183,28 +227,8 @@ namespace EdgeSLAM {
 		int nopt = Optimizer::PoseOptimization(cur);
 		
 		// Discard outliers
-		int nmatchesMap = 0;
-		for (int i = 0; i<cur->N; i++)
-		{
-			if (cur->mvpMapPoints[i])
-			{
-				if (cur->mvbOutliers[i])
-				{
-					MapPoint* pMP = cur->mvpMapPoints[i];
-
-					cur->mvpMapPoints[i] = nullptr;
-					cur->mvbOutliers[i] = false;
-					pMP->mbTrackInView = false;
-					pMP->mnLastFrameSeen = cur->mnFrameID;
-					res--;
-				}
-				else if (cur->mvpMapPoints[i]->Observations()>0)
-					nmatchesMap++;
-			}
-		}
-		if (nmatchesMap < 10)
-			std::cout << "?????????????" << std::endl;
-		return nmatchesMap>=10;
+		//int nmatchesMap = DiscardOutliers(cur);
+		return nopt >=10;
 	}
 	bool Tracker::TrackWithKeyFrame(KeyFrame* ref, Frame* cur){
 		return false;
@@ -213,12 +237,14 @@ namespace EdgeSLAM {
 		LocalMap* pLocalMap = new LocalCovisibilityMap();
 		std::vector<MapPoint*> vpLocalMPs;
 		std::vector<KeyFrame*> vpLocalKFs;
+		std::vector<TrackPoint*> vpLocalTPs;
+
 		//std::cout << "Track::LocalMap::Update::start" << std::endl;
-		pLocalMap->UpdateLocalMap(user, cur, vpLocalKFs, vpLocalMPs);
+		pLocalMap->UpdateLocalMap(user, cur, vpLocalKFs, vpLocalMPs, vpLocalTPs);
 		//std::cout << "Track::LocalMap::Update::end" << std::endl;
 		//update visible
 
-		int nMatch = UpdateVisiblePoints(cur, vpLocalMPs);
+		int nMatch = UpdateVisiblePoints(cur, vpLocalMPs, vpLocalTPs);
 		//std::cout << "Track::LocalMap::Update::Visible::end" << std::endl;
 		if (nMatch == 0)
 			return 0;
@@ -227,13 +253,13 @@ namespace EdgeSLAM {
 		if (cur->mnFrameID < user->mnLastRelocFrameId + 2)
 			thRadius = 5.0;
 
-		int a = SearchPoints::SearchMapByProjection(cur, vpLocalMPs, thMaxDesc, thMinDesc, thRadius);
+		int a = SearchPoints::SearchMapByProjection(cur, vpLocalMPs, vpLocalTPs, thMaxDesc, thMinDesc, thRadius);
 		//std::cout << "match local map = " << vpLocalKFs.size() << " " << vpLocalMPs.size() <<", "<<nMatch<< "=" << a << std::endl;
 		Optimizer::PoseOptimization(cur);
 		return UpdateFoundPoints(cur);
 	}
 
-	bool Tracker::Relocalization(Map* map, User* user, Frame* cur, float thMinDesc) {
+	int Tracker::Relocalization(Map* map, User* user, Frame* cur, float thMinDesc) {
 
 		cur->ComputeBoW();
 
@@ -256,6 +282,8 @@ namespace EdgeSLAM {
 		std::vector<bool> vbDiscarded;
 		vbDiscarded.resize(nKFs);
 
+		std::vector<int> vnGoods(nKFs,0);
+
 		int nCandidates = 0;
 
 		for (int i = 0; i<nKFs; i++)
@@ -267,25 +295,29 @@ namespace EdgeSLAM {
 			{
 				
 				int nmatches = SearchPoints::SearchFrameByBoW(cur->matcher, pKF, cur, vvpMapPointMatches[i], thMinDesc, 0.75);
+				std::cout << "Match = " << i << "=" << nmatches << std::endl;
 				if (nmatches<15)
 				{
 					vbDiscarded[i] = true;
 					continue;
 				}
-				else
+				else {
+					nCandidates++;
+				}
+				/*else
 				{
 					PnPSolver* pSolver = new PnPSolver(cur, vvpMapPointMatches[i]);
 					pSolver->SetRansacParameters(0.99, 10, 300, 4, 0.5, 5.991);
 					vpPnPsolvers[i] = pSolver;
 					nCandidates++;
-				}
+				}*/
 			}
 		}
 		
 		// Alternatively perform some iterations of P4P RANSAC
 		// Until we found a camera pose supported by enough inliers
 		bool bMatch = false;
-
+		int nGood = 0;
 		while (nCandidates>0 && !bMatch)
 		{
 			for (int i = 0; i<nKFs; i++)
@@ -317,7 +349,9 @@ namespace EdgeSLAM {
 					}
 				}
 
-				int nGood = Optimizer::PoseOptimization(cur);
+				nGood = Optimizer::PoseOptimization(cur);
+				vnGoods[i] = nGood;
+				std::cout << "relocalization="<<i<<"=init::ngood=" << nGood << std::endl;
 				if (nGood < 10){
 					vbDiscarded[i] = true;
 					nCandidates--;
@@ -355,6 +389,13 @@ namespace EdgeSLAM {
 						}
 					}
 				}
+				std::cout << "relocalization=" << i << "=final::ngood=" << nGood << std::endl;
+				if (vnGoods[i] == nGood) {
+					vbDiscarded[i] = true;
+					nCandidates--;
+					continue;
+				}
+				vnGoods[i] = nGood;
 				if (nGood >= 50)
 				{
 					bMatch = true;
@@ -364,7 +405,8 @@ namespace EdgeSLAM {
 				continue;
 			}
 		}
-		if (!bMatch)
+		return nGood;
+		/*if (!bMatch)
 		{
 			return false;
 		}
@@ -372,40 +414,39 @@ namespace EdgeSLAM {
 		{
 			user->mnLastRelocFrameId = cur->mnFrameID;
 			return true;
-		}
+		}*/
 	}
-
-	int Tracker::UpdateVisiblePoints(Frame* cur, std::vector<MapPoint*> vpLocalMPs) {
+	
+	int Tracker::UpdateVisiblePoints(Frame* cur, std::vector<MapPoint*> vpLocalMPs, std::vector<TrackPoint*> vpLocalTPs) {
 		// Do not search map points already matched
-		int nFrameID = cur->mnFrameID;
-		for (auto vit = cur->mvpMapPoints.begin(), vend = cur->mvpMapPoints.end(); vit != vend; vit++)
+		for (int i = 0; i<cur->N; i++)
 		{
-			MapPoint* pMP = *vit;
-			if (pMP)
+			if (cur->mvpMapPoints[i])
 			{
-				if (pMP->isBad())
-				{
-					*vit = static_cast<MapPoint*>(nullptr);
+				MapPoint* pMP = cur->mvpMapPoints[i];
+				if (!pMP || pMP->isBad() || cur->mvbOutliers[i]) {
+					cur->mvpMapPoints[i] = nullptr;
+					cur->mvbOutliers[i] = false;
 				}
-				else
-				{
+				else {
 					pMP->IncreaseVisible();
-					pMP->mnLastFrameSeen = nFrameID;
-					pMP->mbTrackInView = false;
 				}
+				cur->mspMapPoints.insert(pMP);
 			}
 		}
 
 		int nToMatch = 0;
 
 		// Project points in frame and check its visibility
-		for (auto vit = vpLocalMPs.begin(), vend = vpLocalMPs.end(); vit != vend; vit++)
+		for(size_t i = 0, iend = vpLocalMPs.size(); i < iend; i++)
+		//for (auto vit = vpLocalMPs.begin(), vend = vpLocalMPs.end(); vit != vend; vit++)
 		{
-			MapPoint* pMP = *vit;
-			if (pMP->mnLastFrameSeen == nFrameID || pMP->isBad())
+			MapPoint* pMP = vpLocalMPs[i];
+			TrackPoint* pTP = vpLocalTPs[i];
+			if (cur->mspMapPoints.count(pMP) || pMP->isBad())
 				continue;
 			// Project (this fills MapPoint variables for matching)
-			if (cur->is_in_frustum(pMP, 0.5))
+			if (cur->is_in_frustum(pMP, pTP, 0.5))
 			{
 				pMP->IncreaseVisible();
 				nToMatch++;
@@ -493,7 +534,6 @@ namespace EdgeSLAM {
 		KeyFrame* pKF = new KeyFrame(cur, map);
 		user->mnReferenceKeyFrameID = pKF->mnId;
 		user->mnLastKeyFrameID = cur->mnFrameID;
-		user->mapKeyFrames[pKF->mnId] = pKF;
 		pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, pKF);
 		map->SetNotStop(false);
 	}

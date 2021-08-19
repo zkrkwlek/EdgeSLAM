@@ -29,6 +29,7 @@ namespace EdgeSLAM {
 		//////////////////////
 		////output½Ã°¢È­
 	public:
+		void ResizeImage(cv::Mat src, cv::Mat& dst);
 		void SetOutputImage(cv::Mat out, int type);
 		cv::Mat GetOutputImage(int type);
 		bool isOutputTypeChanged(int type);

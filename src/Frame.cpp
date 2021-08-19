@@ -9,7 +9,7 @@ namespace EdgeSLAM {
 	Frame::Frame(){}
 	Frame::Frame(const Frame &frame):
 		mnFrameID(frame.mnFrameID), mdTimeStamp(frame.mdTimeStamp), mpCamPose(frame.mpCamPose), mpCamera(frame.mpCamera),
-		K(frame.K), D(frame.D),fx(frame.fx), fy(frame.fy), cx(frame.cx), cy(frame.cy), invfx(frame.invfx), invfy(frame.invfy),
+		K(frame.K), D(frame.D), InvK(frame.InvK),fx(frame.fx), fy(frame.fy), cx(frame.cx), cy(frame.cy), invfx(frame.invfx), invfy(frame.invfy),
 		mnMinX(frame.mnMinX), mnMaxX(frame.mnMaxX), mnMinY(frame.mnMinY), mnMaxY(frame.mnMaxY), mfGridElementWidthInv(frame.mfGridElementWidthInv), mfGridElementHeightInv(frame.mfGridElementHeightInv),
 		FRAME_GRID_COLS(frame.FRAME_GRID_COLS), FRAME_GRID_ROWS(frame.FRAME_GRID_ROWS), mbDistorted(frame.mbDistorted),
 		mnScaleLevels(frame.mnScaleLevels), mfScaleFactor(frame.mfScaleFactor),
@@ -20,7 +20,7 @@ namespace EdgeSLAM {
 		
 	}
 	Frame::Frame(cv::Mat img, Camera* pCam, int id, double time_stamp):mnFrameID(id), mdTimeStamp(time_stamp), mpCamera(pCam),
-		K(pCam->K), D(pCam->D),fx(pCam->fx),fy(pCam->fy), cx(pCam->cx), cy(pCam->cy), invfx(pCam->invfx), invfy(pCam->invfy), mnMinX(pCam->u_min), mnMaxX(pCam->u_max), mnMinY(pCam->v_min), mnMaxY(pCam->v_max), mfGridElementWidthInv(pCam->mfGridElementWidthInv), mfGridElementHeightInv(pCam->mfGridElementHeightInv), FRAME_GRID_COLS(pCam->mnGridCols), FRAME_GRID_ROWS(pCam->mnGridRows), mbDistorted(pCam->bDistorted),
+		K(pCam->K), D(pCam->D), InvK(pCam->Kinv), fx(pCam->fx),fy(pCam->fy), cx(pCam->cx), cy(pCam->cy), invfx(pCam->invfx), invfy(pCam->invfy), mnMinX(pCam->u_min), mnMaxX(pCam->u_max), mnMinY(pCam->v_min), mnMaxY(pCam->v_max), mfGridElementWidthInv(pCam->mfGridElementWidthInv), mfGridElementHeightInv(pCam->mfGridElementHeightInv), FRAME_GRID_COLS(pCam->mnGridCols), FRAME_GRID_ROWS(pCam->mnGridRows), mbDistorted(pCam->bDistorted),
 		mnScaleLevels(detector->mnScaleLevels), mfScaleFactor(detector->mfScaleFactor), mfLogScaleFactor(detector->mfLogScaleFactor), mvScaleFactors(detector->mvScaleFactors), mvInvScaleFactors(detector->mvInvScaleFactors), mvLevelSigma2(detector->mvLevelSigma2), mvInvLevelSigma2(detector->mvInvLevelSigma2)
 	{
 		mpCamPose = new CameraPose();
@@ -41,9 +41,59 @@ namespace EdgeSLAM {
 		AssignFeaturesToGrid();
 	}
 	Frame::~Frame(){}
+	bool Frame::is_in_frustum(MapPoint* pMP, TrackPoint* pTP, float viewingCosLimit) {
+		
+		cv::Mat P = pMP->GetWorldPos();
+		cv::Mat Rw = mpCamPose->GetRotation();
+		cv::Mat tw = mpCamPose->GetTranslation();
+		cv::Mat Ow = mpCamPose->GetCenter();
 
+		// 3D in camera coordinates
+		const cv::Mat Pc = Rw*P + tw;
+		const float &PcX = Pc.at<float>(0);
+		const float &PcY = Pc.at<float>(1);
+		const float &PcZ = Pc.at<float>(2);
+
+		// Check positive depth
+		if (PcZ<0.0f)
+			return false;
+
+		// Project in image and check it is not outside
+		const float invz = 1.0f / PcZ;
+		const float u = fx*PcX*invz + cx;
+		const float v = fy*PcY*invz + cy;
+
+		if (u<mnMinX || u>mnMaxX || v < mnMinY || v > mnMaxY)
+			return false;
+
+		// Check distance is in the scale invariance region of the MapPoint
+		const float maxDistance = pMP->GetMaxDistanceInvariance();
+		const float minDistance = pMP->GetMinDistanceInvariance();
+		const cv::Mat PO = P - Ow;
+		const float dist = cv::norm(PO);
+
+		if (dist<minDistance || dist>maxDistance)
+			return false;
+
+		// Check viewing angle
+		cv::Mat Pn = pMP->GetNormal();
+		const float viewCos = PO.dot(Pn) / dist;
+
+		if (viewCos<viewingCosLimit)
+			return false;
+
+		//// Predict scale in the image
+		const int nPredictedLevel = pMP->PredictScale(dist, this);
+		
+		pTP->mbTrackInView = true;
+		pTP->mTrackProjX = u;
+		pTP->mTrackProjY = v;
+		pTP->mnTrackScaleLevel = nPredictedLevel;
+		pTP->mTrackViewCos = viewCos;
+				
+		return true;
+	}
 	bool Frame::is_in_frustum(MapPoint* pMP, float viewingCosLimit) {
-		pMP->mbTrackInView = false;
 
 		// 3D in absolute coordinates
 		cv::Mat P = pMP->GetWorldPos();
@@ -86,15 +136,15 @@ namespace EdgeSLAM {
 		if (viewCos<viewingCosLimit)
 			return false;
 
-		// Predict scale in the image
-		const int nPredictedLevel = pMP->PredictScale(dist, this);
+		//// Predict scale in the image
+		//const int nPredictedLevel = pMP->PredictScale(dist, this);
 
-		// Data used by the tracking
-		pMP->mbTrackInView = true;
-		pMP->mTrackProjX = u;
-		pMP->mTrackProjY = v;
-		pMP->mnTrackScaleLevel = nPredictedLevel;
-		pMP->mTrackViewCos = viewCos;
+		//// Data used by the tracking
+		//pMP->mbTrackInView = true;
+		//pMP->mTrackProjX = u;
+		//pMP->mTrackProjY = v;
+		//pMP->mnTrackScaleLevel = nPredictedLevel;
+		//pMP->mTrackViewCos = viewCos;
 
 		return true;
 	}
