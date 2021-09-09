@@ -30,6 +30,9 @@ namespace EdgeSLAM {
 		cv::Mat GetInversePose();
 		cv::Mat PredictPose();
 		void UpdatePose(cv::Mat Tnew);
+
+		cv::Mat GetCameraMatrix();
+		cv::Mat GetCameraInverseMatrix();
 	public:
 		std::string userName;
 		std::string mapName;
@@ -50,6 +53,19 @@ namespace EdgeSLAM {
 		MotionModel* mpMotionModel;
 		UserState mState;
 		std::mutex mMutexState;
+/////Visual ID
+	public:
+		void SetVisID(int id);
+		int GetVisID();
+		void AddDevicePosition(cv::Mat pos);
+		std::vector<cv::Mat> GetDevicePositions();
+	private:
+		int mnVisID;
+		std::mutex mMutexVisID;
+
+		std::mutex mMutexDevicePositions;
+		std::vector<cv::Mat> mVecDevicePositions;
+
 	};
 }
 

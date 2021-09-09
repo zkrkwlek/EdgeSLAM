@@ -99,7 +99,7 @@ namespace EdgeSLAM {
 		static FeatureTracker* matcher;
 		int mnId;
 		const int mnFrameId;
-		const double mTimeStamp;
+		const double mdTimeStamp;
 
 		// Grid (to speed up feature matching)
 		const int mnGridCols;

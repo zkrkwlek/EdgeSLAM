@@ -124,4 +124,5 @@ namespace EdgeSLAM {
 
 		return v;
 	}
+
 }

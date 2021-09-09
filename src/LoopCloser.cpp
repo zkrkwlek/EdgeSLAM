@@ -31,7 +31,8 @@ namespace EdgeSLAM {
 		
 		bool bSim3 = false;
 		bool bDetect = pLoopCloser->DetectLoop(system, map, kf);
-		if (bDetect)
+
+		/*if (bDetect)
 		{
 			std::cout << "ComputeSim3::start" << std::endl;
 			bSim3 = pLoopCloser->ComputeSim3(system, map, kf);
@@ -41,7 +42,7 @@ namespace EdgeSLAM {
 			std::cout << "CorrectLoop::start" << std::endl;
 			pLoopCloser->CorrectLoop(system, map, kf);
 			std::cout << "CorrectLoop::start" << std::endl;
-		}
+		}*/
 		map->mnNumLoopClosingFrames--;
 	}
 	bool LoopCloser::DetectLoop(SLAM* system, Map* map, KeyFrame* kf) {
@@ -181,7 +182,7 @@ namespace EdgeSLAM {
 			nCandidates++;
 		}
 		bool bMatch = false;
-
+		std::cout << "ComputeSim #candidates = " << nCandidates << std::endl;
 		// Perform alternatively RANSAC iterations for each candidate
 		// until one is succesful or all fail
 		while (nCandidates>0 && !bMatch)

@@ -9,7 +9,7 @@
 namespace EdgeSLAM {
 	class SLAM;
 	class Map;
-	class User;
+	//class User;
 	class Visualizer {
 	public:
 		Visualizer();
@@ -23,9 +23,10 @@ namespace EdgeSLAM {
 		static void CallBackFunc(int event, int x, int y, int flags, void* userdata);
 		void SetMap(Map* pMap);
 		Map* GetMap();
-		void AddUser(User* pUser);
+		std::string strMapName;
+		/*void AddUser(User* pUser);
 		void RemoveUser(User* pUser);
-		std::vector<User*> GetUsers();
+		std::vector<User*> GetUsers();*/
 		//////////////////////
 		////output½Ã°¢È­
 	public:
@@ -52,8 +53,8 @@ namespace EdgeSLAM {
 		//////////////////////
 
 		std::mutex mMutexMap;
-		std::mutex mMutexUserList;
-		std::set<User*> mspUserLists;
+		//std::mutex mMutexUserList;
+		//std::set<User*> mspUserLists;
 		std::mutex mMutexDoingProcess;
 		bool mbDoingProcess;
 	};

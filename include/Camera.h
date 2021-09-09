@@ -22,6 +22,7 @@ namespace EdgeSLAM {
 		int mnWidth, mnHeight;
 		float fx, fy, cx, cy, invfx, invfy;
 		cv::Mat K, D, Kinv;
+		cv::Mat Kfluker;
 		float u_min, u_max, v_min, v_max;
 		bool bDistorted;
 

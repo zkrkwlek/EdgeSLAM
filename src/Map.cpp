@@ -14,6 +14,7 @@ namespace EdgeSLAM {
 		mbStopGBA(false), mpThreadGBA(nullptr), mbFixScale(bFixScale), mnFullBAIdx(0)
 	{
 		mpKeyFrameDB = new KeyFrameDB(voc);
+		mvvPlanarMPs = std::vector<std::vector<cv::Mat>>(3);
 	}
 	/*Map::Map(ORBVocabulary* voc) : mnNumMappingFrames(0), mnNextKeyFrameID(0), mnNextMapPointID(0), mState(MapState::NoImages) {
 		mpKeyFrameDB = new KeyFrameDB(voc);
@@ -125,7 +126,21 @@ namespace EdgeSLAM {
 	{
 		return mnBigChangeIdx.load();
 	}
-
+	/////Planar Test
+	std::vector<cv::Mat> Map::GetPlanarMPs(int id){
+		std::unique_lock<std::mutex> lock(mMutexPlanarMP);
+		return mvvPlanarMPs[id];
+	}
+	void Map::ClearPlanarMPs(){
+		std::unique_lock<std::mutex> lock(mMutexPlanarMP);
+		for (int i = 0, iend = mvvPlanarMPs.size(); i < iend; i++)
+			mvvPlanarMPs[i].clear();
+	}
+	void Map::AddPlanarMP(cv::Mat m, int id){
+		std::unique_lock<std::mutex> lock(mMutexPlanarMP);
+		mvvPlanarMPs[id].push_back(m);
+	}
+	/////Planar Test
 	/////Depth test
 	std::vector<cv::Mat> Map::GetDepthMPs() {
 		std::unique_lock<std::mutex> lock(mMutexDepthTest);

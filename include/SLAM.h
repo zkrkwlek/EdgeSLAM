@@ -26,8 +26,10 @@ namespace EdgeSLAM {
 	public:
 		void Init();
 		void Track(cv::Mat im, int id,User* user, double ts = 0.0);
+		void Track(int id, User* user, double ts = 0.0);
 		void LoadVocabulary();
 		void InitVisualizer(std::string user,std::string name, int w, int h);
+		void ProcessContentGeneration(std::string user, int id);
 		void ProcessSegmentation(std::string user, int id);
 		void ProcessDepthEstimation(std::string user, int id);
 	public:
@@ -51,8 +53,10 @@ namespace EdgeSLAM {
 		bool CheckMap(std::string str);
 		bool CheckUser(std::string str);
 		void AddUser(std::string id, User* user);
-		User* GetUser(std::string id);
 		void RemoveUser(std::string id);
+		User* GetUser(std::string id);
+		std::vector<User*> GetAllUsersInMap(std::string map);
+		void UpdateDevicePosition(std::string user, int id);
 		void AddMap(std::string name, Map* pMap);
 		Map* GetMap(std::string name);
 		void RemoveMap(std::string name);
@@ -60,6 +64,30 @@ namespace EdgeSLAM {
 		std::mutex mMutexUserList, mMutexMapList;
 		std::map<std::string, User*> mmpConnectedUserList;
 		std::map<std::string, Map*> mmpMapList;
+	////Manage Visualize ID
+	public:
+		void SetUserVisID(User* user);
+		void UpdateUserVisID();
+	private:
+		std::mutex mMutexVisID;
+		int mnVisID;
+		std::map<User*, int> mapVisID;
+
+	//////Save Data
+	public:
+
+		int nTotalTrack, nTotalReloc, nTotalMapping, nTotalSeg, nTotalDepth;
+		float nAvgTrack, nAvgReloc, nAvgMapping,  nAvgSeg, nAvgDepth;
+		float nStdDevTrack, nStdDevReloc, nStdDevMapping, nStdDevSeg, nStdDevDepth;
+		float fSumTrack, fSumTrack2, fSumMapping, fSumMapping2, fSumReloc, fSumReloc2, fSumSeg, fSumSeg2, fSumDepth, fSumDepth2;
+		void UpdateTrackingTime(float ts);
+		void UpdateRelocTime(float ts);
+		void UpdateMappingTime(float ts);
+		void SaveProcessingTime();
+		void LoadProcessingTime();
+		void SaveTrajectory(User* user);
+	private:
+		std::mutex mMutexTrackingTime, mMutexRelocTime, mMutexMappingTime;
 	};
 }
 

@@ -1,7 +1,9 @@
 #include <Visualizer.h>
+#include <SLAM.h>
 #include <Map.h>
 #include <MapPoint.h>
 #include <User.h>
+#include <Segmentator.h>
 
 namespace EdgeSLAM {
 	Visualizer::Visualizer() {
@@ -54,7 +56,7 @@ namespace EdgeSLAM {
 			}
 			else if (tempData[2] < 50 && (y >= 50 && y < 100)) {
 				//bShowOnlyTrajectory = !bShowOnlyTrajectory;
-				bLoadMap = true;
+				bLoadMap = !bLoadMap;
 			}
 			////button interface
 		}
@@ -162,9 +164,12 @@ namespace EdgeSLAM {
 		int nDisCols = leftImg1.cols + mapImage.cols;// +kfWindowImg.cols;
 		mOutputImage = cv::Mat::zeros(nDisRows, nDisCols, CV_8UC3);
 	}
+
+	
 	void Visualizer::Run(){
 		SetAxisMode();
-		int nFrame = 0;
+		int nMapImageID = 0;
+		
 		//현재 여기서 시각화가 안됨
 		//원인 찾는 중
 		cv::imshow("Output::Display", mOutputImage);
@@ -174,8 +179,28 @@ namespace EdgeSLAM {
 		mapControlData[1] = mnVisScale;
 		cv::setMouseCallback("Output::Display", EdgeSLAM::Visualizer::CallBackFunc, (void*)mapControlData);
 
+		std::vector<cv::Scalar> planeColors(3);
+		planeColors[0] = cv::Scalar(125, 0, 0);
+		planeColors[1] = cv::Scalar(0, 125, 0);
+		planeColors[2] = cv::Scalar(0, 0, 125);
+
+		std::vector<cv::Scalar> userColors(6);
+		userColors[0] = cv::Scalar(255, 255, 0);
+		userColors[1] = cv::Scalar(0, 255, 255);
+		userColors[2] = cv::Scalar(255, 0, 255);
+		userColors[3] = cv::Scalar(255, 0, 0);
+		userColors[4] = cv::Scalar(0, 255, 0);
+		userColors[5] = cv::Scalar(0, 0, 255);
+		
+
 		while (true) {
-			nFrame++;
+			if (bSaveMap) {
+				//auto vpUsers = GetUsers();
+				auto user = mpSystem->GetAllUsersInMap(strMapName)[0];
+				mpSystem->pool->EnqueueJob(Segmentator::ProcessPlanarModeling, mpSystem, user);
+				bSaveMap = false;
+			}
+			
 			//////Update Visualizer 
 			mVisMidPt += cv::Point2f(mapControlData[6], mapControlData[7]);
 			mapControlData[6] = 0;
@@ -201,13 +226,16 @@ namespace EdgeSLAM {
 				}
 
 				{
-					cv::Scalar color = cv::Scalar(0, 255, 255);
-					auto vDepth = mpMap->GetDepthMPs();
-					for (int i = 0; i < vDepth.size(); i++) {
-						cv::Mat x3D = vDepth[i];
-						cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
-						tpt += mVisMidPt;
-						cv::circle(tempVis, tpt, 4, color, -1);
+					
+					
+					for (int i = 0, iend = 3; i < iend; i++) {
+						auto vMPs = pMap->GetPlanarMPs(i);
+						for (int j = 0; j < vMPs.size(); j++) {
+							cv::Mat x3D = vMPs[j];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							tpt += mVisMidPt;
+							cv::circle(tempVis, tpt, 4, planeColors[i], -1);
+						}
 					}
 				}
 			}
@@ -215,7 +243,7 @@ namespace EdgeSLAM {
 			{
 				////User 위치 시각화
 				//추후 유저별 정보로 변경
-				auto vpUsers = GetUsers();
+				auto vpUsers = mpSystem->GetAllUsersInMap(strMapName);
 				for (size_t i = 0, iend = vpUsers.size(); i < iend; i++) {
 					auto user = vpUsers[i];
 					if (!user)
@@ -223,7 +251,18 @@ namespace EdgeSLAM {
 					auto pos = user->GetPosition();
 					cv::Point2f pt1 = cv::Point2f(pos.at<float>(mnAxis1)* mnVisScale, pos.at<float>(mnAxis2)* mnVisScale);
 					pt1 += mVisMidPt;
-					cv::circle(tempVis, pt1, 5, cv::Scalar(0, 0, 255), -1);
+					if(user->mbMapping)
+						cv::circle(tempVis, pt1, 4, cv::Scalar(0, 0, 255), -1);
+					else {
+						cv::circle(tempVis, pt1, 4, userColors[i], -1);
+					}
+					auto dPoses = user->GetDevicePositions();
+					for (int j = 0, jend = dPoses.size(); j < jend; j++) {
+						auto pos = dPoses[j];
+						cv::Point2f pt1 = cv::Point2f(pos.at<float>(mnAxis1)* mnVisScale, pos.at<float>(mnAxis2)* mnVisScale);
+						pt1 += mVisMidPt;
+						cv::circle(tempVis, pt1, 2, userColors[i], -1);
+					}
 				}
 			}
 
@@ -253,10 +292,16 @@ namespace EdgeSLAM {
 				cv::Mat mMappingImg = GetOutputImage(5);
 				mMappingImg.copyTo(mOutputImage(mvRects[5]));
 			}
-			if (nFrame % 100 == 0) {
-				/*imshow("Output::Display", mOutputImage);
-				cv::waitKey(1);*/
-			}
+			
+			///////save image
+			//nMapImageID++;
+			//if (nMapImageID % 20 == 0) {
+			//	std::stringstream sss;
+			//	sss << "../../bin/img/Map/" << nMapImageID << ".jpg";
+			//	cv::imwrite(sss.str(), mOutputImage);
+			//}
+			///////save image
+
 			imshow("Output::Display", mOutputImage);
 			cv::waitKey(1);
 		}
@@ -295,7 +340,7 @@ namespace EdgeSLAM {
 		std::unique_lock<std::mutex> lockTemp(mMutexMap);
 		return mpMap;
 	}
-	void Visualizer::AddUser(User* pUser) {
+	/*void Visualizer::AddUser(User* pUser) {
 		std::unique_lock<std::mutex>lock(mMutexUserList);
 		mspUserLists.insert(pUser);
 	}
@@ -307,6 +352,5 @@ namespace EdgeSLAM {
 	std::vector<User*> Visualizer::GetUsers() {
 		std::unique_lock<std::mutex>lock(mMutexUserList);
 		return std::vector<User*>(mspUserLists.begin(), mspUserLists.end());
-	}
-	
+	}*/
 }

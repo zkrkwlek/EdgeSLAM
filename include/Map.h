@@ -111,7 +111,16 @@ namespace EdgeSLAM {
 		std::map<int, KeyFrame*> mmpKeyFrames;
 		LocalMap* mpLocalMap;
 		////local map??
-	////Depth Test
+		////Plane Test
+	public:
+		std::vector<cv::Mat> GetPlanarMPs(int id);
+		void ClearPlanarMPs();
+		void AddPlanarMP(cv::Mat m, int id);
+	private:
+		std::mutex mMutexPlanarMP;
+		std::vector<std::vector<cv::Mat>> mvvPlanarMPs;
+		////Plane Test
+		////Depth Test
 	public:
 		std::vector<cv::Mat> GetDepthMPs();
 		void ClearDepthMPs();

@@ -9,7 +9,7 @@
 
 namespace EdgeSLAM {
 	KeyFrame::KeyFrame(Frame *F, Map* pMap):
-		mnId(pMap->mnNextKeyFrameID++),mnFrameId(F->mnFrameID), mTimeStamp(F->mdTimeStamp), mnGridCols(F->FRAME_GRID_COLS), mnGridRows(F->FRAME_GRID_ROWS), mpCamPose(F->mpCamPose),
+		mnId(pMap->mnNextKeyFrameID++),mnFrameId(F->mnFrameID), mdTimeStamp(F->mdTimeStamp), mnGridCols(F->FRAME_GRID_COLS), mnGridRows(F->FRAME_GRID_ROWS), mpCamPose(F->mpCamPose),
 		mfGridElementWidthInv(F->mfGridElementWidthInv), mfGridElementHeightInv(F->mfGridElementHeightInv),
 		mnFuseTargetForKF(0), mnBALocalForKF(0), mnBAFixedForKF(0),//mnTrackReferenceForFrame(0), 
 		mnLoopQuery(0), mnLoopWords(0), mnRelocQuery(0), mnRelocWords(0), mnBAGlobalForKF(0),

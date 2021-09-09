@@ -23,12 +23,284 @@ namespace EdgeSLAM {
 	Tracker::Tracker(){}
 	Tracker::~Tracker(){}
 
-	void Tracker::Track(ThreadPool::ThreadPool* pool, SLAM* system, cv::Mat im, int id, User* user, double ts) {
+	cv::Point2f CalcLinePoint(float val, cv::Mat mLine, bool opt) {
+		float x, y;
+		if (opt) {
+			x = 0.0;
+			y = val;
+			if (mLine.at<float>(0) != 0)
+				x = (-mLine.at<float>(2) - mLine.at<float>(1)*y) / mLine.at<float>(0);
+		}
+		else {
+			y = 0.0;
+			x = val;
+			if (mLine.at<float>(1) != 0)
+				y = (-mLine.at<float>(2) - mLine.at<float>(0)*x) / mLine.at<float>(1);
+		}
+
+		return cv::Point2f(x, y);
+	}
+
+	void Tracker::Track(ThreadPool::ThreadPool* pool, SLAM* system, int id, User* user, double ts) {
 		if (user->mbProgress)
 			return;
 		user->mbProgress = true;
 		auto cam = user->mpCamera;
 		auto map = user->mpMap;
+
+		std::cout << "Frame = " << user->userName << "=start!!" << std::endl;
+		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+
+		////receive image
+		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+		std::stringstream ss;
+		ss << "/Load?keyword=Image" << "&id=" << id << "&src=" << user->userName;
+		auto res = mpAPI->Send(ss.str(), "");
+		int n2 = res.size();
+		cv::Mat temp = cv::Mat::zeros(n2, 1, CV_8UC1);
+		std::memcpy(temp.data, res.data(), res.size());
+		cv::Mat img = cv::imdecode(temp, cv::IMREAD_COLOR);
+		////receive image
+		/////save image
+		std::stringstream sss;
+		sss << "../../bin/img/" << user->userName << "/Color/" << id << ".jpg";
+		cv::imwrite(sss.str(), img);
+		/////save image
+		Frame* frame = new Frame(img, cam, id, ts);
+		user->mnCurrFrameID = frame->mnFrameID;
+
+		//std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
+
+		auto mapState = map->GetState();
+		auto userState = user->GetState();
+		auto trackState = UserState::NotEstimated;
+		int nInliers = 0;
+		if (mapState == MapState::NoImages) {
+			//set reference frame
+			map->SetState(MapState::NotInitialized);
+			system->mpInitializer->Init(frame);
+		}
+		if (mapState == MapState::NotInitialized) {
+			//initialization
+			auto res = system->mpInitializer->Initialize(frame, map);
+			map->SetState(res);
+			if (res == MapState::Initialized) {
+				trackState = UserState::Success;
+				auto kf1 = system->mpInitializer->mpInitKeyFrame1;
+				auto kf2 = system->mpInitializer->mpInitKeyFrame2;
+				map->mvpKeyFrameOrigins.push_back(kf1);
+				map->mvpKeyFrameOrigins.push_back(kf2);
+				/*user->mapKeyFrames[kf1->mnId] = kf1;
+				user->mapKeyFrames[kf2->mnId] = kf2;*/
+				user->mnReferenceKeyFrameID = kf2->mnId;
+				user->mnLastKeyFrameID = frame->mnFrameID;
+				pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf1);
+				pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf2);
+
+				for (int i = 0; i < frame->N; i++)
+				{
+					if (frame->mvpMapPoints[i])
+					{
+						if (!frame->mvbOutliers[i])
+						{
+							nInliers++;
+						}
+					}
+				}
+			}
+		}
+		if (mapState == MapState::Initialized) {
+			bool bTrack = false;
+			if (userState == UserState::NotEstimated || userState == UserState::Failed) {
+				//global localization
+				//set reference keyframe and last keyframe
+				frame->reset_map_points();
+				nInliers = system->mpTracker->Relocalization(map, user, frame, system->mpFeatureTracker->min_descriptor_distance);
+				if (nInliers >= 50)
+				{
+					bTrack = true;
+					user->mnLastRelocFrameId = frame->mnFrameID;
+					//trackState = UserState::Success;
+				}
+				std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+				auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+				float t_test1 = du_test1 / 1000.0;
+				system->UpdateRelocTime(t_test1);
+			}
+			else {
+				if (userState == UserState::Success) {
+					//std::cout << "Tracker::Start" << std::endl;
+					auto f_ref = user->mapFrames[user->mnPrevFrameID];
+					f_ref->check_replaced_map_points();
+					cv::Mat Tpredict = user->PredictPose();
+					frame->SetPose(Tpredict);
+					bTrack = system->mpTracker->TrackWithPrevFrame(f_ref, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+
+					if (!bTrack) {
+						std::cout << "track with reference frame :: start" << std::endl;
+
+						std::cout << "track with reference frame :: end" << std::endl;
+					}
+				}
+				/*if (userState == UserState::Failed) {
+				frame->reset_map_points();
+				nInliers = system->mpTracker->Relocalization(map, user, frame, system->mpFeatureTracker->min_descriptor_distance);
+				if (nInliers >= 50) {
+				bTrack = true;
+				user->mnLastRelocFrameId = frame->mnFrameID;
+				}
+				}*/
+			}
+			if (bTrack) {
+				nInliers = system->mpTracker->TrackWithLocalMap(user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+				if (frame->mnFrameID < user->mnLastRelocFrameId + 30 && nInliers < 50) {
+					bTrack = false;
+				}
+				else if (nInliers < 30) {
+					bTrack = false;
+				}
+				else {
+					bTrack = true;
+				}
+			}
+			if (!bTrack)
+				trackState = UserState::Failed;
+			if (bTrack)
+				trackState = UserState::Success;
+		}
+
+		////update user frame
+		user->SetState(trackState);
+		if (trackState == UserState::Success) {
+
+			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+			std::stringstream ss;
+			ss << "/Store?keyword=Pose&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
+			////data
+			cv::Mat T = frame->GetPose();
+			cv::Mat data = cv::Mat::zeros(13 + nInliers * 8, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
+			int nDataIdx = 0;
+			data.at<float>(nDataIdx++) = (float)nInliers;
+			data.at<float>(nDataIdx++) = T.at<float>(0, 0);
+			data.at<float>(nDataIdx++) = T.at<float>(0, 1);
+			data.at<float>(nDataIdx++) = T.at<float>(0, 2);
+			data.at<float>(nDataIdx++) = T.at<float>(1, 0);
+			data.at<float>(nDataIdx++) = T.at<float>(1, 1);
+			data.at<float>(nDataIdx++) = T.at<float>(1, 2);
+			data.at<float>(nDataIdx++) = T.at<float>(2, 0);
+			data.at<float>(nDataIdx++) = T.at<float>(2, 1);
+			data.at<float>(nDataIdx++) = T.at<float>(2, 2);
+			data.at<float>(nDataIdx++) = T.at<float>(0, 3);
+			data.at<float>(nDataIdx++) = T.at<float>(1, 3);
+			data.at<float>(nDataIdx++) = T.at<float>(2, 3);
+
+			for (int i = 0; i < frame->N; i++)
+			{
+				if (frame->mvpMapPoints[i])
+				{
+					if (!frame->mvbOutliers[i])
+					{
+						auto kp = frame->mvKeysUn[i];
+						auto mp = frame->mvpMapPoints[i]->GetWorldPos();
+						int octave = kp.octave;
+						data.at<float>(nDataIdx++) = kp.pt.x;
+						data.at<float>(nDataIdx++) = kp.pt.y;
+						data.at<float>(nDataIdx++) = (float)kp.octave;
+						data.at<float>(nDataIdx++) = kp.angle;
+						data.at<float>(nDataIdx++) = (float)frame->mvpMapPoints[i]->mnId;
+						data.at<float>(nDataIdx++) = mp.at<float>(0);
+						data.at<float>(nDataIdx++) = mp.at<float>(1);
+						data.at<float>(nDataIdx++) = mp.at<float>(2);
+					}
+				}
+			}
+			////data
+			auto res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
+			//pose update
+			user->UpdatePose(T);
+			//check keyframe
+			auto ref = map->GetKeyFrame(user->mnReferenceKeyFrameID);
+			if (user->mbMapping && system->mpTracker->NeedNewKeyFrame(map, system->mpLocalMapper, frame, ref, nInliers, user->mnLastKeyFrameID.load(), user->mnLastRelocFrameId.load())) {
+				system->mpTracker->CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, user);
+				Segmentator::RequestSegmentation(user->userName, frame->mnFrameID);
+			}
+			////frame line visualization
+			/*if (!user->mbMapping) {
+				cv::Mat R, t;
+				R = frame->GetRotation();
+				t = frame->GetTranslation();
+				float m1,m2;
+				cv::Mat line1, line2;
+				line1 = Segmentator::LineProjection(R, t, Segmentator::Lw1, frame->mpCamera->Kfluker, m1);
+				m1 = -line1.at<float>(0) / line1.at<float>(1);
+				bool bSlopeOpt1 = abs(m1) > 1.0;
+				float val1;
+				if (bSlopeOpt1)
+					val1 = 360.0;
+				else
+					val1 = 640.0;
+				auto sPt1 = CalcLinePoint(0.0, line1, bSlopeOpt1);
+				auto ePt1 = CalcLinePoint(val1, line1, bSlopeOpt1);
+				cv::line(img, sPt1, ePt1, cv::Scalar(255, 0, 255),3);
+
+				line2 = Segmentator::LineProjection(R, t, Segmentator::Lw2, frame->mpCamera->Kfluker, m2);
+				m2 = -line2.at<float>(0) / line2.at<float>(1);
+				bool bSlopeOpt2 = abs(m2) > 1.0;
+				float val2;
+				if (bSlopeOpt2)
+					val2 = 360.0;
+				else
+					val2 = 640.0;
+				auto sPt2 = CalcLinePoint(0.0, line2, bSlopeOpt2);
+				auto ePt2 = CalcLinePoint(val2, line2, bSlopeOpt2);
+				cv::line(img, sPt2, ePt2, cv::Scalar(255, 255, 0),3);
+			}*/
+			////frame line visualization
+		}
+		user->mapFrames[frame->mnFrameID] = frame;
+		user->mnPrevFrameID = frame->mnFrameID;
+		user->mbProgress = false;
+		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+		float t_test1 = du_test1 / 1000.0;
+		std::cout << "Frame = " << user->userName << " : " << id << ", Matches = " << nInliers << ", time =" << t_test1 << std::endl;
+		system->UpdateTrackingTime(t_test1);
+
+		////visualization
+		if (mapState == MapState::Initialized && userState != UserState::NotEstimated) {
+			for (int i = 0; i < frame->mvKeys.size(); i++) {
+				auto pMP = frame->mvpMapPoints[i];
+				cv::Scalar color = cv::Scalar(255, 0, 255);
+				int r = 2;
+				if (pMP && !pMP->isBad())
+				{
+					color.val[1] = 255;
+					color.val[2] = 0;
+					r++;
+					cv::circle(img, frame->mvKeys[i].pt, r, color, -1);
+				}
+			}
+			system->mpVisualizer->ResizeImage(img, img);
+			system->mpVisualizer->SetOutputImage(img, user->GetVisID());
+
+			/////save image
+			std::stringstream sss;
+			sss << "../../bin/img/" << user->userName << "/Track/" << id << ".jpg";
+			cv::imwrite(sss.str(), img);
+			/////save image
+		}
+		////visualization
+	}
+
+	void Tracker::TrackWithImage(ThreadPool::ThreadPool* pool, SLAM* system, cv::Mat im, int id, User* user, double ts) {
+		if (user->mbProgress)
+			return;
+		user->mbProgress = true;
+		auto cam = user->mpCamera;
+		auto map = user->mpMap;
+
+		std::cout << "Frame = " << user->userName << "=start!!" << std::endl;
+
 		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 		Frame* frame = new Frame(im, cam, id, ts);
 		user->mnCurrFrameID = frame->mnFrameID;
@@ -95,6 +367,7 @@ namespace EdgeSLAM {
 					cv::Mat Tpredict = user->PredictPose();
 					frame->SetPose(Tpredict);
 					bTrack = system->mpTracker->TrackWithPrevFrame(f_ref, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+
 					if (!bTrack) {
 						std::cout << "track with reference frame :: start" << std::endl;
 
@@ -207,7 +480,7 @@ namespace EdgeSLAM {
 				}
 			}
 			system->mpVisualizer->ResizeImage(im, im);
-			system->mpVisualizer->SetOutputImage(im, 0);
+			system->mpVisualizer->SetOutputImage(im, user->GetVisID());
 		}
 		////visualization
 	}
@@ -282,7 +555,7 @@ namespace EdgeSLAM {
 		std::vector<bool> vbDiscarded;
 		vbDiscarded.resize(nKFs);
 
-		std::vector<int> vnGoods(nKFs,0);
+		//std::vector<int> vnGoods(nKFs,0);
 
 		int nCandidates = 0;
 
@@ -350,7 +623,7 @@ namespace EdgeSLAM {
 				}
 
 				nGood = Optimizer::PoseOptimization(cur);
-				vnGoods[i] = nGood;
+				//vnGoods[i] = nGood;
 				std::cout << "relocalization="<<i<<"=init::ngood=" << nGood << std::endl;
 				if (nGood < 10){
 					vbDiscarded[i] = true;
@@ -390,21 +663,26 @@ namespace EdgeSLAM {
 					}
 				}
 				std::cout << "relocalization=" << i << "=final::ngood=" << nGood << std::endl;
-				if (vnGoods[i] == nGood) {
+				/*if (vnGoods[i] == nGood) {
 					vbDiscarded[i] = true;
 					nCandidates--;
 					continue;
-				}
-				vnGoods[i] = nGood;
+				}*/
+				//vnGoods[i] = nGood;
 				if (nGood >= 50)
 				{
 					bMatch = true;
 					break;
 				}
+				else {
+					vbDiscarded[i] = true;
+					nCandidates--;
+				}
 				
 				continue;
 			}
 		}
+		std::cout << "End::relocalization!!" << std::endl;
 		return nGood;
 		/*if (!bMatch)
 		{

@@ -19,6 +19,8 @@ namespace EdgeSLAM {
 		Kinv.at<float>(0, 2) = -cx / fx;
 		Kinv.at<float>(1, 2) = -cy / fy;
 
+		Kfluker = (cv::Mat_<float>(3, 3) << fx, 0, 0, 0, fy, 0, -fy*cx, -fx*cy, fx*fy);
+
 		D = cv::Mat::zeros(4, 1, CV_32FC1);
 		D.at<float>(0) = _d1;
 		D.at<float>(1) = _d2;
