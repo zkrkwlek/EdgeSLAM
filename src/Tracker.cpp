@@ -40,7 +40,17 @@ namespace EdgeSLAM {
 
 		return cv::Point2f(x, y);
 	}
+	void Tracker::UpdateDeviceGyro(SLAM* system, User* user, int id) {
+		std::stringstream ss;
+		ss << "/Load?keyword=Gyro" << "&id=" << id << "&src=" << user->userName;
+		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+		auto res = mpAPI->Send(ss.str(), "");
+		int n2 = res.size();
 
+		cv::Mat fdata = cv::Mat::zeros(3, 3, CV_32FC1);
+		std::memcpy(fdata.data, res.data(), res.size());
+		user->UpdateGyro(fdata);
+	}
 	void Tracker::Track(ThreadPool::ThreadPool* pool, SLAM* system, int id, User* user, double ts) {
 		if (user->mbProgress)
 			return;
@@ -129,10 +139,21 @@ namespace EdgeSLAM {
 			}
 			else {
 				if (userState == UserState::Success) {
+					
 					//std::cout << "Tracker::Start" << std::endl;
 					auto f_ref = user->mapFrames[user->mnPrevFrameID];
 					f_ref->check_replaced_map_points();
-					cv::Mat Tpredict = user->PredictPose();
+
+					cv::Mat Tpredict;
+					if (user->mbIMU) {
+						auto Rgyro = user->GetGyro();
+						cv::Mat Tgyro = cv::Mat::eye(4, 4, CV_32FC1);
+						Rgyro.copyTo(Tgyro.rowRange(0, 3).colRange(0, 3));
+						Tpredict = Tgyro * user->GetPose();
+					}
+					else {
+						Tpredict = user->PredictPose();
+					}
 					frame->SetPose(Tpredict);
 					bTrack = system->mpTracker->TrackWithPrevFrame(f_ref, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
 
@@ -200,7 +221,7 @@ namespace EdgeSLAM {
 				{
 					if (!frame->mvbOutliers[i])
 					{
-						auto kp = frame->mvKeysUn[i];
+						auto kp = frame->mvKeys[i];
 						auto mp = frame->mvpMapPoints[i]->GetWorldPos();
 						int octave = kp.octave;
 						data.at<float>(nDataIdx++) = kp.pt.x;

@@ -49,13 +49,14 @@ namespace EdgeSLAM {
 	/////Multi user and multi map
 	public:
 		void CreateMap(std::string name);
-		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, bool _b);
+		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, bool _b, bool _b2 = false);
 		bool CheckMap(std::string str);
 		bool CheckUser(std::string str);
 		void AddUser(std::string id, User* user);
 		void RemoveUser(std::string id);
 		User* GetUser(std::string id);
 		std::vector<User*> GetAllUsersInMap(std::string map);
+		void UpdateDeviceGyroSensor(std::string user, int id);
 		void UpdateDevicePosition(std::string user, int id);
 		void AddMap(std::string name, Map* pMap);
 		Map* GetMap(std::string name);

@@ -20,7 +20,7 @@ namespace EdgeSLAM {
 	class User {
 	public:
 		User();
-		User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, bool _b);
+		User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, bool _b, bool bimu = false);
 		virtual ~User();
 	public:
 		bool mbMotionModel;
@@ -30,6 +30,8 @@ namespace EdgeSLAM {
 		cv::Mat GetInversePose();
 		cv::Mat PredictPose();
 		void UpdatePose(cv::Mat Tnew);
+		void UpdateGyro(cv::Mat _R);
+		cv::Mat GetGyro();
 
 		cv::Mat GetCameraMatrix();
 		cv::Mat GetCameraInverseMatrix();
@@ -39,7 +41,7 @@ namespace EdgeSLAM {
 		Map* mpMap;
 		Camera* mpCamera;
 		CameraPose* mpCamPose;
-		bool mbMapping;
+		bool mbMapping, mbIMU;
 
 		std::map<int, Frame*> mapFrames;
 		//std::map<int, KeyFrame*> mapKeyFrames;
@@ -65,6 +67,9 @@ namespace EdgeSLAM {
 
 		std::mutex mMutexDevicePositions;
 		std::vector<cv::Mat> mVecDevicePositions;
+
+		std::mutex mMutexGyro, mMutexAcc;
+		cv::Mat Rgyro, tacc;
 
 	};
 }

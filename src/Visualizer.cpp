@@ -248,6 +248,59 @@ namespace EdgeSLAM {
 					auto user = vpUsers[i];
 					if (!user)
 						continue;
+					//if (i == 0) {
+					//	////gyro testa
+					//	auto Ra = user->GetGyro();
+					//	cv::Mat Tgyro = cv::Mat::eye(4, 4, CV_32FC1);
+					//	Ra.copyTo(Tgyro.rowRange(0, 3).colRange(0, 3));
+					//	cv::Mat T = user->GetPose();
+					//	T = Tgyro*T;
+					//	cv::Mat Rtemp = T.rowRange(0, 3).colRange(0, 3);
+
+
+					//	cv::Point2f pt1 = cv::Point2f(0,0);
+					//	pt1 += mVisMidPt;
+					//	cv::circle(tempVis, pt1, 3, cv::Scalar(0, 0, 255), -1);
+
+					//	cv::Mat directionZ = Rtemp.row(2);
+					//	cv::Point2f dirPtZ = cv::Point2f(directionZ.at<float>(mnAxis1)* mnVisScale / 10.0, directionZ.at<float>(mnAxis2)* mnVisScale / 10.0) + pt1;
+					//	cv::line(tempVis, pt1, dirPtZ, cv::Scalar(255, 0, 0), 2);
+
+					//	cv::Mat directionY = Rtemp.row(1);
+					//	cv::Point2f dirPtY = cv::Point2f(directionY.at<float>(mnAxis1)* mnVisScale / 10.0, directionY.at<float>(mnAxis2)* mnVisScale / 10.0) + pt1;
+					//	cv::line(tempVis, pt1, dirPtY, cv::Scalar(0, 255, 0), 2);
+
+					//	cv::Mat directionX = Rtemp.row(0);
+					//	cv::Point2f dirPtX1 = pt1 + cv::Point2f(directionX.at<float>(mnAxis1)* mnVisScale / 10.0, directionX.at<float>(mnAxis2)* mnVisScale / 10.0);
+					//	cv::Point2f dirPtX2 = pt1 - cv::Point2f(directionX.at<float>(mnAxis1)* mnVisScale / 10.0, directionX.at<float>(mnAxis2)* mnVisScale / 10.0);
+					//	cv::line(tempVis, dirPtX1, dirPtX2, cv::Scalar(0, 0, 255), 2);
+
+					//}
+
+					//{
+					//	////gyro testa
+					//	cv::Mat T = user->GetPose();
+					//	cv::Mat R = T.rowRange(0, 3).colRange(0, 3);
+					//	auto pos = user->GetPosition();
+					//	cv::Point2f pt1 = cv::Point2f(pos.at<float>(mnAxis1)* mnVisScale, pos.at<float>(mnAxis2)* mnVisScale);
+					//	pt1 += mVisMidPt;
+					//	cv::circle(tempVis, pt1, 3, cv::Scalar(0, 0, 255), -1);
+
+					//	cv::Mat directionZ = R.row(2);
+					//	cv::Point2f dirPtZ = cv::Point2f(directionZ.at<float>(mnAxis1)* mnVisScale / 10.0, directionZ.at<float>(mnAxis2)* mnVisScale / 10.0) + pt1;
+					//	cv::line(tempVis, pt1, dirPtZ, cv::Scalar(255, 0, 0), 2);
+
+					//	cv::Mat directionY = R.row(1);
+					//	cv::Point2f dirPtY = cv::Point2f(directionY.at<float>(mnAxis1)* mnVisScale / 10.0, directionY.at<float>(mnAxis2)* mnVisScale / 10.0) + pt1;
+					//	cv::line(tempVis, pt1, dirPtY, cv::Scalar(0, 255, 0), 2);
+
+					//	cv::Mat directionX = R.row(0);
+					//	cv::Point2f dirPtX1 = pt1 + cv::Point2f(directionX.at<float>(mnAxis1)* mnVisScale / 10.0, directionX.at<float>(mnAxis2)* mnVisScale / 10.0);
+					//	cv::Point2f dirPtX2 = pt1 - cv::Point2f(directionX.at<float>(mnAxis1)* mnVisScale / 10.0, directionX.at<float>(mnAxis2)* mnVisScale / 10.0);
+					//	cv::line(tempVis, dirPtX1, dirPtX2, cv::Scalar(0, 0, 255), 2);
+
+					//}
+
 					auto pos = user->GetPosition();
 					cv::Point2f pt1 = cv::Point2f(pos.at<float>(mnAxis1)* mnVisScale, pos.at<float>(mnAxis2)* mnVisScale);
 					pt1 += mVisMidPt;

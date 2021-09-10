@@ -94,8 +94,8 @@ namespace EdgeSLAM {
 		auto pNewMap = new Map(mpDBoWVoc);
 		AddMap(name, pNewMap);
 	}
-	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, bool _b){
-		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _b);
+	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, bool _b, bool _bimu){
+		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _b, _bimu);
 		pNewUser->mpMap = GetMap(_map);
 		AddUser(_user, pNewUser);
 	}
@@ -112,6 +112,13 @@ namespace EdgeSLAM {
 			return true;
 		}
 		return false;
+	}
+	void SLAM::UpdateDeviceGyroSensor(std::string user, int id) {
+		if (!CheckUser(user))
+			return;
+		auto pUser = GetUser(user);
+		pool->EnqueueJob(Tracker::UpdateDeviceGyro, this, pUser, id);
+		
 	}
 	void SLAM::UpdateDevicePosition(std::string user, int id) {
 		if (!CheckUser(user))
