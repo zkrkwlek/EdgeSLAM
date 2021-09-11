@@ -22,9 +22,9 @@ namespace EdgeSLAM {
 		auto pLoopCloser = system->mpLoopCloser;
 		if (kf->mnId < 2)
 			return;
-		std::cout << "LoopClosing #" << map->mnNumLoopClosingFrames << " frames" << std::endl;
+		//std::cout << "LoopClosing #" << map->mnNumLoopClosingFrames << " frames" << std::endl;
 		if (map->mnNumLoopClosingFrames == 1) {
-			std::cout << "Loop closing error!!!!!!!!!!!!!!" << std::endl;
+			//std::cout << "Loop closing error!!!!!!!!!!!!!!" << std::endl;
 			return;
 		}
 		map->mnNumLoopClosingFrames++;
@@ -32,17 +32,17 @@ namespace EdgeSLAM {
 		bool bSim3 = false;
 		bool bDetect = pLoopCloser->DetectLoop(system, map, kf);
 
-		/*if (bDetect)
+		if (bDetect)
 		{
-			std::cout << "ComputeSim3::start" << std::endl;
+			//std::cout << "ComputeSim3::start" << std::endl;
 			bSim3 = pLoopCloser->ComputeSim3(system, map, kf);
-			std::cout << "ComputeSim3::end" << std::endl;
+			//std::cout << "ComputeSim3::end" << std::endl;
 		}
 		if (bSim3) {
-			std::cout << "CorrectLoop::start" << std::endl;
+			//std::cout << "CorrectLoop::start" << std::endl;
 			pLoopCloser->CorrectLoop(system, map, kf);
-			std::cout << "CorrectLoop::start" << std::endl;
-		}*/
+			//std::cout << "CorrectLoop::start" << std::endl;
+		}
 		map->mnNumLoopClosingFrames--;
 	}
 	bool LoopCloser::DetectLoop(SLAM* system, Map* map, KeyFrame* kf) {
@@ -182,7 +182,8 @@ namespace EdgeSLAM {
 			nCandidates++;
 		}
 		bool bMatch = false;
-		std::cout << "ComputeSim #candidates = " << nCandidates << std::endl;
+		//std::cout << "ComputeSim #candidates = " << nCandidates <<", "<< nInitialCandidates << std::endl;
+
 		// Perform alternatively RANSAC iterations for each candidate
 		// until one is succesful or all fail
 		while (nCandidates>0 && !bMatch)
@@ -201,7 +202,7 @@ namespace EdgeSLAM {
 
 				Sim3Solver* pSolver = vpSim3Solvers[i];
 				cv::Mat Scm = pSolver->iterate(5, bNoMore, vbInliers, nInliers);
-
+				
 				// If Ransac reachs max. iterations discard keyframe
 				if (bNoMore)
 				{
@@ -218,7 +219,6 @@ namespace EdgeSLAM {
 						if (vbInliers[j])
 							vpMapPointMatches[j] = vvpMapPointMatches[i][j];
 					}
-
 					cv::Mat R = pSolver->GetEstimatedRotation();
 					cv::Mat t = pSolver->GetEstimatedTranslation();
 					const float s = pSolver->GetEstimatedScale();
@@ -271,10 +271,8 @@ namespace EdgeSLAM {
 				}
 			}
 		}
-		std::cout << "3" << std::endl;
 		// Find more matches projecting with the computed Sim3
 		SearchPoints::SearchKeyByProjection(kf->matcher, kf, map->mScw, map->mvpLoopMapPoints, map->mvpCurrentMatchedPoints, kf->matcher->min_descriptor_distance);
-		std::cout << "4" << std::endl;
 		// If enough matches accept Loop
 		int nTotalMatches = 0;
 		for (size_t i = 0; i<map->mvpCurrentMatchedPoints.size(); i++)
@@ -339,6 +337,8 @@ namespace EdgeSLAM {
 
 
 		{
+			std::cout << "Correct start" << std::endl;
+
 			// Get Map Mutex
 			std::unique_lock < std::mutex > lock(map->mMutexMapUpdate);
 
@@ -365,6 +365,8 @@ namespace EdgeSLAM {
 				//Pose without correction
 				NonCorrectedSim3[pKFi] = g2oSiw;
 			}
+
+			std::cout << "Correct "<< CorrectedSim3.size() << std::endl;
 
 			// Correct all MapPoints obsrved by current keyframe and neighbors, so that they align with the other side of the loop
 			for (KeyFrameAndPose::iterator mit = CorrectedSim3.begin(), mend = CorrectedSim3.end(); mit != mend; mit++)
@@ -434,6 +436,7 @@ namespace EdgeSLAM {
 
 		}
 
+
 		// Project MapPoints observed in the neighborhood of the loop keyframe
 		// into the current keyframe and neighbors using corrected poses.
 		// Fuse duplications.
@@ -443,6 +446,7 @@ namespace EdgeSLAM {
 		// After the MapPoint fusion, new links in the covisibility graph will appear attaching both sides of the loop
 		std::map<KeyFrame*, std::set<KeyFrame*> > LoopConnections;
 
+		std::cout << "Loop MP = " << map->mvpCurrentConnectedKFs.size() << std::endl;
 		for (auto vit = map->mvpCurrentConnectedKFs.begin(), vend = map->mvpCurrentConnectedKFs.end(); vit != vend; vit++)
 		{
 			KeyFrame* pKFi = *vit;
@@ -461,8 +465,11 @@ namespace EdgeSLAM {
 			}
 		}
 
+
 		// Optimize graph
 		Optimizer::OptimizeEssentialGraph(map, map->mpMatchedKF, kf, NonCorrectedSim3, CorrectedSim3, LoopConnections, map->mbFixScale);
+
+		std::cout << "Essential Graph!!" << std::endl;
 
 		map->InformNewBigChange();
 

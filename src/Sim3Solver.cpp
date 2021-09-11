@@ -35,10 +35,7 @@ namespace EdgeSLAM {
 				MapPoint* pMP1 = vpKeyFrameMP1[i1];
 				MapPoint* pMP2 = vpMatched12[i1];
 
-				if (!pMP1)
-					continue;
-
-				if (pMP1->isBad() || pMP2->isBad())
+				if (!pMP1 || !pMP2 || pMP1->isBad() || pMP2->isBad())
 					continue;
 
 				int indexKF1 = pMP1->GetIndexInKeyFrame(pKF1);
@@ -126,15 +123,15 @@ namespace EdgeSLAM {
 
 		std::random_device rd;
 		std::mt19937_64 g(rd());
-		std::uniform_int_distribution<int> range(0, vAvailableIndices.size() - 1);
-
+		
 		int nCurrentIterations = 0;
 		while (mnIterations<mRansacMaxIts && nCurrentIterations<nIterations)
 		{
 			nCurrentIterations++;
 			mnIterations++;
-
+			
 			vAvailableIndices = mvAllIndices;
+			std::uniform_int_distribution<int> range(0, vAvailableIndices.size() - 1);
 
 			// Get min set of points
 			for (short i = 0; i < 3; ++i)
@@ -148,11 +145,8 @@ namespace EdgeSLAM {
 				vAvailableIndices[randi] = vAvailableIndices.back();
 				vAvailableIndices.pop_back();
 			}
-
 			ComputeSim3(P3Dc1i, P3Dc2i);
-
 			CheckInliers();
-
 			if (mnInliersi >= mnBestInliers)
 			{
 				mvbBestInliers = mvbInliersi;
