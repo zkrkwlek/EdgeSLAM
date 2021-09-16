@@ -7,7 +7,11 @@
 #include <mutex>
 
 namespace EdgeSLAM {
+	class SLAM;
 	class MapPoint;
+	class KeyFrame;
+	class User;
+	class Map;
 	class Plane {
 	public:
 		Plane();
@@ -28,8 +32,26 @@ namespace EdgeSLAM {
 		cv::Mat matPlaneParam;
 	};
 
+	//frame or keyframe id
+	class LocalIndoorModel {
+	public:
+		LocalIndoorModel();
+		LocalIndoorModel(KeyFrame* pKF);
+		virtual ~LocalIndoorModel();
+	public:
+		KeyFrame* mpTargetKF;
+		std::vector<KeyFrame*> mvpLocalKFs;
+		std::vector<MapPoint*> mvpLocalMPs;
+		Plane *mpFloor, *mpCeil, *mpWall1, *mpWall2, *mpWall3;
+	private:
+
+	};
+
 	class PlaneProcessor {
 	public:
+		std::map<int, LocalIndoorModel*> LocalPlanarMap;
+	public:
+		static void EstimateLocalMapPlanes(SLAM* system, Map* map, KeyFrame* pKF);
 		static bool calcUnitNormalVector(cv::Mat& X);
 		static int GetNormalType(cv::Mat X);
 		static bool PlaneInitialization(Plane* plane,std::vector<MapPoint*> vpPoints, std::vector<MapPoint*>& vpOutlierMPs, int ransac_trial = 1500, float thresh_distance = 0.05, float thresh_ratio = 0.1);

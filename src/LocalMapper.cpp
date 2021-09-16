@@ -8,6 +8,7 @@
 #include <FeatureTracker.h>
 #include <SearchPoints.h>
 #include <Optimizer.h>
+#include <Plane.h>
 #include <Utils.h>
 #include <chrono>
 
@@ -40,6 +41,7 @@ namespace EdgeSLAM {
 			}
 			pMapper->KeyFrameCulling(map, targetKF);
 		}
+		pool->EnqueueJob(PlaneProcessor::EstimateLocalMapPlanes, system, map, targetKF);
 		pool->EnqueueJob(LoopCloser::ProcessLoopClosing, system, map, targetKF);
 		map->mnNumMappingFrames--;
 
@@ -191,6 +193,7 @@ namespace EdgeSLAM {
 			// Triangulate each match
 			const int nmatches = vMatchedIndices.size();
 			for (int ikp = 0; ikp<nmatches; ikp++)
+
 			{
 				const int &idx1 = vMatchedIndices[ikp].first;
 				const int &idx2 = vMatchedIndices[ikp].second;

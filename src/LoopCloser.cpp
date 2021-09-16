@@ -246,7 +246,6 @@ namespace EdgeSLAM {
 			for (int i = 0; i<nInitialCandidates; i++)
 				map->mvpEnoughConsistentCandidates[i]->SetErase();
 			kf->SetErase();
-			std::cout << "false" << std::endl;
 			return false;
 		}
 

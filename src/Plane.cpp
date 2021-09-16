@@ -1,6 +1,11 @@
 #include <Plane.h>
 #include <random>
+#include <SLAM.h>
+#include <User.h>
+#include <Map.h>
+#include <KeyFrame.h>
 #include <MapPoint.h>
+#include <Segmentator.h>
 
 namespace EdgeSLAM {
 	Plane::Plane() :mbInit(false), mbParallel(false) {
@@ -43,6 +48,116 @@ namespace EdgeSLAM {
 	cv::Mat Plane::GetParam() {
 		std::unique_lock<std::mutex> lockTemp(mMutexParam);
 		return matPlaneParam.clone();
+	}
+
+	LocalIndoorModel::LocalIndoorModel() {
+		mpFloor = new Plane();
+		mpWall1 = new Plane();
+		mpWall2 = new Plane();
+		mpWall3 = new Plane();
+		mpCeil = new Plane();
+	}
+	LocalIndoorModel::LocalIndoorModel(KeyFrame* pKF):mpTargetKF(pKF){
+		mpFloor = new Plane();
+		mpWall1 = new Plane();
+		mpWall2 = new Plane();
+		mpWall3 = new Plane();
+		mpCeil = new Plane();
+	}
+	LocalIndoorModel::~LocalIndoorModel() {
+
+	}
+
+	void PlaneProcessor::EstimateLocalMapPlanes(SLAM* system, Map* map, KeyFrame* pKF) {
+		
+		if (map->mnNumPlaneEstimation >= 1){
+			std::cout << "Already Doing Plane Estimation!! = " << map->mnNumPlaneEstimation << std::endl;
+			return;
+		}
+		else {
+			std::cout << "Start PE = " << map->mnNumPlaneEstimation << std::endl;
+		}
+		map->mnNumPlaneEstimation++;
+		LocalMap* pLocalMap = new LocalCovisibilityMap();
+		std::vector<MapPoint*> vpLocalMPs;
+		std::vector<KeyFrame*> vpLocalKFs;
+
+		//std::cout << "Track::LocalMap::Update::start" << std::endl;
+		LocalIndoorModel *pModel = new LocalIndoorModel(pKF);
+		pLocalMap->UpdateLocalMap(pKF, vpLocalKFs, vpLocalMPs);
+
+		std::set<MapPoint*> spFloorMPs, spWallMPs, spCeilMPs;
+		std::vector<MapPoint*> vpFloorMPs, vpWallMPs, vpCeilMPs;
+
+		for (auto iter = vpLocalMPs.begin(); iter != vpLocalMPs.end(); iter++) {
+			auto pMPi = *iter;// ->first;
+			if (!pMPi || pMPi->isBad())
+				continue;
+						
+			if (Segmentator::ObjectPoints.Count(pMPi->mnId)) {
+				auto obj = Segmentator::ObjectPoints.Get(pMPi->mnId);
+				if (obj) {
+					int label = obj->GetLabel();
+					switch (label) {
+					case (int)ObjectLabel::FLOOR:
+						if (spFloorMPs.count(pMPi))
+							continue;
+						spFloorMPs.insert(pMPi);
+						break;
+					case (int)ObjectLabel::WALL:
+						if (spWallMPs.count(pMPi))
+							continue;
+						spWallMPs.insert(pMPi);
+						break;
+					case (int)ObjectLabel::CEIL:
+						break;
+					}
+				}
+			}
+			/*cv::Mat x3D = pMPi->GetWorldPos();
+			cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+			tpt += mVisMidPt;
+			cv::circle(tempVis, tpt, 2, color, -1);*/
+		}//for
+		//cluster mps from label
+
+		if (spFloorMPs.size() < 200){
+			map->mnNumPlaneEstimation--;
+			return;
+		}
+		std::cout << "pe = " << spFloorMPs.size() << " " << spWallMPs.size() << std::endl;
+
+		//map->ClearPlanarMPs();
+		{
+			std::vector<MapPoint*> vpMPs(spFloorMPs.begin(), spFloorMPs.end());
+			std::vector<MapPoint*> vpOutlierMPs;
+			pModel->mpFloor->mbInit = PlaneProcessor::PlaneInitialization(pModel->mpFloor, vpMPs, vpOutlierMPs);
+
+			/*if (pModel->mpFloor->mbInit) {
+				for (int i = 0, iend = pModel->mpFloor->mvpMPs.size(); i < iend; i++) {
+					auto pMP = pModel->mpFloor->mvpMPs[i];
+					if (!pMP || pMP->isBad())
+						continue;
+					map->AddPlanarMP(pMP->GetWorldPos(), 0);
+				}
+			}*/
+		}
+		//std::vector<MapPoint*> vpOutlierWallMPs, vpOutlierWallMPs2;
+		//{
+		//	std::vector<MapPoint*> vpMPs(spWallMPs.begin(), spWallMPs.end());
+
+		//	pModel->mpWall1->mbInit = PlaneProcessor::PlaneInitialization(pModel->mpWall1, vpMPs, vpOutlierWallMPs, 1500, 0.01);
+		//	//if (pModel->mpWall1->mbInit) {
+		//	//	for (int i = 0, iend = pModel->mpWall1->mvpMPs.size(); i < iend; i++) {
+		//	//		auto pMP = pModel->mpWall1->mvpMPs[i];
+		//	//		if (!pMP || pMP->isBad())
+		//	//			continue;
+		//	//		//map->AddPlanarMP(pMP->GetWorldPos(), 1);
+		//	//	}
+		//	//}
+		//}
+
+		map->mnNumPlaneEstimation--;
 	}
 
 	bool PlaneProcessor::calcUnitNormalVector(cv::Mat& X) {

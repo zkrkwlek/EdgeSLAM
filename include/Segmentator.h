@@ -6,7 +6,7 @@
 #include <opencv2/core.hpp>
 #include <ThreadPool.h>
 #include <WebAPI.h>
-
+#include <NewMapClass.h>
 
 namespace EdgeSLAM {
 	
@@ -53,8 +53,9 @@ namespace EdgeSLAM {
 		static void Init();
 		
 	public:
+
+		static NewMapClass<int, Object*> ObjectPoints;
 		static int mnMaxObjectLabel;
-		static std::map<int, Object*> ObjectPoints;
 		static std::set<MapPoint*> mspAllFloorPoints;
 		static std::set<MapPoint*> mspAllWallPoints;
 		static std::vector<cv::Vec3b> mvObjectLabelColors;

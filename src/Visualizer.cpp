@@ -218,8 +218,8 @@ namespace EdgeSLAM {
 						continue;
 
 					cv::Scalar color = cv::Scalar(0, 0, 0);
-					if (Segmentator::ObjectPoints.count(pMPi->mnId)) {
-						auto obj = Segmentator::ObjectPoints[pMPi->mnId];
+					if (Segmentator::ObjectPoints.Count(pMPi->mnId)) {
+						auto obj = Segmentator::ObjectPoints.Get(pMPi->mnId);
 						if (obj) {
 							int label = obj->GetLabel();
 							color = Segmentator::mvObjectLabelColors[label];

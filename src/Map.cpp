@@ -7,7 +7,7 @@
 #include <windows.h>
 
 namespace EdgeSLAM {
-	Map::Map(DBoW3::Vocabulary* voc, bool bFixScale):mnMaxKFid(0), mnBigChangeIdx(0), mnNumMappingFrames(0), mnNumLoopClosingFrames(0), mnNextKeyFrameID(0), mnNextMapPointID(0), mState(MapState::NoImages), mpVoc(voc),
+	Map::Map(DBoW3::Vocabulary* voc, bool bFixScale):mnMaxKFid(0), mnBigChangeIdx(0), mnNumMappingFrames(0), mnNumLoopClosingFrames(0), mnNumPlaneEstimation(0), mnNextKeyFrameID(0), mnNextMapPointID(0), mState(MapState::NoImages), mpVoc(voc),
 		mbResetRequested(false), mbFinishRequested(false), mbFinished(true),
 		mbAbortBA(false), mbStopped(false), mbStopRequested(false), mbNotStop(false),
 		mpMatchedKF(nullptr), mnLastLoopKFid(0), mbRunningGBA(false), mbFinishedGBA(true),
@@ -261,6 +261,115 @@ namespace EdgeSLAM {
 	LocalCovisibilityMap::~LocalCovisibilityMap() {
 
 	}
+	/////////////keyframe
+	void LocalCovisibilityMap::UpdateLocalMap(KeyFrame* kf, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs){
+		UpdateLocalKeyFrames(kf, vpLocalKFs);
+		UpdateLocalMapPoitns(kf, vpLocalKFs, vpLocalMPs);
+	}
+	void LocalCovisibilityMap::UpdateLocalKeyFrames(KeyFrame* kf, std::vector<KeyFrame*>& vpLocalKFs){
+		// Each map point vote for the keyframes in which it has been observed
+		std::map<KeyFrame*, int> keyframeCounter;
+		int nFrameID = kf->mnId;
+		for (int i = 0; i<kf->N; i++)
+		{
+			auto pMP = kf->mvpMapPoints[i];
+			if (pMP && !pMP->isBad()) {
+				const std::map<KeyFrame*, size_t> observations = pMP->GetObservations();
+				for (std::map<KeyFrame*, size_t>::const_iterator it = observations.begin(), itend = observations.end(); it != itend; it++)
+					keyframeCounter[it->first]++;
+			}
+			else {
+				kf->mvpMapPoints[i] = nullptr;
+			}
+		}
+
+		if (keyframeCounter.empty())
+			return;
+
+		int max = 0;
+		KeyFrame* pKFmax = static_cast<KeyFrame*>(nullptr);
+		std::set<KeyFrame*> spKFs;
+
+		// All keyframes that observe a map point are included in the local map. Also check which keyframe shares most points
+		for (std::map<KeyFrame*, int>::const_iterator it = keyframeCounter.begin(), itEnd = keyframeCounter.end(); it != itEnd; it++)
+		{
+			KeyFrame* pKF = it->first;
+
+			if (pKF->isBad())
+				continue;
+
+			if (it->second>max)
+			{
+				max = it->second;
+				pKFmax = pKF;
+			}
+
+			vpLocalKFs.push_back(it->first);
+			spKFs.insert(pKF);
+		}
+
+		// Include also some not-already-included keyframes that are neighbors to already-included keyframes
+		//for (std::vector<KeyFrame*>::const_iterator itKF = vpLocalKFs.begin(), itEndKF = vpLocalKFs.end(); itKF != itEndKF; itKF++)
+		for (size_t i = 0, iend = vpLocalKFs.size(); i < iend; i++)
+		{
+			// Limit the number of keyframes
+			if (vpLocalKFs.size()>80)
+				break;
+
+			KeyFrame* pKF = vpLocalKFs[i];// *itKF;
+
+			const std::vector<KeyFrame*> vNeighs = pKF->GetBestCovisibilityKeyFrames(10);
+
+			for (std::vector<KeyFrame*>::const_iterator itNeighKF = vNeighs.begin(), itEndNeighKF = vNeighs.end(); itNeighKF != itEndNeighKF; itNeighKF++)
+			{
+				KeyFrame* pNeighKF = *itNeighKF;
+				if (pNeighKF && !pNeighKF->isBad() && !spKFs.count(pNeighKF))
+				{
+					spKFs.insert(pNeighKF);
+					break;
+				}
+			}
+
+			const std::set<KeyFrame*> spChilds = pKF->GetChilds();
+			for (std::set<KeyFrame*>::const_iterator sit = spChilds.begin(), send = spChilds.end(); sit != send; sit++)
+			{
+				KeyFrame* pChildKF = *sit;
+				if (pChildKF && !pChildKF->isBad() && !spKFs.count(pChildKF))
+				{
+					spKFs.insert(pChildKF);
+					break;
+				}
+			}
+
+			KeyFrame* pParent = pKF->GetParent();
+			if (pParent && !pParent->isBad() && !spKFs.count(pParent))
+			{
+				spKFs.insert(pParent);
+				break;
+			}
+
+		}
+
+	}
+	void LocalCovisibilityMap::UpdateLocalMapPoitns(KeyFrame* kf, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs){
+		std::set<MapPoint*> spMPs;
+		for (std::vector<KeyFrame*>::const_iterator itKF = vpLocalKFs.begin(), itEndKF = vpLocalKFs.end(); itKF != itEndKF; itKF++)
+		{
+			KeyFrame* pKF = *itKF;
+			const std::vector<MapPoint*> vpMPs = pKF->GetMapPointMatches();
+
+			for (std::vector<MapPoint*>::const_iterator itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
+			{
+				MapPoint* pMP = *itMP;
+				if (!pMP || pMP->isBad() || spMPs.count(pMP))
+					continue;
+				vpLocalMPs.push_back(pMP);
+				spMPs.insert(pMP);
+			}
+		}
+	}
+	////////////keyframe
+
 	void LocalCovisibilityMap::UpdateLocalMap(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs, std::vector<TrackPoint*>& vpLocalTPs) {
 		UpdateLocalKeyFrames(user, f, vpLocalKFs);
 		UpdateLocalMapPoitns(f, vpLocalKFs, vpLocalMPs, vpLocalTPs);

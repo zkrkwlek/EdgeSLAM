@@ -13,7 +13,7 @@
 namespace EdgeSLAM {
 
 	int Segmentator::mnMaxObjectLabel;
-	std::map<int, Object*> Segmentator::ObjectPoints;
+	NewMapClass<int, Object*> Segmentator::ObjectPoints;
 	std::vector<cv::Vec3b> Segmentator:: mvObjectLabelColors;
 	std::set<MapPoint*> Segmentator::mspAllFloorPoints;
 	std::set<MapPoint*> Segmentator::mspAllWallPoints;
@@ -347,12 +347,12 @@ namespace EdgeSLAM {
 			////update object label
 			int nmpid = pMP->mnId;
 			Object* obj = nullptr;
-			if (ObjectPoints.count(nmpid)) {
-				obj = ObjectPoints[nmpid];
+			if (ObjectPoints.Count(nmpid)) {
+				obj = ObjectPoints.Get(nmpid);
 			}
 			else {
 				obj = new Object();
-				ObjectPoints[nmpid] = obj;
+				ObjectPoints.Update(nmpid, obj);
 			}
 			obj->Update(label);
 			////update object label
