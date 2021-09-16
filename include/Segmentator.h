@@ -39,16 +39,6 @@ namespace EdgeSLAM {
 		std::mutex mMutexObject;
 	};
 
-	//frame or keyframe id
-	class LocalIndoorModel {
-	public:
-		LocalIndoorModel();
-		virtual ~LocalIndoorModel();
-
-	private:
-
-	};
-
 	class Segmentator {
 	public:
 		Segmentator();
