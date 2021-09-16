@@ -216,12 +216,20 @@ namespace EdgeSLAM {
 					auto pMPi = *iter;// ->first;
 					if (!pMPi || pMPi->isBad())
 						continue;
-					//int label = iter->second;
+
+					cv::Scalar color = cv::Scalar(0, 0, 0);
+					if (Segmentator::ObjectPoints.count(pMPi->mnId)) {
+						auto obj = Segmentator::ObjectPoints[pMPi->mnId];
+						if (obj) {
+							int label = obj->GetLabel();
+							color = Segmentator::mvObjectLabelColors[label];
+						}
+					}
+					
 					cv::Mat x3D = pMPi->GetWorldPos();
 					cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
 					tpt += mVisMidPt;
-
-					cv::Scalar color = cv::Scalar(0, 0, 0);
+					
 					cv::circle(tempVis, tpt, 2, color, -1);
 				}
 

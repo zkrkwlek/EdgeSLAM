@@ -12,6 +12,8 @@
 
 namespace EdgeSLAM {
 
+	int Segmentator::mnMaxObjectLabel;
+	std::map<int, Object*> Segmentator::ObjectPoints;
 	std::vector<cv::Vec3b> Segmentator:: mvObjectLabelColors;
 	std::set<MapPoint*> Segmentator::mspAllFloorPoints;
 	std::set<MapPoint*> Segmentator::mspAllWallPoints;
@@ -30,7 +32,59 @@ namespace EdgeSLAM {
 	Segmentator::~Segmentator() {
 
 	}
+	Object::Object():mnLabel(0), mnCount(0){
+		matLabels = cv::Mat::zeros(Segmentator::mnMaxObjectLabel, 1, CV_16UC1);
+	}
+	Object::~Object(){
 	
+	}
+	void Object::Update(int nLabel){
+		
+		std::unique_lock<std::mutex> lock(mMutexObject);
+		matLabels.at<ushort>(nLabel)++;
+		if (mnLabel == nLabel) {
+			mnCount++;
+		}
+		else {
+			int count = matLabels.at<ushort>(nLabel);
+			if (count > mnCount) {
+				double minVal;
+				double maxVal;
+				int minIdx, maxIdx;
+				cv::minMaxIdx(matLabels, &minVal, &maxVal, &minIdx, &maxIdx, cv::Mat());
+				mnLabel = maxIdx;
+				mnCount = matLabels.at<ushort>(maxIdx);
+			}
+		}
+	}
+	int Object::GetLabel(){
+		std::unique_lock<std::mutex> lock(mMutexObject);
+		return mnLabel;
+		/*cv::Mat label;
+		{
+			std::unique_lock<std::mutex> lock(mMutexObject);
+			label = matLabels.clone();
+		}
+		double minVal;
+		double maxVal;
+		int minIdx, maxIdx;
+		cv::minMaxIdx(matLabels, &minVal, &maxVal, &minIdx, &maxIdx, cv::Mat());
+		return maxIdx;*/
+	}
+	cv::Mat Object::GetLabels(){
+		std::unique_lock<std::mutex> lock(mMutexObject);
+		return matLabels.clone();
+	}
+	int Object::GetCount(int l){
+		std::unique_lock<std::mutex> lock(mMutexObject);
+		return matLabels.at<ushort>(l);
+		/*cv::Mat label;
+		{
+			std::unique_lock<std::mutex> lock(mMutexObject);
+			label = matLabels.clone();
+		}
+		return label.at<ushort>(l);*/
+	}
 	void Segmentator::ProcessDevicePosition(SLAM* system, User* user, int id) {
 		std::stringstream ss;
 		ss << "/Load?keyword=DevicePosition" << "&id=" << id << "&src=" << user->userName;
@@ -275,6 +329,9 @@ namespace EdgeSLAM {
 					segcolor.at<cv::Vec3b>(y, x) = Segmentator::mvObjectLabelColors[label];
 					//mask_ceil.at<uchar>(y, x) = 255;
 					break;
+				default:
+					segcolor.at<cv::Vec3b>(y, x) = Segmentator::mvObjectLabelColors[label];
+					break;
 				}
 			}
 		}
@@ -287,6 +344,20 @@ namespace EdgeSLAM {
 			auto pt = F->mvKeys[i].pt;
 			int label = labeled.at<uchar>(pt.y, pt.x) + 1;
 
+			////update object label
+			int nmpid = pMP->mnId;
+			Object* obj = nullptr;
+			if (ObjectPoints.count(nmpid)) {
+				obj = ObjectPoints[nmpid];
+			}
+			else {
+				obj = new Object();
+				ObjectPoints[nmpid] = obj;
+			}
+			obj->Update(label);
+			////update object label
+
+			////detect structure poitns
 			switch (label) {
 			case (int)ObjectLabel::FLOOR:
 				if (mspAllFloorPoints.count(pMP))
@@ -301,7 +372,7 @@ namespace EdgeSLAM {
 			case (int)ObjectLabel::CEIL:
 				break;
 			}
-			
+			////detect structure poitns
 		}
 
 		/////save image
@@ -489,7 +560,6 @@ namespace EdgeSLAM {
 	
 	void Segmentator::RequestSegmentation(std::string user, int id)
 	{
-		std::cout << "request segmentation" << std::endl;
 		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 		std::stringstream ss;
 		ss << "/Store?keyword=RequestDepth&id=" << id << "&src=" << user;
@@ -521,5 +591,6 @@ namespace EdgeSLAM {
 			cv::Vec3b color = cv::Vec3b(colormap.at<uchar>(i, 0), colormap.at<uchar>(i, 1), colormap.at<uchar>(i, 2));
 			mvObjectLabelColors.push_back(color);
 		}
+		mnMaxObjectLabel = mvObjectLabelColors.size();
 	}
 }

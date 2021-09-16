@@ -21,6 +21,34 @@ namespace EdgeSLAM {
 	class User;
 	class MapPoint;
 	class Plane;
+
+	
+	class Object{
+	public:
+		Object();
+		virtual ~Object();
+		void Update(int label);
+		int GetLabel();
+		cv::Mat GetLabels();
+		int GetCount(int label);
+		
+	private:
+		int mnLabel;
+		int mnCount;
+		cv::Mat matLabels;
+		std::mutex mMutexObject;
+	};
+
+	//frame or keyframe id
+	class LocalIndoorModel {
+	public:
+		LocalIndoorModel();
+		virtual ~LocalIndoorModel();
+
+	private:
+
+	};
+
 	class Segmentator {
 	public:
 		Segmentator();
@@ -31,8 +59,12 @@ namespace EdgeSLAM {
 		static void RequestSegmentation(std::string user,int id);
 		static void ProcessContentGeneration(SLAM* system, User* user, int id);
 		static void ProcessDevicePosition(SLAM* system, User* user, int id);
+		
 		static void Init();
+		
 	public:
+		static int mnMaxObjectLabel;
+		static std::map<int, Object*> ObjectPoints;
 		static std::set<MapPoint*> mspAllFloorPoints;
 		static std::set<MapPoint*> mspAllWallPoints;
 		static std::vector<cv::Vec3b> mvObjectLabelColors;

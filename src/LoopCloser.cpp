@@ -321,6 +321,8 @@ namespace EdgeSLAM {
 		// Wait until Local Mapping has effectively stopped
 		while (!map->isStopped())
 		{
+			map->Stop();
+			std::cout << "Stop mapping!!" << std::endl;
 			Sleep(1000);
 		}
 
