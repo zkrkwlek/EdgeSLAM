@@ -165,7 +165,7 @@ namespace EdgeSLAM {
 	bool Map::Stop()
 	{
 		if (mbStopRequested && !mbNotStop)
-		{
+		{ 
 			mbStopped = true;
 			return true;
 		}

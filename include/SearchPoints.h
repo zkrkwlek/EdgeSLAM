@@ -17,6 +17,7 @@ namespace EdgeSLAM {
 	class SearchPoints {
 	public:
 		static const int HISTO_LENGTH;
+		static int SearchObject(cv::Mat obj, DBoW3::FeatureVector fvec, Frame* curr, std::vector<std::pair<int, int>>& matches, float thMaxDesc, float thMinDesc, float thProjection, bool bCheckOri);
 		static int SearchBySim3(FeatureTracker* pFeatureTracker, KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint*> &vpMatches12, const float &s12, const cv::Mat &R12, const cv::Mat &t12, float thMaxDesc, float thRadius = 7.5);
 		static int SearchKeyFrameByBoW(FeatureTracker* pFeatureTracker, KeyFrame* pKF1, KeyFrame *pKF2, std::vector<MapPoint*> &vpMapPointMatches, float thMinDesc, float thMatchRatio, bool bCheckOri = true);
 		static int SearchFrameByBoW(FeatureTracker* pFeatureTracker, KeyFrame* pKF, Frame *F, std::vector<MapPoint*> &vpMapPointMatches, float thMinDesc, float thMatchRatio, bool bCheckOri = true);

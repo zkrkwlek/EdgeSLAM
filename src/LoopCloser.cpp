@@ -19,6 +19,7 @@ namespace EdgeSLAM {
 	LoopCloser::~LoopCloser(){}
 	void LoopCloser::ProcessLoopClosing(SLAM* system, Map* map, KeyFrame* kf) {
 		//update keyframe database
+
 		auto pLoopCloser = system->mpLoopCloser;
 		if (kf->mnId < 2)
 			return;
@@ -27,6 +28,7 @@ namespace EdgeSLAM {
 			//std::cout << "Loop closing error!!!!!!!!!!!!!!" << std::endl;
 			return;
 		}
+		std::cout << "Loop closing = start" << std::endl;
 		map->mnNumLoopClosingFrames++;
 		
 		bool bSim3 = false;
@@ -44,6 +46,7 @@ namespace EdgeSLAM {
 			//std::cout << "CorrectLoop::start" << std::endl;
 		}
 		map->mnNumLoopClosingFrames--;
+		std::cout << "Loop closing = end" << std::endl;
 	}
 	bool LoopCloser::DetectLoop(SLAM* system, Map* map, KeyFrame* kf) {
 		auto db = map->mpKeyFrameDB;
@@ -540,6 +543,8 @@ namespace EdgeSLAM {
 
 				while (!map->isStopped() && !map->isFinished())
 				{
+					map->Stop();
+					std::cout << "Stop mapping!!" << std::endl;
 					Sleep(1000);
 				}
 

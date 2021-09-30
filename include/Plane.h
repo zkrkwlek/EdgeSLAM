@@ -58,6 +58,18 @@ namespace EdgeSLAM {
 		static cv::Mat CalcInverPlaneParam(cv::Mat P, cv::Mat Tinv);
 		static float CalculateDepth(cv::Mat Xcam, cv::Mat Pinv);
 		static cv::Mat CreateWorldPoint(cv::Mat Xcam, cv::Mat Tinv, float depth);
+	private:
+		static bool PlaneInitialization2(cv::Mat src, cv::Mat& res, cv::Mat& matInliers, cv::Mat& matOutliers, int ransac_trial, float thresh_distance, float thresh_ratio);
+		static bool Ransac_fitting(cv::Mat src, cv::Mat& res, cv::Mat& matInliers, cv::Mat& matOutliers, int ransac_trial, float thresh_distance, float thresh_ratio);
+		static cv::Mat CalcPlaneRotationMatrix(cv::Mat normal);
+
+		static void CreatePlanarMapPoints(Map* map, KeyFrame* targetKF, cv::Mat param);
+	private:
+		static float fHistSize;
+		static int nTrial;
+		static float fDistance;
+		static float fRatio; 
+		static float fNormal;
 	};
 }
 

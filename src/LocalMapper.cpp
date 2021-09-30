@@ -20,7 +20,7 @@ namespace EdgeSLAM {
 	void LocalMapper::ProcessMapping(ThreadPool::ThreadPool* pool, SLAM* system, Map* map, KeyFrame* targetKF) {
 
 		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-
+		std::cout << "LocalMapping=start" << std::endl;
 		map->mnNumMappingFrames++;
 		auto pMapper = system->mpLocalMapper;
 		pMapper->ProcessNewKeyFrame(map, targetKF);
@@ -41,9 +41,11 @@ namespace EdgeSLAM {
 			}
 			pMapper->KeyFrameCulling(map, targetKF);
 		}
-		pool->EnqueueJob(PlaneProcessor::EstimateLocalMapPlanes, system, map, targetKF);
+		//pool->EnqueueJob(PlaneProcessor::EstimateLocalMapPlanes, system, map, targetKF);
 		pool->EnqueueJob(LoopCloser::ProcessLoopClosing, system, map, targetKF);
 		map->mnNumMappingFrames--;
+
+		std::cout << "LocalMapping=end" << std::endl;
 
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

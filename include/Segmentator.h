@@ -53,7 +53,7 @@ namespace EdgeSLAM {
 		static void Init();
 		
 	public:
-
+		static NewMapClass<int, cv::Mat> SegmentedFrames;
 		static NewMapClass<int, Object*> ObjectPoints;
 		static int mnMaxObjectLabel;
 		static std::set<MapPoint*> mspAllFloorPoints;

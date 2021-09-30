@@ -58,7 +58,7 @@ namespace EdgeSLAM {
 		auto cam = user->mpCamera;
 		auto map = user->mpMap;
 
-		std::cout << "Frame = " << user->userName << "=start!!" << std::endl;
+		std::cout << "Frame = " << user->userName <<" "<<id<< "=start!!" << std::endl;
 		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
 		////receive image
@@ -72,12 +72,13 @@ namespace EdgeSLAM {
 		cv::Mat img = cv::imdecode(temp, cv::IMREAD_COLOR);
 		////receive image
 		/////save image
-		std::stringstream sss;
+		/*std::stringstream sss;
 		sss << "../../bin/img/" << user->userName << "/Color/" << id << ".jpg";
-		cv::imwrite(sss.str(), img);
+		cv::imwrite(sss.str(), img);*/
 		/////save image
 		Frame* frame = new Frame(img, cam, id, ts);
 		user->mnCurrFrameID = frame->mnFrameID;
+		std::cout << frame->mDescriptors.size() << " " << frame->mDescriptors.type() << std::endl;
 
 		//std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
 
@@ -162,6 +163,9 @@ namespace EdgeSLAM {
 
 						std::cout << "track with reference frame :: end" << std::endl;
 					}
+					else {
+						std::cout << "test0" << std::endl;
+					}
 				}
 				/*if (userState == UserState::Failed) {
 				frame->reset_map_points();
@@ -173,7 +177,9 @@ namespace EdgeSLAM {
 				}*/
 			}
 			if (bTrack) {
+				std::cout << "test11" << std::endl;
 				nInliers = system->mpTracker->TrackWithLocalMap(user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+				std::cout << "test22" << std::endl;
 				if (frame->mnFrameID < user->mnLastRelocFrameId + 30 && nInliers < 50) {
 					bTrack = false;
 				}
@@ -237,6 +243,7 @@ namespace EdgeSLAM {
 			}
 			////data
 			auto res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
+			std::cout << "test = send data " << data.rows << std::endl;
 			//pose update
 			user->UpdatePose(T);
 			//check keyframe
@@ -245,6 +252,7 @@ namespace EdgeSLAM {
 				system->mpTracker->CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, user);
 				Segmentator::RequestSegmentation(user->userName, frame->mnFrameID);
 			}
+			std::cout << "test2" << std::endl;
 			////frame line visualization
 			/*if (!user->mbMapping) {
 				cv::Mat R, t;

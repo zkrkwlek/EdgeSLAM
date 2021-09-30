@@ -16,4 +16,38 @@ namespace EdgeSLAM {
 		cv::Mat t12x = SkewSymmetricMatrix(t12);
 		return K1.t().inv()*t12x*R12*K2.inv();
 	}
+	cv::Mat Utils::RotationMatrixFromEulerAngle(float a, char c) {
+		cv::Mat res = cv::Mat::eye(3, 3, CV_32FC1);
+
+		//input¿∫ radian
+		float cx = cos(a);
+		float sx = sin(a);
+
+		if (c == 'x' || c == 'X') {
+			res.at<float>(1, 1) = cx;
+			res.at<float>(1, 2) = -sx;
+			res.at<float>(2, 1) = sx;
+			res.at<float>(2, 2) = cx;
+		}
+		else if (c == 'y' || c == 'Y') {
+			res.at<float>(0, 0) = cx;
+			res.at<float>(0, 2) = sx;
+			res.at<float>(2, 0) = -sx;
+			res.at<float>(2, 2) = cx;
+		}
+		else if (c == 'z' || c == 'Z') {
+			res.at<float>(0, 0) = cx;
+			res.at<float>(0, 1) = -sx;
+			res.at<float>(1, 0) = sx;
+			res.at<float>(1, 1) = cx;
+		}
+		return res;
+	}
+	cv::Mat Utils::RotationMatrixFromEulerAngles(float a, float b, float c, std::string str) {
+		auto cstr = str.c_str();
+		cv::Mat R1 = RotationMatrixFromEulerAngle(a, cstr[0]);
+		cv::Mat R2 = RotationMatrixFromEulerAngle(b, cstr[1]);
+		cv::Mat R3 = RotationMatrixFromEulerAngle(c, cstr[2]);
+		return R1*R2*R3;
+	}
 }
