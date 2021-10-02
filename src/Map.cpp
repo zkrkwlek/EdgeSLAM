@@ -370,9 +370,9 @@ namespace EdgeSLAM {
 	}
 	////////////keyframe
 
-	void LocalCovisibilityMap::UpdateLocalMap(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs, std::vector<TrackPoint*>& vpLocalTPs) {
-		UpdateLocalKeyFrames(user, f, vpLocalKFs);
-		UpdateLocalMapPoitns(f, vpLocalKFs, vpLocalMPs, vpLocalTPs);
+	void LocalCovisibilityMap::UpdateLocalMap(User* user, Frame* f) {
+		UpdateLocalKeyFrames(user, f, mvpLocalKFs);
+		UpdateLocalMapPoitns(f, mvpLocalKFs, mvpLocalMPs, mvpLocalTPs);
 	}
 	void LocalCovisibilityMap::UpdateLocalKeyFrames(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs) {
 		// Each map point vote for the keyframes in which it has been observed

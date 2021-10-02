@@ -345,44 +345,44 @@ namespace EdgeSLAM {
 		SegmentedFrames.Update(id, labeled);
 
 		////test matching object points and frame
-		if (prevID > 0) {
-			auto F1 = pUser->mapFrames[id];
-			auto F2 = pUser->mapFrames[prevID];
-			std::vector<std::pair<int, int>> matches;
-			std::vector<cv::Point2f> pts;
-			
-			DBoW3::BowVector mBowVec;
-			DBoW3::FeatureVector mFeatVec;
+		//if (prevID > 0) {
+		//	auto F1 = pUser->mapFrames[id];
+		//	auto F2 = pUser->mapFrames[prevID];
+		//	std::vector<std::pair<int, int>> matches;
+		//	std::vector<cv::Point2f> pts;
+		//	
+		//	DBoW3::BowVector mBowVec;
+		//	DBoW3::FeatureVector mFeatVec;
 
-			cv::Mat matObj = cv::Mat::zeros(0, F1->mDescriptors.cols, F1->mDescriptors.type());
-			for (int i = 0; i < F1->N; i++) {
-				auto pt = F1->mvKeys[i].pt;
-				int label = labeled.at<uchar>(pt) + 1;
-				if (label == (int)ObjectLabel::FLOOR) {
-					pts.push_back(pt);
-					matObj.push_back(F1->mDescriptors.row(i));
-					
-				}
-			}
-			std::vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(matObj);
-			F1->mpVoc->transform(vCurrentDesc, mBowVec, mFeatVec, 4);  // 5 is better
-			
-			SearchPoints::SearchObject(matObj, mFeatVec, F2, matches,50.0,50.0,0.7,false);
-			cv::Mat m1 = F1->imgColor.clone();
-			cv::Mat m2 = F2->imgColor.clone();
-			for (int i = 0, iend = matches.size(); i < iend; i++) {
-				int idx1 = matches[i].first;
-				int idx2 = matches[i].second;
-				cv::circle(m1, pts[idx1], 3, cv::Scalar(255, 0, 255), -1);
-				cv::circle(m2, F2->mvKeys[idx2].pt, 3, cv::Scalar(255, 0, 255), -1);
-			}
+		//	cv::Mat matObj = cv::Mat::zeros(0, F1->mDescriptors.cols, F1->mDescriptors.type());
+		//	for (int i = 0; i < F1->N; i++) {
+		//		auto pt = F1->mvKeys[i].pt;
+		//		int label = labeled.at<uchar>(pt) + 1;
+		//		if (label == (int)ObjectLabel::FLOOR) {
+		//			pts.push_back(pt);
+		//			matObj.push_back(F1->mDescriptors.row(i));
+		//			
+		//		}
+		//	}
+		//	std::vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(matObj);
+		//	F1->mpVoc->transform(vCurrentDesc, mBowVec, mFeatVec, 4);  // 5 is better
+		//	
+		//	SearchPoints::SearchObject(matObj, mFeatVec, F2, matches,50.0,50.0,0.7,false);
+		//	cv::Mat m1 = F1->imgColor.clone();
+		//	cv::Mat m2 = F2->imgColor.clone();
+		//	for (int i = 0, iend = matches.size(); i < iend; i++) {
+		//		int idx1 = matches[i].first;
+		//		int idx2 = matches[i].second;
+		//		cv::circle(m1, pts[idx1], 3, cv::Scalar(255, 0, 255), -1);
+		//		cv::circle(m2, F2->mvKeys[idx2].pt, 3, cv::Scalar(255, 0, 255), -1);
+		//	}
 
-			imshow("obj", m1);
-			imshow("obj2", m2);
-			cv::waitKey(1);
-			//std::cout << "aaaa = " << matches.size() << std::endl;
-		}
-		prevID = id;
+		//	imshow("obj", m1);
+		//	imshow("obj2", m2);
+		//	cv::waitKey(1);
+		//	//std::cout << "aaaa = " << matches.size() << std::endl;
+		//}
+		//prevID = id;
 		////test matching object points and frame
 
 		////Update Object Points
@@ -467,9 +467,9 @@ namespace EdgeSLAM {
 			cv::normalize(depthImg, depth, 0, 255, cv::NORM_MINMAX, CV_32FC1);
 			
 			/////save image
-			std::stringstream sss;
+			/*std::stringstream sss;
 			sss << "../../bin/img/" << pUser->userName << "/Depth/" << id << ".jpg";
-			cv::imwrite(sss.str(), depth);
+			cv::imwrite(sss.str(), depth);*/
 			/////save image
 		}
 

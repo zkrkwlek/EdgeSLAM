@@ -58,6 +58,8 @@ namespace EdgeSLAM {
 		auto cam = user->mpCamera;
 		auto map = user->mpMap;
 
+		LocalMap* pLocalMap = new LocalCovisibilityMap();
+
 		std::cout << "Frame = " << user->userName <<" "<<id<< "=start!!" << std::endl;
 		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
@@ -73,7 +75,8 @@ namespace EdgeSLAM {
 		////receive image
 		/////save image
 		/*std::stringstream sss;
-		sss << "../../bin/img/" << user->userName << "/Color/" << id << ".jpg";
+		sss << "
+		/img/" << user->userName << "/Color/" << id << ".jpg";
 		cv::imwrite(sss.str(), img);*/
 		/////save image
 		Frame* frame = new Frame(img, cam, id, ts);
@@ -176,10 +179,11 @@ namespace EdgeSLAM {
 				}
 				}*/
 			}
+
+			
+
 			if (bTrack) {
-				std::cout << "test11" << std::endl;
-				nInliers = system->mpTracker->TrackWithLocalMap(user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
-				std::cout << "test22" << std::endl;
+				nInliers = system->mpTracker->TrackWithLocalMap(pLocalMap, user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
 				if (frame->mnFrameID < user->mnLastRelocFrameId + 30 && nInliers < 50) {
 					bTrack = false;
 				}
@@ -200,51 +204,13 @@ namespace EdgeSLAM {
 		user->SetState(trackState);
 		if (trackState == UserState::Success) {
 
-			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
-			std::stringstream ss;
-			ss << "/Store?keyword=Pose&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
-			////data
-			cv::Mat T = frame->GetPose();
-			cv::Mat data = cv::Mat::zeros(13 + nInliers * 8, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
-			int nDataIdx = 0;
-			data.at<float>(nDataIdx++) = (float)nInliers;
-			data.at<float>(nDataIdx++) = T.at<float>(0, 0);
-			data.at<float>(nDataIdx++) = T.at<float>(0, 1);
-			data.at<float>(nDataIdx++) = T.at<float>(0, 2);
-			data.at<float>(nDataIdx++) = T.at<float>(1, 0);
-			data.at<float>(nDataIdx++) = T.at<float>(1, 1);
-			data.at<float>(nDataIdx++) = T.at<float>(1, 2);
-			data.at<float>(nDataIdx++) = T.at<float>(2, 0);
-			data.at<float>(nDataIdx++) = T.at<float>(2, 1);
-			data.at<float>(nDataIdx++) = T.at<float>(2, 2);
-			data.at<float>(nDataIdx++) = T.at<float>(0, 3);
-			data.at<float>(nDataIdx++) = T.at<float>(1, 3);
-			data.at<float>(nDataIdx++) = T.at<float>(2, 3);
-
-			for (int i = 0; i < frame->N; i++)
-			{
-				if (frame->mvpMapPoints[i])
-				{
-					if (!frame->mvbOutliers[i])
-					{
-						auto kp = frame->mvKeys[i];
-						auto mp = frame->mvpMapPoints[i]->GetWorldPos();
-						int octave = kp.octave;
-						data.at<float>(nDataIdx++) = kp.pt.x;
-						data.at<float>(nDataIdx++) = kp.pt.y;
-						data.at<float>(nDataIdx++) = (float)kp.octave;
-						data.at<float>(nDataIdx++) = kp.angle;
-						data.at<float>(nDataIdx++) = (float)frame->mvpMapPoints[i]->mnId;
-						data.at<float>(nDataIdx++) = mp.at<float>(0);
-						data.at<float>(nDataIdx++) = mp.at<float>(1);
-						data.at<float>(nDataIdx++) = mp.at<float>(2);
-					}
-				}
+			if (user->mbDeviceTracking) {
+				//SendDeviceTrackingData
+				pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, user, pLocalMap, frame, nInliers, id);
 			}
-			////data
-			auto res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
-			std::cout << "test = send data " << data.rows << std::endl;
+			
 			//pose update
+			cv::Mat T = frame->GetPose();
 			user->UpdatePose(T);
 			//check keyframe
 			auto ref = map->GetKeyFrame(user->mnReferenceKeyFrameID);
@@ -252,7 +218,7 @@ namespace EdgeSLAM {
 				system->mpTracker->CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, user);
 				Segmentator::RequestSegmentation(user->userName, frame->mnFrameID);
 			}
-			std::cout << "test2" << std::endl;
+			
 			////frame line visualization
 			/*if (!user->mbMapping) {
 				cv::Mat R, t;
@@ -313,9 +279,9 @@ namespace EdgeSLAM {
 			system->mpVisualizer->SetOutputImage(img, user->GetVisID());
 
 			/////save image
-			std::stringstream sss;
+			/*std::stringstream sss;
 			sss << "../../bin/img/" << user->userName << "/Track/" << id << ".jpg";
-			cv::imwrite(sss.str(), img);
+			cv::imwrite(sss.str(), img);*/
 			/////save image
 		}
 		////visualization
@@ -328,6 +294,7 @@ namespace EdgeSLAM {
 		auto cam = user->mpCamera;
 		auto map = user->mpMap;
 
+		LocalMap* pLocalMap = new LocalCovisibilityMap();
 		std::cout << "Frame = " << user->userName << "=start!!" << std::endl;
 
 		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
@@ -412,8 +379,10 @@ namespace EdgeSLAM {
 					}
 				}*/
 			}
+			
 			if (bTrack) {
-				nInliers = system->mpTracker->TrackWithLocalMap(user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+				
+				nInliers = system->mpTracker->TrackWithLocalMap(pLocalMap, user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
 				if (frame->mnFrameID < user->mnLastRelocFrameId + 30 && nInliers < 50) {
 					bTrack = false;
 				}
@@ -535,18 +504,14 @@ namespace EdgeSLAM {
 	bool Tracker::TrackWithKeyFrame(KeyFrame* ref, Frame* cur){
 		return false;
 	}
-	int Tracker::TrackWithLocalMap(User* user, Frame* cur, float thMaxDesc, float thMinDesc){
-		LocalMap* pLocalMap = new LocalCovisibilityMap();
-		std::vector<MapPoint*> vpLocalMPs;
-		std::vector<KeyFrame*> vpLocalKFs;
-		std::vector<TrackPoint*> vpLocalTPs;
+	int Tracker::TrackWithLocalMap(LocalMap* pLocalMap, User* user, Frame* cur, float thMaxDesc, float thMinDesc){
 
 		//std::cout << "Track::LocalMap::Update::start" << std::endl;
-		pLocalMap->UpdateLocalMap(user, cur, vpLocalKFs, vpLocalMPs, vpLocalTPs);
+		pLocalMap->UpdateLocalMap(user, cur);
 		//std::cout << "Track::LocalMap::Update::end" << std::endl;
 		//update visible
 
-		int nMatch = UpdateVisiblePoints(cur, vpLocalMPs, vpLocalTPs);
+		int nMatch = UpdateVisiblePoints(cur, pLocalMap->mvpLocalMPs, pLocalMap->mvpLocalTPs);
 		//std::cout << "Track::LocalMap::Update::Visible::end" << std::endl;
 		if (nMatch == 0)
 			return 0;
@@ -555,7 +520,7 @@ namespace EdgeSLAM {
 		if (cur->mnFrameID < user->mnLastRelocFrameId + 2)
 			thRadius = 5.0;
 
-		int a = SearchPoints::SearchMapByProjection(cur, vpLocalMPs, vpLocalTPs, thMaxDesc, thMinDesc, thRadius);
+		int a = SearchPoints::SearchMapByProjection(cur, pLocalMap->mvpLocalMPs, pLocalMap->mvpLocalTPs, thMaxDesc, thMinDesc, thRadius);
 		//std::cout << "match local map = " << vpLocalKFs.size() << " " << vpLocalMPs.size() <<", "<<nMatch<< "=" << a << std::endl;
 		Optimizer::PoseOptimization(cur);
 		return UpdateFoundPoints(cur);
@@ -843,5 +808,116 @@ namespace EdgeSLAM {
 		user->mnLastKeyFrameID = cur->mnFrameID;
 		pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, pKF);
 		map->SetNotStop(false);
+	}
+
+	void Tracker::SendDeviceTrackingData(SLAM* system, User* user, LocalMap* pLocalMap, Frame* frame, int nInlier, int id) {
+		{
+			std::cout << "local map test = " << pLocalMap->mvpLocalMPs.size() << " " << pLocalMap->mvpLocalTPs.size() << std::endl;
+
+			int N = std::min((int)pLocalMap->mvpLocalMPs.size(), 2000);
+			cv::Mat descs = cv::Mat::zeros(N, 32, CV_8UC1);
+			cv::Mat scales = cv::Mat::zeros(N, 1, CV_8UC1);
+			cv::Mat angles = cv::Mat::zeros(N, 1, CV_32FC1);
+			cv::Mat pts = cv::Mat::zeros(N, 3, CV_32FC1);
+
+			cv::Mat idxs = cv::Mat::zeros(N, 3, CV_16UC1);
+
+			for (int i = 0, iend = N; i < iend; i++) {
+				cv::Mat desc = pLocalMap->mvpLocalMPs[i]->GetDescriptor();
+				//std::cout << desc.size() << " " << descs.size() << " " << desc.type() << " " << descs.type() << std::endl;
+				desc.copyTo(descs.row(i));
+				scales.at<uchar>(i, 0) = (uchar)pLocalMap->mvpLocalTPs[i]->mnTrackScaleLevel;
+				angles.at<float>(i, 0) = pLocalMap->mvpLocalTPs[i]->mTrackViewCos;
+				cv::Mat X = pLocalMap->mvpLocalMPs[i]->GetWorldPos().t();
+				X.copyTo(pts.row(i));
+			}
+			{
+				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+				std::stringstream ss;
+				ss << "/Store?keyword=LocalMap&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
+				auto res = mpAPI->Send(ss.str(), descs.data, descs.rows * descs.cols);
+			}
+			{
+				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+				std::stringstream ss;
+				ss << "/Store?keyword=LocalMapScales&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
+				auto res = mpAPI->Send(ss.str(), scales.data, scales.rows);
+			}
+			{
+				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+				std::stringstream ss;
+				ss << "/Store?keyword=LocalMapAngles&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
+				auto res = mpAPI->Send(ss.str(), angles.data, angles.rows * sizeof(float));
+			}
+			{
+				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+				std::stringstream ss;
+				ss << "/Store?keyword=LocalMapPoints&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
+				auto res = mpAPI->Send(ss.str(), descs.data, descs.rows * 3 * sizeof(float));
+			}
+			//cv::Mat testMat;
+			//scales.convertTo(testMat, CV_8UC1);
+			//std::cout << "test = " << scales.rows << " " << testMat. << std::endl;
+
+			//cv::Mat data = cv::Mat::zeros(13 + nInliers * 8, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
+
+		}
+
+
+		
+		////data
+		cv::Mat T = frame->GetPose();
+		cv::Mat data = cv::Mat::zeros(13 + nInlier * 8, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
+		int nDataIdx = 0;
+		data.at<float>(nDataIdx++) = (float)nInlier;
+		data.at<float>(nDataIdx++) = T.at<float>(0, 0);
+		data.at<float>(nDataIdx++) = T.at<float>(0, 1);
+		data.at<float>(nDataIdx++) = T.at<float>(0, 2);
+		data.at<float>(nDataIdx++) = T.at<float>(1, 0);
+		data.at<float>(nDataIdx++) = T.at<float>(1, 1);
+		data.at<float>(nDataIdx++) = T.at<float>(1, 2);
+		data.at<float>(nDataIdx++) = T.at<float>(2, 0);
+		data.at<float>(nDataIdx++) = T.at<float>(2, 1);
+		data.at<float>(nDataIdx++) = T.at<float>(2, 2);
+		data.at<float>(nDataIdx++) = T.at<float>(0, 3);
+		data.at<float>(nDataIdx++) = T.at<float>(1, 3);
+		data.at<float>(nDataIdx++) = T.at<float>(2, 3);
+
+		cv::Mat desc = cv::Mat::zeros(0, 32, CV_8UC1);
+		for (int i = 0; i < frame->N; i++)
+		{
+			if (frame->mvpMapPoints[i])
+			{
+				if (!frame->mvbOutliers[i])
+				{
+					auto kp = frame->mvKeys[i];
+					auto mp = frame->mvpMapPoints[i]->GetWorldPos();
+					int octave = kp.octave;
+					data.at<float>(nDataIdx++) = kp.pt.x;
+					data.at<float>(nDataIdx++) = kp.pt.y;
+					data.at<float>(nDataIdx++) = (float)kp.octave;
+					data.at<float>(nDataIdx++) = kp.angle;
+					data.at<float>(nDataIdx++) = (float)frame->mvpMapPoints[i]->mnId;
+					data.at<float>(nDataIdx++) = mp.at<float>(0);
+					data.at<float>(nDataIdx++) = mp.at<float>(1);
+					data.at<float>(nDataIdx++) = mp.at<float>(2);
+					desc.push_back(frame->mDescriptors.row(i));
+				}
+			}
+		}
+		{
+			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+			std::stringstream ss;
+			ss << "/Store?keyword=ReferenceFrame&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
+			auto res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
+		}
+		{
+			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+			std::stringstream ss;
+			ss << "/Store?keyword=ReferenceFrameDesc&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
+			auto res = mpAPI->Send(ss.str(), desc.data, desc.rows*desc.cols);
+		}
+		////data
+		
 	}
 }

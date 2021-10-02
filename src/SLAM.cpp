@@ -30,7 +30,10 @@ namespace EdgeSLAM {
 	ORBVocabulary* Frame::mpVoc;*/
 	void SLAM::Init() {
 		LoadVocabulary();
-		LoadProcessingTime();
+		
+		////이거 수정 필요
+		//LoadProcessingTime();
+
 		Segmentator::Init();
 		pool = new ThreadPool::ThreadPool(16);
 		mpInitializer = new Initializer();
@@ -53,7 +56,7 @@ namespace EdgeSLAM {
 	}
 	void SLAM::LoadVocabulary() {
 		mpDBoWVoc = new DBoW3::Vocabulary();
-		mpDBoWVoc->load("../../bin/data/orbvoc.dbow3");
+		mpDBoWVoc->load("../bin/data/orbvoc.dbow3");
 		/*mpDBoWVoc = new ORBVocabulary();
 		mpDBoWVoc->loadFromBinaryFile("../../bin/data/ORBvoc.bin");*/
 	}
@@ -94,8 +97,8 @@ namespace EdgeSLAM {
 		auto pNewMap = new Map(mpDBoWVoc);
 		AddMap(name, pNewMap);
 	}
-	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, bool _b, bool _bimu){
-		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _b, _bimu);
+	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, bool _b, bool _bTracking, bool _bimu){
+		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _b, _bTracking, _bimu);
 		pNewUser->mpMap = GetMap(_map);
 		AddUser(_user, pNewUser);
 	}

@@ -146,7 +146,7 @@ namespace EdgeSLAM {
 		LocalMap();
 		virtual ~LocalMap();
 	public:
-		virtual void UpdateLocalMap(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs, std::vector<TrackPoint*>& vpLocalTPs) {}
+		virtual void UpdateLocalMap(User* user, Frame* f) {}
 		virtual void UpdateLocalKeyFrames(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs) {}
 		virtual void UpdateLocalMapPoitns(Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs, std::vector<TrackPoint*>& vpLocalTPs) {}
 
@@ -154,6 +154,11 @@ namespace EdgeSLAM {
 		virtual void UpdateLocalKeyFrames(KeyFrame* kf, std::vector<KeyFrame*>& vpLocalKFs){}
 		virtual void UpdateLocalMapPoitns(KeyFrame* kf, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs){}
 	public:
+
+		std::vector<MapPoint*> mvpLocalMPs;
+		std::vector<KeyFrame*> mvpLocalKFs;
+		std::vector<TrackPoint*> mvpLocalTPs;
+
 		/*std::vector<MapPoint*> mvpLocalMapPoints;
 		std::vector<KeyFrame*> mvpLocalKeyFrames;*/
 	private:
@@ -165,7 +170,7 @@ namespace EdgeSLAM {
 		LocalCovisibilityMap();
 		virtual ~LocalCovisibilityMap();
 	public:
-		void UpdateLocalMap(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs, std::vector<TrackPoint*>& vpLocalTPs);
+		void UpdateLocalMap(User* user, Frame* f);
 		void UpdateLocalKeyFrames(User* user, Frame* f, std::vector<KeyFrame*>& vpLocalKFs);
 		void UpdateLocalMapPoitns(Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs, std::vector<TrackPoint*>& vpLocalTPs);
 		//void UpdateKeyFrames

@@ -12,6 +12,7 @@
 #include <Utils.h>
 #include <chrono>
 
+
 namespace EdgeSLAM {
 	LocalMapper::LocalMapper()
 	{}
