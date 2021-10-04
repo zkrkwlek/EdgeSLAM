@@ -74,15 +74,13 @@ namespace EdgeSLAM {
 		cv::Mat img = cv::imdecode(temp, cv::IMREAD_COLOR);
 		////receive image
 		/////save image
-		/*std::stringstream sss;
-		sss << "
-		/img/" << user->userName << "/Color/" << id << ".jpg";
-		cv::imwrite(sss.str(), img);*/
+		std::stringstream sss;
+		sss << "../bin/img/" << user->userName << "/Color/" << id << ".jpg";
+		cv::imwrite(sss.str(), img);
 		/////save image
 		Frame* frame = new Frame(img, cam, id, ts);
 		user->mnCurrFrameID = frame->mnFrameID;
-		std::cout << frame->mDescriptors.size() << " " << frame->mDescriptors.type() << std::endl;
-
+		
 		//std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
 
 		auto mapState = map->GetState();
@@ -201,6 +199,18 @@ namespace EdgeSLAM {
 		}
 
 		////update user frame
+		if (!user->mbDeviceTracking) {
+
+			{
+				cv::Mat data = cv::Mat::zeros(1, 1, CV_32SC1);
+				data.at<int>(0) = nInliers;
+				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+				std::stringstream ss;
+				ss << "/Store?keyword=MappingResult&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
+				auto res = mpAPI->Send(ss.str(), data.data, sizeof(int));
+			}
+		}
+
 		user->SetState(trackState);
 		if (trackState == UserState::Success) {
 
@@ -819,6 +829,8 @@ namespace EdgeSLAM {
 			cv::Mat scales = cv::Mat::zeros(N, 1, CV_8UC1);
 			cv::Mat angles = cv::Mat::zeros(N, 1, CV_32FC1);
 			cv::Mat pts = cv::Mat::zeros(N, 3, CV_32FC1);
+			cv::Mat ids = cv::Mat::zeros(N, 1, CV_32SC1);
+			cv::Mat obs = cv::Mat::zeros(N, 1, CV_8UC1);
 
 			cv::Mat idxs = cv::Mat::zeros(N, 3, CV_16UC1);
 
@@ -828,6 +840,10 @@ namespace EdgeSLAM {
 				desc.copyTo(descs.row(i));
 				scales.at<uchar>(i, 0) = (uchar)pLocalMap->mvpLocalTPs[i]->mnTrackScaleLevel;
 				angles.at<float>(i, 0) = pLocalMap->mvpLocalTPs[i]->mTrackViewCos;
+				ids.at<int>(i, 0) = pLocalMap->mvpLocalMPs[i]->mnId;
+				int nObs = pLocalMap->mvpLocalMPs[i]->Observations();
+				uchar cobs = std::min(nObs, 255);
+				obs.at<uchar>(i, 0) = cobs;
 				cv::Mat X = pLocalMap->mvpLocalMPs[i]->GetWorldPos().t();
 				X.copyTo(pts.row(i));
 			}
@@ -853,7 +869,19 @@ namespace EdgeSLAM {
 				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 				std::stringstream ss;
 				ss << "/Store?keyword=LocalMapPoints&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
-				auto res = mpAPI->Send(ss.str(), descs.data, descs.rows * 3 * sizeof(float));
+				auto res = mpAPI->Send(ss.str(), pts.data, pts.rows * 3 * sizeof(float));
+			}
+			{
+				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+				std::stringstream ss;
+				ss << "/Store?keyword=LocalMapPointIDs&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
+				auto res = mpAPI->Send(ss.str(), ids.data, ids.rows * sizeof(int));
+			}
+			{
+				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+				std::stringstream ss;
+				ss << "/Store?keyword=LocalMapPointObservation&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
+				auto res = mpAPI->Send(ss.str(), obs.data, obs.rows);
 			}
 			//cv::Mat testMat;
 			//scales.convertTo(testMat, CV_8UC1);
