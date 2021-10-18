@@ -2,6 +2,17 @@
 
 namespace EdgeSLAM {
 
+	std::vector<std::string> Utils::Split(std::string s, std::string divid) {
+		std::vector<std::string> v;
+		char* context = NULL;
+		char* c = strtok_s((char*)s.c_str(), divid.c_str(),&context);
+		while (c) {
+			v.push_back(c);
+			c = strtok_s(NULL, divid.c_str(),&context);
+		}
+		return v;
+	}
+
 	cv::Mat Utils::SkewSymmetricMatrix(const cv::Mat &v)
 	{
 		return (cv::Mat_<float>(3, 3) << 0, -v.at<float>(2), v.at<float>(1),

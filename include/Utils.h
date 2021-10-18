@@ -8,6 +8,7 @@
 namespace EdgeSLAM {
 	class Utils {
 	public:
+		static std::vector<std::string> Split(std::string s, std::string divid);
 		static cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
 		static cv::Mat ComputeF12(cv::Mat R1, cv::Mat t1, cv::Mat R2, cv::Mat t2, cv::Mat K1, cv::Mat K2);
 		static cv::Mat RotationMatrixFromEulerAngles(float a, float b, float c, std::string str);

@@ -5,6 +5,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <mutex>
+#include <NewMapClass.h>
 
 namespace EdgeSLAM {
 	class SLAM;
@@ -49,7 +50,10 @@ namespace EdgeSLAM {
 
 	class PlaneProcessor {
 	public:
-		std::map<int, LocalIndoorModel*> LocalPlanarMap;
+		static float HoughBinSize;
+		static NewMapClass<int, cv::Mat> PlanarHoughImages;
+		static NewMapClass<int, LocalIndoorModel*> LocalPlanarMap;
+		//std::map<int, LocalIndoorModel*> LocalPlanarMap;
 	public:
 		static void EstimateLocalMapPlanes(SLAM* system, Map* map, KeyFrame* pKF);
 		static bool calcUnitNormalVector(cv::Mat& X);
@@ -59,6 +63,8 @@ namespace EdgeSLAM {
 		static float CalculateDepth(cv::Mat Xcam, cv::Mat Pinv);
 		static cv::Mat CreateWorldPoint(cv::Mat Xcam, cv::Mat Tinv, float depth);
 	private:
+		static cv::Point CalcSphericalCoordinate(cv::Mat normal);
+
 		static bool PlaneInitialization2(cv::Mat src, cv::Mat& res, cv::Mat& matInliers, cv::Mat& matOutliers, int ransac_trial, float thresh_distance, float thresh_ratio);
 		static bool Ransac_fitting(cv::Mat src, cv::Mat& res, cv::Mat& matInliers, cv::Mat& matOutliers, int ransac_trial, float thresh_distance, float thresh_ratio);
 		static cv::Mat CalcPlaneRotationMatrix(cv::Mat normal);

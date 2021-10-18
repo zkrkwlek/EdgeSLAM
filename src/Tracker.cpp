@@ -75,7 +75,7 @@ namespace EdgeSLAM {
 		////receive image
 		/////save image
 		std::stringstream sss;
-		sss << "../bin/img/" << user->userName << "/Color/" << id << ".jpg";
+		sss << "../bin/img/" << user->userName << "/" << id << "_color.jpg";
 		cv::imwrite(sss.str(), img);
 		/////save image
 		Frame* frame = new Frame(img, cam, id, ts);
@@ -178,8 +178,6 @@ namespace EdgeSLAM {
 				}*/
 			}
 
-			
-
 			if (bTrack) {
 				nInliers = system->mpTracker->TrackWithLocalMap(pLocalMap, user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
 				if (frame->mnFrameID < user->mnLastRelocFrameId + 30 && nInliers < 50) {
@@ -264,7 +262,7 @@ namespace EdgeSLAM {
 		}
 		user->mapFrames[frame->mnFrameID] = frame;
 		user->mnPrevFrameID = frame->mnFrameID;
-		user->mbProgress = false;
+		user->mbProgress = false; 
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		float t_test1 = du_test1 / 1000.0;
@@ -279,9 +277,20 @@ namespace EdgeSLAM {
 				int r = 2;
 				if (pMP && !pMP->isBad())
 				{
+
+					/*if (Segmentator::ObjectPoints.Count(pMP->mnId))
+					{
+						int label = Segmentator::ObjectPoints.Get(pMP->mnId)->GetLabel();
+						color = Segmentator::mvObjectLabelColors[label];
+					}
+					else {
+						color.val[1] = 255;
+						color.val[2] = 0;
+						
+					}
+					r++;*/
 					color.val[1] = 255;
 					color.val[2] = 0;
-					r++;
 					cv::circle(img, frame->mvKeys[i].pt, r, color, -1);
 				}
 			}

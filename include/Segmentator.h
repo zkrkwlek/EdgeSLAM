@@ -44,6 +44,7 @@ namespace EdgeSLAM {
 		Segmentator();
 		virtual ~Segmentator();
 		static void ProcessPlanarModeling(SLAM* system, User* user);
+		static bool ConnectedComponentLabeling(cv::Mat src, cv::Mat& dst, cv::Mat& stat, std::string strLabel);
 		static void ProcessSegmentation(ThreadPool::ThreadPool* pool, SLAM* system, std::string user,int id);
 		static void ProcessDepthEstimation(ThreadPool::ThreadPool* pool, SLAM* system, std::string user, int id);
 		static void RequestSegmentation(std::string user,int id);
@@ -55,11 +56,13 @@ namespace EdgeSLAM {
 	public:
 		static NewMapClass<int, cv::Mat> SegmentedFrames;
 		static NewMapClass<int, Object*> ObjectPoints;
+		static NewMapClass<int, cv::Mat> KFObjCounts;
 		static int mnMaxObjectLabel;
 		static std::set<MapPoint*> mspAllFloorPoints;
 		static std::set<MapPoint*> mspAllWallPoints;
 		static std::vector<cv::Vec3b> mvObjectLabelColors;
-
+		static std::string strLabel;
+		static std::vector<std::string> mvStrLabels;
 		//temp
 		static std::atomic<int> mnContentID;
 		static Plane* floorPlane;

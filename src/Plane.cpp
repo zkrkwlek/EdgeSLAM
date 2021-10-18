@@ -12,6 +12,10 @@
 
 namespace EdgeSLAM {
 
+	float PlaneProcessor::HoughBinSize = 30.0;
+	NewMapClass<int, cv::Mat> PlaneProcessor::PlanarHoughImages;
+	NewMapClass<int, LocalIndoorModel*> PlaneProcessor::LocalPlanarMap;
+
 	float PlaneProcessor::fHistSize = 0.02f;
 	int PlaneProcessor::nTrial = 1500;
 	float PlaneProcessor::fDistance = 0.02;
@@ -252,6 +256,7 @@ namespace EdgeSLAM {
 		// Retrieve neighbor keyframes in covisibility graph
 		int nn = 20;
 		const std::vector<KeyFrame*> vpNeighKFs = targetKF->GetBestCovisibilityKeyFrames(nn);
+
 		//0.6, false
 		//ORBmatcher matcher(0.6, false);
 
@@ -435,8 +440,12 @@ namespace EdgeSLAM {
 		}
 	}
 
-	void PlaneProcessor::EstimateLocalMapPlanes(SLAM* system, Map* map, KeyFrame* pKF) {
+	void PlaneProcessor::EstimateLocalMapPlanes(SLAM* system, Map* map, KeyFrame* mpTargetKF) {
 		
+		int nSize = 360 / HoughBinSize;
+		cv::Mat hist = cv::Mat::zeros(nSize, nSize, CV_32SC1);
+		PlanarHoughImages.Update(mpTargetKF->mnId, hist);
+
 		if (map->mnNumPlaneEstimation >= 1){
 			std::cout << "Already Doing Plane Estimation!! = " << map->mnNumPlaneEstimation << std::endl;
 			return;
@@ -445,14 +454,26 @@ namespace EdgeSLAM {
 			std::cout << "Start PE = " << map->mnNumPlaneEstimation << std::endl;
 		}
 		map->mnNumPlaneEstimation++;
-		LocalMap* pLocalMap = new LocalCovisibilityMap();
-		std::vector<MapPoint*> vpLocalMPs;
-		std::vector<KeyFrame*> vpLocalKFs;
 
-		//std::cout << "Track::LocalMap::Update::start" << std::endl;
-		LocalIndoorModel *pModel = new LocalIndoorModel(pKF);
-		pLocalMap->UpdateLocalMap(pKF, vpLocalKFs, vpLocalMPs);
-		std::cout << "update local map end " << std::endl;
+		std::vector<MapPoint*> vpLocalMPs;
+		std::vector<KeyFrame*> vpLocalKFs = mpTargetKF->GetBestCovisibilityKeyFrames(10);
+		vpLocalKFs.push_back(mpTargetKF);
+		std::set<MapPoint*> spMPs;
+		for (std::vector<KeyFrame*>::const_iterator itKF = vpLocalKFs.begin(), itEndKF = vpLocalKFs.end(); itKF != itEndKF; itKF++)
+		{
+			KeyFrame* pKF = *itKF;
+			const std::vector<MapPoint*> vpMPs = pKF->GetMapPointMatches();
+
+			for (std::vector<MapPoint*>::const_iterator itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
+			{
+				MapPoint* pMP = *itMP;
+				if (!pMP || pMP->isBad() || spMPs.count(pMP))
+					continue;
+				vpLocalMPs.push_back(pMP);
+				spMPs.insert(pMP);
+			}
+		}
+		LocalIndoorModel *pModel = new LocalIndoorModel(mpTargetKF);
 		if (vpLocalMPs.size() < 100){
 			map->mnNumPlaneEstimation--;
 			return;
@@ -503,7 +524,7 @@ namespace EdgeSLAM {
 			map->mnNumPlaneEstimation--;
 			return;
 		}
-		std::cout << "pe = " << spFloorMPs.size() << " " << spWallMPs.size() << std::endl;
+		//std::cout << "pe = " << spFloorMPs.size() << " " << spWallMPs.size() << std::endl;
 
 		map->ClearPlanarMPs();
 		{
@@ -512,27 +533,20 @@ namespace EdgeSLAM {
 			cv::Mat outliers = cv::Mat::zeros(0, 3, CV_32FC1);
 			int nAddNormal = 0;
 			pModel->mpFloor->mbInit = PlaneInitialization2(matFloorData, param, inliers, outliers, nTrial, fDistance, fRatio);
-
-			/*std::vector<MapPoint*> vpMPs(spFloorMPs.begin(), spFloorMPs.end());
-			std::vector<MapPoint*> vpOutlierMPs;
-			pModel->mpFloor->mbInit = PlaneProcessor::PlaneInitialization(pModel->mpFloor, vpMPs, vpOutlierMPs);*/
-
+						
 			if (pModel->mpFloor->mbInit) {
-				std::cout<<"PE = "<<param.t()<<std::endl;
+				auto idx = CalcSphericalCoordinate(param.rowRange(0, 3));
+				hist.at<int>(idx)++;
+				//std::cout<<"PE = "<<param.t()<<std::endl;
 				pModel->mpFloor->SetParam(param);
 				for (int i = 0, iend = inliers.rows; i <iend; i++) {
 					map->AddPlanarMP(inliers.row(i), 0);
 				}
-				/*for (int i = 0, iend = pModel->mpFloor->mvpMPs.size(); i < iend; i++) {
-					auto pMP = pModel->mpFloor->mvpMPs[i];
-					if (!pMP || pMP->isBad())
-						continue;
-					map->AddPlanarMP(pMP->GetWorldPos(), 0);
-				}*/
-
+				
 				{
+					////이부분은 올해안에 완성시키기
 					//planar 3d test
-					PlaneProcessor::CreatePlanarMapPoints(map, pKF, param.clone());
+					//PlaneProcessor::CreatePlanarMapPoints(map, mpTargetKF, param.clone());
 				}
 
 			}
@@ -569,7 +583,7 @@ namespace EdgeSLAM {
 				cv::Mat param2;
 				cv::Mat inliers2 = cv::Mat::zeros(0, 3, CV_32FC1);
 				cv::Mat outliers2 = cv::Mat::zeros(0, 3, CV_32FC1);
-				bool bWall2 = Ransac_fitting(outliers, param, inliers2, outliers2, nTrial, fDistance, fRatio);
+				bool bWall2 = Ransac_fitting(outliers, param2, inliers2, outliers2, nTrial, fDistance, fRatio);
 				if (bWall2) {
 					for (int i = 0, iend = inliers2.rows; i <iend; i++) {
 						//map->AddPlanarMP(inliers2.row(i), 2);
@@ -581,13 +595,37 @@ namespace EdgeSLAM {
 					map->AddPlanarMP(pMP->GetWorldPos(), 0);
 					}*/
 				}
-
+				if (bWall) {
+					auto idx = CalcSphericalCoordinate(param.rowRange(0, 3));
+					hist.at<int>(idx)++;
+				}
+				if (bWall2) {
+					auto idx = CalcSphericalCoordinate(param2.rowRange(0, 3));
+					hist.at<int>(idx)++;
+				}
 			}
 
 
 			////wall estimation
 		}
 
+		////KF 별 히스토그램 갱신 및 이미지로 저장
+		//PlanarHoughImages.Update(mpTargetKF->mnId, hist);
+		//for (std::vector<KeyFrame*>::const_iterator itKF = vpLocalKFs.begin(), itEndKF = vpLocalKFs.end(); itKF != itEndKF; itKF++)
+		//{
+
+		//	KeyFrame* pKF = *itKF;
+		//	if (pKF == mpTargetKF)
+		//		continue;
+		//	if (PlanarHoughImages.Count(pKF->mnId)) {
+		//		cv::Mat hist2 = PlanarHoughImages.Get(pKF->mnId);
+		//		hist2 += hist;
+		//		PlanarHoughImages.Update(pKF->mnId, hist2);
+		//		std::stringstream ss;
+		//		ss << "../bin/img/hist_" << pKF->mnId << ".jpg";
+		//		cv::imwrite(ss.str(), hist2);
+		//	}
+		//}
 
 
 		//std::vector<MapPoint*> vpOutlierWallMPs, vpOutlierWallMPs2;
@@ -606,6 +644,36 @@ namespace EdgeSLAM {
 		//}
 
 		map->mnNumPlaneEstimation--;
+	}
+
+	cv::Point PlaneProcessor::CalcSphericalCoordinate(cv::Mat normal) {
+		cv::Mat a = normal.clone();
+		
+		cv::Mat b = normal.clone(); //0 y z
+		b.at<float>(0) = 0.0;
+
+		cv::Mat c = cv::Mat::zeros(3, 1, CV_32FC1);
+		c.at<float>(2) = 1.0; // 0 0 1
+
+		float len_a = sqrt(a.dot(a));
+		float len_b = sqrt(b.dot(b));
+		float len_c = sqrt(c.dot(c));
+
+		float azi = b.dot(c) / (len_b*len_c) * 180.0 / CV_PI;
+		if (azi < 0.0)
+			azi += 360.0;
+		if (azi >= 360.0)
+			azi -= 360.0;
+		float ele = b.dot(a) / (len_a*len_b) * 180.0 / CV_PI;
+		if (ele < 0.0)
+			ele += 360.0;
+		if (ele >= 360.0)
+			ele -= 360.0;
+
+		int x = (int)azi / HoughBinSize;
+		int y = (int)ele / HoughBinSize;
+
+		return cv::Point(x, y);
 	}
 
 	bool PlaneProcessor::calcUnitNormalVector(cv::Mat& X) {

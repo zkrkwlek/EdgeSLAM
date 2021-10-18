@@ -29,6 +29,9 @@ namespace EdgeSLAM {
 		pMapper->CreateNewMapPoints(map, targetKF);
 		if(map->mnNumMappingFrames == 1)
 			pMapper->SearchInNeighbors(map, targetKF);
+		
+		pool->EnqueueJob(PlaneProcessor::EstimateLocalMapPlanes, system, map, targetKF);
+		
 		map->mbAbortBA = false;
 		if (map->mnNumMappingFrames == 1 && !map->stopRequested())
 		{
@@ -42,7 +45,7 @@ namespace EdgeSLAM {
 			}
 			pMapper->KeyFrameCulling(map, targetKF);
 		}
-		//pool->EnqueueJob(PlaneProcessor::EstimateLocalMapPlanes, system, map, targetKF);
+		
 		pool->EnqueueJob(LoopCloser::ProcessLoopClosing, system, map, targetKF);
 		map->mnNumMappingFrames--;
 
