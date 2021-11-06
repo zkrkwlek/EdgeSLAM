@@ -16,7 +16,9 @@
 
 namespace EdgeSLAM {
 	std::string Segmentator::strLabel = "wall,building,sky,floor,tree,ceiling,road,bed,windowpane,grass,cabinet,sidewalk,person,earth,door,table,mountain,plant,curtain,chair,car,water,painting,sofa,shelf,house,sea,mirror,rug,field,armchair,seat,fence,desk,rock,wardrobe,lamp,bathtub,railing,cushion,base,box,column,signboard,chest of drawers,counter,sand,sink,skyscraper,fireplace,refrigerator,grandstand,path,stairs,runway,case,pool table,pillow,screen door,stairway,river,bridge,bookcase,blind,coffee table,toilet,flower,book,hill,bench,countertop,stove,palm,kitchen island,computer,swivel chair,boat,bar,arcade machine,hovel,bus,towel,light,truck,tower,chandelier,awning,streetlight,booth,television,airplane,dirt track,apparel,pole,land,bannister,escalator,ottoman,bottle,buffet,poster,stage,van,ship,fountain,conveyer belt,canopy,washer,plaything,swimming pool,stool,barrel,basket,waterfall,tent,bag,minibike,cradle,oven,ball,food,step,tank,trade name,microwave,pot,animal,bicycle,lake,dishwasher,screen,blanket,sculpture,hood,sconce,vase,traffic light,tray,ashcan,fan,pier,crt screen,plate,monitor,bulletin board,shower,radiator,glass,clock,flag";
+	std::string Segmentator::strYoloObjectLabel = "person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light,fire hydrant,stop sign,parking meter,bench,bird,cat,dog,horse,sheep,cow,elephant,bear,zebra,giraffe,backpack,umbrella,handbag,tie,suitcase,frisbee,skis,snowboard,sports ball,kite,baseball bat,baseball glove,skateboard,surfboard,tennis racket,bottle,wine glass,cup,fork,knife,spoon,bowl,banana,apple,sandwich,orange,broccoli,carrot,hot dog,pizza,donut,cake,chair,couch,potted plant,bed,dining table,toilet,tv,laptop,mouse,remote,keyboard,cell phone,microwave,oven,toaster,sink,refrigerator,book,clock,vase,scissors,teddy bear,hair drier,toothbrush";
 	std::vector<std::string> Segmentator::mvStrLabels;
+	std::vector<std::string> Segmentator::mvStrObjectLabels;
 	int Segmentator::mnMaxObjectLabel;
 	NewMapClass<int, cv::Mat> Segmentator::SegmentedFrames;
 	NewMapClass<int, Object*> Segmentator::ObjectPoints;
@@ -25,7 +27,7 @@ namespace EdgeSLAM {
 	std::set<MapPoint*> Segmentator::mspAllWallPoints;
 	std::atomic<int> Segmentator::mnContentID = 0;
 	
-	Plane* Segmentator::floorPlane;
+	Plane* Segmentator::floorPlane = nullptr;
 	Plane* Segmentator::wallPlane1;
 	Plane* Segmentator::wallPlane2;
 
@@ -136,6 +138,8 @@ namespace EdgeSLAM {
 		auto res = mpAPI->Send(ss.str(), "");
 		int n2 = res.size();
 
+		std::cout << "평면 체크부터!!!" << std::endl;
+
 		cv::Mat fdata = cv::Mat::zeros(5, 3, CV_32FC1);
 		std::memcpy(fdata.data, res.data(), res.size());
 		
@@ -192,6 +196,10 @@ namespace EdgeSLAM {
 			ePt1 = pt11;
 		}*/
 		////click check
+
+		////임시로
+		if (!floorPlane)
+			return;
 
 		cv::Mat Kinv = user->GetCameraInverseMatrix();
 		cv::Mat Pinv = PlaneProcessor::CalcInverPlaneParam(floorPlane->GetParam(), Tinv);
@@ -360,23 +368,18 @@ namespace EdgeSLAM {
 		std::memcpy(labeled.data, res.data(), res.size());
 
 		////segmentation image
-
-		std::vector<cv::Mat> vecBinaryLabelImages(mvStrLabels.size());
+		/*std::vector<cv::Mat> vecBinaryLabelImages(mnMaxObjectLabel);
 		cv::Mat temp = cv::Mat::zeros(h, w, CV_8UC1);
-		for (int i = 0, iend = mvStrLabels.size(); i < iend; i++) {
+		for (int i = 0, iend = mnMaxObjectLabel; i < iend; i++) {
 			 vecBinaryLabelImages[i] = temp.clone();
-		}
+		}*/
 		
 		cv::Mat segcolor = cv::Mat::zeros(h,w, CV_8UC3);
 		for (int y = 0; y < h; y++) {
 			for (int x = 0; x < w; x++) {
 				int label = labeled.at<uchar>(y, x) + 1;
-				if (label == 0 || label > 150){
-					std::cout << "obj erro!!!!!!!!!!!!!"<< label << std::endl;
-					exit(-1);
-				}
 				segcolor.at<cv::Vec3b>(y, x) = Segmentator::mvObjectLabelColors[label];
-				vecBinaryLabelImages[label - 1].at<uchar>(y, x) = 255;
+				//vecBinaryLabelImages[label].at<uchar>(y, x) = 255;
 
 				//switch (label) {
 				//case (int)ObjectLabel::FLOOR:
@@ -442,8 +445,8 @@ namespace EdgeSLAM {
 		////test matching object points and frame
 
 		////Update Object Points && 
-		int nLabel = mvStrLabels.size();
-		cv::Mat count = cv::Mat::zeros(nLabel, 1, CV_32SC1);
+		//int nLabel = mvStrLabels.size();
+		//cv::Mat count = cv::Mat::zeros(nLabel, 1, CV_32SC1);
 
 		auto F = pUser->mapFrames[id];
 
@@ -452,11 +455,8 @@ namespace EdgeSLAM {
 			if (!pMP || pMP->isBad())
 				continue;
 			auto pt = F->mvKeys[i].pt;
-			int label = labeled.at<uchar>(pt.y, pt.x);
-			if (label >= 150 || label < 0)
-				std::cout << "Error!!!!" << std::endl << std::endl << std::endl << std::endl;
-			count.at<int>(label)++;
-			
+			int label = labeled.at<uchar>(pt.y, pt.x)+1;
+			//count.at<int>(label)++;
 
 			////update object label
 			int nmpid = pMP->mnId;
@@ -471,41 +471,43 @@ namespace EdgeSLAM {
 			obj->Update(label);
 			////update object label
 			
-			////detect structure poitns
-			label++;
-			switch (label) {
-			case (int)ObjectLabel::FLOOR:
-				if (mspAllFloorPoints.count(pMP))
-					continue;
-				mspAllFloorPoints.insert(pMP);
-				break;
-			case (int)ObjectLabel::WALL:
-				if (mspAllWallPoints.count(pMP))
-					continue;
-				mspAllWallPoints.insert(pMP);
-				break;
-			case (int)ObjectLabel::CEIL:
-				break;
-			}
-			////detect structure poitns
+			//////detect structure poitns
+			//label++;
+			//switch (label) {
+			//case (int)ObjectLabel::FLOOR:
+			//	if (mspAllFloorPoints.count(pMP))
+			//		continue;
+			//	mspAllFloorPoints.insert(pMP);
+			//	break;
+			//case (int)ObjectLabel::WALL:
+			//	if (mspAllWallPoints.count(pMP))
+			//		continue;
+			//	mspAllWallPoints.insert(pMP);
+			//	break;
+			//case (int)ObjectLabel::CEIL:
+			//	break;
+			//}
+			//////detect structure poitns
 		}
 		
+		////Connected Component Labeling
 		////put text
-		cv::Mat objLabel = count > 20; //thresh로 빼기
-		for (int i = 0, iend = mvStrLabels.size(); i < iend; i++) {
-			int nLabel = i + 1;
-			switch (nLabel) {
-			case (int)ObjectLabel::FLOOR:
-			case (int)ObjectLabel::WALL:
-			case (int)ObjectLabel::CEIL:
-				continue;
-			}
-			if (!objLabel.at<uchar>(i)) {
-				continue;
-			}
-			cv::Mat stat;
-			ConnectedComponentLabeling(vecBinaryLabelImages[i], segcolor, stat, mvStrLabels[i]);
-		}
+		//cv::Mat objLabel = count > 20; //thresh로 빼기
+		//for (int i = 0, iend = mvStrLabels.size(); i < iend; i++) {
+		//	int nLabel = i + 1;
+		//	switch (nLabel) {
+		//	case (int)ObjectLabel::FLOOR:
+		//	case (int)ObjectLabel::WALL:
+		//	case (int)ObjectLabel::CEIL:
+		//		continue;
+		//	}
+		//	if (!objLabel.at<uchar>(i)) {
+		//		continue;
+		//	}
+		//	cv::Mat stat;
+		//	ConnectedComponentLabeling(vecBinaryLabelImages[i], segcolor, stat, mvStrLabels[i]);
+		//}
+		////Connected Component Labeling
 		////put text
 		{
 			////////
@@ -559,6 +561,37 @@ namespace EdgeSLAM {
 		cv::imwrite(ssa.str(), F->imgColor);*/
 		////save image
 	}
+	void Segmentator::ProcessObjectDetection(ThreadPool::ThreadPool* pool, SLAM* system, std::string user, int id){
+		auto pUser = system->GetUser(user);
+		std::stringstream ss;
+		ss << "/Load?keyword=ObjectDetection" << "&id=" << id << "&src=" << user;
+		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+		auto res = mpAPI->Send(ss.str(), "");
+		int n2 = res.size();
+		int n = n2 / 24;
+		cv::Mat data = cv::Mat::zeros(n, 6, CV_32FC1);
+		
+		auto F = pUser->mapFrames[id];
+		cv::Mat dst = F->imgColor.clone();
+		std::memcpy(data.data, res.data(), res.size());
+
+		for (int j = 0; j < n; j++) {
+			int label = (int)data.at<float>(j, 0);
+			float conf = data.at<float>(j, 1);
+			std::stringstream ss;
+			ss << mvStrObjectLabels[label] << "(" << conf << ")" << std::endl;
+			cv::Point2f left(data.at<float>(j, 2), data.at<float>(j, 3));
+			cv::Point2f right(data.at<float>(j, 4), data.at<float>(j, 5));
+			
+			rectangle(dst,left, right, cv::Scalar(255, 255, 255));
+			cv::putText(dst, ss.str(), cv::Point(left.x, left.y - 6), 1, 1.5, cv::Scalar::all(255));
+		}
+		
+		//cv::imshow("yolo", dst); cv::waitKey(1);
+		//system->mpVisualizer->ResizeImage(dst, dst);
+		//system->mpVisualizer->SetOutputImage(dst, 2);
+
+	}
 	void Segmentator::ProcessDepthEstimation(ThreadPool::ThreadPool* pool, SLAM* system, std::string user, int id)
 	{
 		auto pUser = system->GetUser(user);
@@ -575,14 +608,18 @@ namespace EdgeSLAM {
 
 		{
 			cv::Mat depth;
-			cv::normalize(depthImg, depth, 0, 255, cv::NORM_MINMAX, CV_32FC1);
-			
+			cv::normalize(depthImg, depth, 0, 255, cv::NORM_MINMAX, CV_8UC1);
+			cv::cvtColor(depth, depth, cv::COLOR_GRAY2BGR);
 			/////save image
 			/*std::stringstream sss;
 			sss << "../../bin/img/" << pUser->userName << "/Depth/" << id << ".jpg";
 			cv::imwrite(sss.str(), depth);*/
 			/////save image
+			system->mpVisualizer->ResizeImage(depth, depth);
+			system->mpVisualizer->SetOutputImage(depth, 3);
 		}
+		
+		return;
 
 		////segmentation image
 		//cv::Mat depthImg = cv::Mat::zeros(h, w, CV_8UC3);
@@ -719,9 +756,16 @@ namespace EdgeSLAM {
 		cv::resize(segcolor, resized_test, cv::Size(segcolor.cols / 2, segcolor.rows / 2));
 		system->mpVisualizer->SetOutputImage(resized_test, 2);*/
 	}
-	
+	void Segmentator::RequestObjectDetection(std::string user, int id)
+	{
+		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+		std::stringstream ss;
+		ss << "/Store?keyword=RequestObjectDetection&id=" << id << "&src=" << user;
+		auto res = mpAPI->Send(ss.str(), "");
+	}
 	void Segmentator::RequestSegmentation(std::string user, int id)
 	{
+		
 		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 		std::stringstream ss;
 		ss << "/Store?keyword=RequestDepth&id=" << id << "&src=" << user;
@@ -729,6 +773,7 @@ namespace EdgeSLAM {
 		ss.str("");
 		ss << "/Store?keyword=RequestSegmentation&id=" << id <<"&src="<<user;
 		res = mpAPI->Send(ss.str(), "");
+		
 	}
 	void Segmentator::Init() {
 		cv::Mat colormap = cv::Mat::zeros(256, 3, CV_8UC1);
@@ -755,6 +800,7 @@ namespace EdgeSLAM {
 		}
 		mnMaxObjectLabel = mvObjectLabelColors.size();
 		mvStrLabels = Utils::Split(strLabel,",");
+		mvStrObjectLabels = Utils::Split(strYoloObjectLabel, ",");
 
 	}
 }

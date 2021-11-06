@@ -111,7 +111,7 @@ namespace EdgeSLAM {
 				matches.push_back(std::make_pair(i, bestIdx2));
 			}
 		}*/
-
+		return nmatches;
 	}
 
 	int SearchPoints::SearchKeyFrameByBoW(FeatureTracker* pFeatureTracker, KeyFrame* pKF1, KeyFrame *pKF2, std::vector<MapPoint*> &vpMatches12, float thMinDesc, float thMatchRatio, bool bCheckOri)

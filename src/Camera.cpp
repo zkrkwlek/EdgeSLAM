@@ -4,7 +4,7 @@ namespace EdgeSLAM {
 	int Camera::mnGridSize = 10;
 	Camera::Camera(){}
 	Camera::~Camera(){}
-	Camera::Camera(int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4)
+	Camera::Camera(int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5)
 		:mnWidth(_w), mnHeight(_h), fx(_fx), fy(_fy), cx(_cx), cy(_cy), invfx(1.0/fx), invfy(1.0/fy)
 	{
 		K = cv::Mat::eye(3, 3, CV_32FC1);
@@ -21,11 +21,17 @@ namespace EdgeSLAM {
 
 		Kfluker = (cv::Mat_<float>(3, 3) << fx, 0, 0, 0, fy, 0, -fy*cx, -fx*cy, fx*fy);
 
+
 		D = cv::Mat::zeros(4, 1, CV_32FC1);
 		D.at<float>(0) = _d1;
 		D.at<float>(1) = _d2;
 		D.at<float>(2) = _d3;
 		D.at<float>(3) = _d4;
+		if (_d5 != 0)
+		{
+			D.resize(5);
+			D.at<float>(4) = _d5;
+		}
 
 		bDistorted = sqrt(D.dot(D)) > 1e-10;
 		u_min = 0.0;

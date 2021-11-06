@@ -24,6 +24,7 @@ namespace EdgeSLAM {
 		static void UpdateDeviceGyro(SLAM* system, User* user, int id);
 		static void Track(ThreadPool::ThreadPool* pool, SLAM* system, int id, User* user, double ts);
 		static void TrackWithImage(ThreadPool::ThreadPool* pool, SLAM* system, cv::Mat im, int id, User* user, double ts);
+		static void SendTrackingResults(SLAM* system, User* user, int nFrameID, int n, cv::Mat R, cv::Mat t);
 		static void SendDeviceTrackingData(SLAM* system, User* user, LocalMap* pLocalMap, Frame* frame, int nInlier, int id);
 		bool TrackWithPrevFrame(Frame* prev, Frame* cur, float thMaxDesc, float thMinDesc);
 		int TrackWithLocalMap(LocalMap* localMap, User* user, Frame* cur, float thMaxDesc, float thMinDesc);

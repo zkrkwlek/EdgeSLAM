@@ -17,6 +17,7 @@
 #include <Visualizer.h>
 #include <Segmentator.h>
 #include <WebAPI.h>
+#include <Converter.h>
 
 #include <chrono>
 namespace EdgeSLAM {
@@ -72,12 +73,15 @@ namespace EdgeSLAM {
 		cv::Mat temp = cv::Mat::zeros(n2, 1, CV_8UC1);
 		std::memcpy(temp.data, res.data(), res.size());
 		cv::Mat img = cv::imdecode(temp, cv::IMREAD_COLOR);
+		std::chrono::high_resolution_clock::time_point received = std::chrono::high_resolution_clock::now();
 		////receive image
+		
 		/////save image
-		std::stringstream sss;
+		/*std::stringstream sss;
 		sss << "../bin/img/" << user->userName << "/" << id << "_color.jpg";
-		cv::imwrite(sss.str(), img);
+		cv::imwrite(sss.str(), img);*/
 		/////save image
+		
 		Frame* frame = new Frame(img, cam, id, ts);
 		user->mnCurrFrameID = frame->mnFrameID;
 		
@@ -161,11 +165,10 @@ namespace EdgeSLAM {
 
 					if (!bTrack) {
 						std::cout << "track with reference frame :: start" << std::endl;
-
 						std::cout << "track with reference frame :: end" << std::endl;
 					}
 					else {
-						std::cout << "test0" << std::endl;
+						
 					}
 				}
 				/*if (userState == UserState::Failed) {
@@ -200,23 +203,22 @@ namespace EdgeSLAM {
 		if (!user->mbDeviceTracking) {
 
 			{
-				cv::Mat data = cv::Mat::zeros(1, 1, CV_32SC1);
-				data.at<int>(0) = nInliers;
-				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
-				std::stringstream ss;
-				ss << "/Store?keyword=MappingResult&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
-				auto res = mpAPI->Send(ss.str(), data.data, sizeof(int));
+				//bool b = trackState == UserState::Success ? true : false;
+				pool->EnqueueJob(Tracker::SendTrackingResults, system, user, id, nInliers, frame->GetRotation(), frame->GetTranslation());
 			}
 		}
 
+
 		user->SetState(trackState);
 		if (trackState == UserState::Success) {
+			
+			////오브젝트 검출 요청
+			//Segmentator::RequestObjectDetection(user->userName, frame->mnFrameID);
 
 			if (user->mbDeviceTracking) {
 				//SendDeviceTrackingData
 				pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, user, pLocalMap, frame, nInliers, id);
 			}
-			
 			//pose update
 			cv::Mat T = frame->GetPose();
 			user->UpdatePose(T);
@@ -226,7 +228,6 @@ namespace EdgeSLAM {
 				system->mpTracker->CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, user);
 				Segmentator::RequestSegmentation(user->userName, frame->mnFrameID);
 			}
-			
 			////frame line visualization
 			/*if (!user->mbMapping) {
 				cv::Mat R, t;
@@ -260,13 +261,19 @@ namespace EdgeSLAM {
 			}*/
 			////frame line visualization
 		}
+		
 		user->mapFrames[frame->mnFrameID] = frame;
 		user->mnPrevFrameID = frame->mnFrameID;
 		user->mbProgress = false; 
+		
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(received - start).count();
 		float t_test1 = du_test1 / 1000.0;
-		std::cout << "Frame = " << user->userName << " : " << id << ", Matches = " << nInliers << ", time =" << t_test1 << std::endl;
+
+		auto du_test2 = std::chrono::duration_cast<std::chrono::milliseconds>(end - received).count();
+		float t_test2 = du_test2 / 1000.0;
+
+		std::cout << "Frame = " << user->userName << " : " << id << ", Matches = " << nInliers << ", time =" << t_test1 <<", "<< t_test2<< std::endl;
 		system->UpdateTrackingTime(t_test1);
 
 		////visualization
@@ -295,7 +302,8 @@ namespace EdgeSLAM {
 				}
 			}
 			system->mpVisualizer->ResizeImage(img, img);
-			system->mpVisualizer->SetOutputImage(img, user->GetVisID());
+			if(user->GetVisID() <= 3)
+				system->mpVisualizer->SetOutputImage(img, user->GetVisID());
 
 			/////save image
 			/*std::stringstream sss;
@@ -820,6 +828,7 @@ namespace EdgeSLAM {
 
 	void Tracker::CreateNewKeyFrame(ThreadPool::ThreadPool* pool, SLAM* system, Map* map, LocalMapper* mapper, Frame* cur, User* user)
 	{
+		
 		if (!map->SetNotStop(true))
 			return;
 		KeyFrame* pKF = new KeyFrame(cur, map);
@@ -827,12 +836,36 @@ namespace EdgeSLAM {
 		user->mnLastKeyFrameID = cur->mnFrameID;
 		pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, pKF);
 		map->SetNotStop(false);
+		
+	}
+
+	void Tracker::SendTrackingResults(SLAM* system, User* user, int nFrameID, int n, cv::Mat R, cv::Mat t) {
+		
+		auto q = Converter::toQuaternion(R.t());
+		cv::Mat data = cv::Mat::zeros(8, 1, CV_32FC1);
+		data.at<float>(0) = (float)n;
+		data.at<float>(1) = q[0];
+		data.at<float>(2) = q[1];
+		data.at<float>(3) = q[2];
+		data.at<float>(4) = q[3];
+		data.at<float>(5) = t.at<float>(0);
+		data.at<float>(6) = t.at<float>(1);
+		data.at<float>(7) = t.at<float>(2);
+		
+		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+		std::stringstream ss;
+		ss << "/Store?keyword=MappingResult&id=" << nFrameID << "&src=" << user->userName << "&type2=" << user->userName;
+
+		std::chrono::high_resolution_clock::time_point s1 = std::chrono::high_resolution_clock::now();
+		auto res = mpAPI->Send(ss.str(), data.data, sizeof(float)*data.rows);
+		std::chrono::high_resolution_clock::time_point s2 = std::chrono::high_resolution_clock::now();
+		auto d = std::chrono::duration_cast<std::chrono::milliseconds>(s2 - s1).count();
+		float t2 = d / 1000.0;
+		std::cout << "sending time1 = " << t2 << std::endl;
 	}
 
 	void Tracker::SendDeviceTrackingData(SLAM* system, User* user, LocalMap* pLocalMap, Frame* frame, int nInlier, int id) {
 		{
-			std::cout << "local map test = " << pLocalMap->mvpLocalMPs.size() << " " << pLocalMap->mvpLocalTPs.size() << std::endl;
-
 			int N = std::min((int)pLocalMap->mvpLocalMPs.size(), 2000);
 			cv::Mat descs = cv::Mat::zeros(N, 32, CV_8UC1);
 			cv::Mat scales = cv::Mat::zeros(N, 1, CV_8UC1);
@@ -856,6 +889,8 @@ namespace EdgeSLAM {
 				cv::Mat X = pLocalMap->mvpLocalMPs[i]->GetWorldPos().t();
 				X.copyTo(pts.row(i));
 			}
+
+			std::chrono::high_resolution_clock::time_point s1 = std::chrono::high_resolution_clock::now();
 			{
 				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 				std::stringstream ss;
@@ -892,6 +927,12 @@ namespace EdgeSLAM {
 				ss << "/Store?keyword=LocalMapPointObservation&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
 				auto res = mpAPI->Send(ss.str(), obs.data, obs.rows);
 			}
+
+			std::chrono::high_resolution_clock::time_point s2 = std::chrono::high_resolution_clock::now();
+			auto d = std::chrono::duration_cast<std::chrono::milliseconds>(s2 - s1).count();
+			float t = d / 1000.0;  
+			std::cout << "sending time2 = " << t << std::endl;
+
 			//cv::Mat testMat;
 			//scales.convertTo(testMat, CV_8UC1);
 			//std::cout << "test = " << scales.rows << " " << testMat. << std::endl;

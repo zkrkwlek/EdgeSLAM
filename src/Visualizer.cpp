@@ -210,7 +210,7 @@ namespace EdgeSLAM {
 			cv::Mat tempVis = mVisPoseGraph.clone();
 			auto pMap = GetMap();
 			if (pMap) {
-
+				
 				auto mmpMap = pMap->GetAllMapPoints();
 				for (auto iter = mmpMap.begin(); iter != mmpMap.end(); iter++) {
 					auto pMPi = *iter;// ->first;
@@ -218,14 +218,13 @@ namespace EdgeSLAM {
 						continue;
 
 					cv::Scalar color = cv::Scalar(0, 0, 0);
-					if (Segmentator::ObjectPoints.Count(pMPi->mnId)) {
+					/*if (Segmentator::ObjectPoints.Count(pMPi->mnId)) {
 						auto obj = Segmentator::ObjectPoints.Get(pMPi->mnId);
 						if (obj) {
-							int label = obj->GetLabel();
+							int label = obj->GetLabel()+1;
 							color = Segmentator::mvObjectLabelColors[label];
 						}
-					}
-					
+					}*/
 					cv::Mat x3D = pMPi->GetWorldPos();
 					cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
 					tpt += mVisMidPt;

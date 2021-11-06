@@ -89,6 +89,9 @@ namespace EdgeSLAM {
 	void SLAM::ProcessSegmentation(std::string user,int id) {
 		pool->EnqueueJob(Segmentator::ProcessSegmentation, pool, this, user, id);
 	}
+	void SLAM::ProcessObjectDetection(std::string user, int id) {
+		pool->EnqueueJob(Segmentator::ProcessObjectDetection, pool, this, user, id);
+	}
 	void SLAM::ProcessDepthEstimation(std::string user, int id) {
 		pool->EnqueueJob(Segmentator::ProcessDepthEstimation, pool, this, user, id);
 	}
@@ -97,8 +100,8 @@ namespace EdgeSLAM {
 		auto pNewMap = new Map(mpDBoWVoc);
 		AddMap(name, pNewMap);
 	}
-	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, bool _b, bool _bTracking, bool _bimu){
-		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _b, _bTracking, _bimu);
+	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, bool _b, bool _bTracking, bool _bimu){
+		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _d5, _b, _bTracking, _bimu);
 		pNewUser->mpMap = GetMap(_map);
 		AddUser(_user, pNewUser);
 	}
@@ -237,7 +240,7 @@ namespace EdgeSLAM {
 	void SLAM::SaveProcessingTime() {
 		{
 			std::ofstream file;
-			file.open("../../bin/time/tracking.txt");
+			file.open("../bin/time/tracking.txt");
 			std::string s;
 			std::stringstream ss;
 			ss << nTotalTrack << " " << fSumTrack << " " << fSumTrack2;
@@ -246,7 +249,7 @@ namespace EdgeSLAM {
 		}
 		{
 			std::ofstream file;
-			file.open("../../bin/time/mapping.txt");
+			file.open("../bin/time/mapping.txt");
 			std::string s;
 			std::stringstream ss;
 			ss << nTotalMapping << " " << fSumMapping << " " << fSumMapping2;
@@ -255,7 +258,7 @@ namespace EdgeSLAM {
 		}
 		{
 			std::ofstream file;
-			file.open("../../bin/time/reloc.txt");
+			file.open("../bin/time/reloc.txt");
 			std::string s;
 			std::stringstream ss;
 			ss << nTotalReloc << " " << fSumReloc << " " << fSumReloc2;
@@ -267,7 +270,7 @@ namespace EdgeSLAM {
 		
 		{
 			std::ifstream file;
-			file.open("../../bin/time/tracking.txt");
+			file.open("../bin/time/tracking.txt");
 			std::string s;
 			getline(file, s);
 			std::stringstream ss;
@@ -277,7 +280,7 @@ namespace EdgeSLAM {
 		}
 		{
 			std::ifstream file;
-			file.open("../../bin/time/mapping.txt");
+			file.open("../bin/time/mapping.txt");
 			std::string s;
 			getline(file, s);
 			std::stringstream ss;
@@ -287,7 +290,7 @@ namespace EdgeSLAM {
 		}
 		{
 			std::ifstream file;
-			file.open("../../bin/time/reloc.txt");
+			file.open("../bin/time/reloc.txt");
 			std::string s;
 			getline(file, s);
 			std::stringstream ss;
@@ -302,7 +305,7 @@ namespace EdgeSLAM {
 		auto vpKFs =  pMap->GetAllKeyFrames();
 
 		std::stringstream ss;
-		ss << "../../bin/trajectory/" << user->mapName << ".txt";
+		ss << "../bin/trajectory/" << user->mapName << ".txt";
 		std::ofstream f;
 		f.open(ss.str().c_str());
 		f << std::fixed;

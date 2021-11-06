@@ -28,7 +28,7 @@ namespace EdgeSLAM {
 			//std::cout << "Loop closing error!!!!!!!!!!!!!!" << std::endl;
 			return;
 		}
-		std::cout << "Loop closing = start" << std::endl;
+		
 		map->mnNumLoopClosingFrames++;
 		
 		bool bSim3 = false;
@@ -46,7 +46,7 @@ namespace EdgeSLAM {
 			//std::cout << "CorrectLoop::start" << std::endl;
 		}
 		map->mnNumLoopClosingFrames--;
-		std::cout << "Loop closing = end" << std::endl;
+		
 	}
 	bool LoopCloser::DetectLoop(SLAM* system, Map* map, KeyFrame* kf) {
 		auto db = map->mpKeyFrameDB;
@@ -540,20 +540,20 @@ namespace EdgeSLAM {
 				std::cout << "Updating map ..." << std::endl;
 				map->RequestStop();
 				// Wait until Local Mapping has effectively stopped
-
+				std::cout << "Stop Requested ..." << std::endl;
 				while (!map->isStopped() && !map->isFinished())
 				{
 					map->Stop();
 					std::cout << "Stop mapping!!" << std::endl;
 					Sleep(1000);
 				}
-
+				std::cout << "Lock Map Update1 ..." << std::endl;
 				// Get Map Mutex
 				std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
-
+				std::cout << "Lock Map Update2 ..." << std::endl;
 				// Correct keyframes starting at map first keyframe
 				std::list<KeyFrame*> lpKFtoCheck(map->mvpKeyFrameOrigins.begin(), map->mvpKeyFrameOrigins.end());
-
+				std::cout << "gba = 1" << std::endl;
 				while (!lpKFtoCheck.empty())
 				{
 					KeyFrame* pKF = lpKFtoCheck.front();
@@ -576,10 +576,10 @@ namespace EdgeSLAM {
 					pKF->SetPose(pKF->mTcwGBA);
 					lpKFtoCheck.pop_front();
 				}
-
+				std::cout << "gba = 2" << std::endl;
 				// Correct MapPoints
 				const std::vector<MapPoint*> vpMPs = map->GetAllMapPoints();
-
+				std::cout << "gba =3" << std::endl;
 				for (size_t i = 0; i<vpMPs.size(); i++)
 				{
 					MapPoint* pMP = vpMPs[i];
@@ -613,10 +613,11 @@ namespace EdgeSLAM {
 						pMP->SetWorldPos(Rwc*Xc + twc);
 					}
 				}
-
+				std::cout << "gba = 4" << std::endl;
 				map->InformNewBigChange();
+				std::cout << "gba = 5" << std::endl;
 				map->Release();
-
+				std::cout << "gba = 6" << std::endl;
 				std::cout << "Map updated!" << std::endl;
 			}
 

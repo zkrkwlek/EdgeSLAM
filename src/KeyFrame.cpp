@@ -326,13 +326,19 @@ namespace EdgeSLAM {
 				return;
 			}
 		}
+		
+		std::vector<MapPoint*> vpMP;
+		{
+			std::unique_lock<std::mutex> lockMPs(mMutexFeatures);
+			vpMP = mvpMapPoints;
+		}
 
 		for (std::map<KeyFrame*, int>::iterator mit = mConnectedKeyFrameWeights.begin(), mend = mConnectedKeyFrameWeights.end(); mit != mend; mit++)
 			mit->first->EraseConnection(this);
 
-		for (size_t i = 0; i<mvpMapPoints.size(); i++)
-			if (mvpMapPoints[i])
-				mvpMapPoints[i]->EraseObservation(this);
+		for (size_t i = 0; i<vpMP.size(); i++)
+			if (vpMP[i])
+				vpMP[i]->EraseObservation(this);
 		{
 			std::unique_lock<std::mutex> lock(mMutexConnections);
 			std::unique_lock<std::mutex> lock1(mMutexFeatures);
@@ -430,6 +436,7 @@ namespace EdgeSLAM {
 
 	void KeyFrame::EraseMapPointMatch(MapPoint* pMP)
 	{
+		std::unique_lock<std::mutex> lock(mMutexFeatures);
 		int idx = pMP->GetIndexInKeyFrame(this);
 		if (idx >= 0)
 			mvpMapPoints[idx] = static_cast<MapPoint*>(nullptr);
@@ -438,6 +445,7 @@ namespace EdgeSLAM {
 
 	void KeyFrame::ReplaceMapPointMatch(const size_t &idx, MapPoint* pMP)
 	{
+		std::unique_lock<std::mutex> lock(mMutexFeatures);
 		mvpMapPoints[idx] = pMP;
 	}
 
@@ -552,9 +560,9 @@ namespace EdgeSLAM {
 		float zcw = Tcw_.at<float>(2, 3);
 		for (int i = 0; i<N; i++)
 		{
-			if (mvpMapPoints[i])
+			if (vpMapPoints[i])
 			{
-				MapPoint* pMP = mvpMapPoints[i];
+				MapPoint* pMP = vpMapPoints[i];
 				cv::Mat x3Dw = pMP->GetWorldPos();
 				float z = Rcw2.dot(x3Dw) + zcw;
 				vDepths.push_back(z);

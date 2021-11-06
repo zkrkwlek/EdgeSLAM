@@ -31,6 +31,7 @@ namespace EdgeSLAM {
 		void InitVisualizer(std::string user,std::string name, int w, int h);
 		void ProcessContentGeneration(std::string user, int id);
 		void ProcessSegmentation(std::string user, int id);
+		void ProcessObjectDetection(std::string user, int id);
 		void ProcessDepthEstimation(std::string user, int id);
 	public:
 		ThreadPool::ThreadPool* pool;
@@ -49,7 +50,7 @@ namespace EdgeSLAM {
 	/////Multi user and multi map
 	public:
 		void CreateMap(std::string name);
-		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, bool _b, bool _bTracking = false, bool _b2 = false);
+		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, bool _b, bool _bTracking = false, bool _b2 = false);
 		bool CheckMap(std::string str);
 		bool CheckUser(std::string str);
 		void AddUser(std::string id, User* user);

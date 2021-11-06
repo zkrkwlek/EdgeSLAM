@@ -46,8 +46,10 @@ namespace EdgeSLAM {
 		static void ProcessPlanarModeling(SLAM* system, User* user);
 		static bool ConnectedComponentLabeling(cv::Mat src, cv::Mat& dst, cv::Mat& stat, std::string strLabel);
 		static void ProcessSegmentation(ThreadPool::ThreadPool* pool, SLAM* system, std::string user,int id);
+		static void ProcessObjectDetection(ThreadPool::ThreadPool* pool, SLAM* system, std::string user, int id);
 		static void ProcessDepthEstimation(ThreadPool::ThreadPool* pool, SLAM* system, std::string user, int id);
 		static void RequestSegmentation(std::string user,int id);
+		static void RequestObjectDetection(std::string user, int id);
 		static void ProcessContentGeneration(SLAM* system, User* user, int id);
 		static void ProcessDevicePosition(SLAM* system, User* user, int id);
 		
@@ -61,8 +63,8 @@ namespace EdgeSLAM {
 		static std::set<MapPoint*> mspAllFloorPoints;
 		static std::set<MapPoint*> mspAllWallPoints;
 		static std::vector<cv::Vec3b> mvObjectLabelColors;
-		static std::string strLabel;
-		static std::vector<std::string> mvStrLabels;
+		static std::string strLabel, strYoloObjectLabel;
+		static std::vector<std::string> mvStrLabels, mvStrObjectLabels;
 		//temp
 		static std::atomic<int> mnContentID;
 		static Plane* floorPlane;

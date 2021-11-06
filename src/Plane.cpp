@@ -521,10 +521,11 @@ namespace EdgeSLAM {
 		//cluster mps from label
 
 		if (spFloorMPs.size() < 200){
+			std::cout << "포인트 더 모아야 함 !!!" << spFloorMPs .size()<< std::endl << std::endl << std::endl;
 			map->mnNumPlaneEstimation--;
 			return;
 		}
-		//std::cout << "pe = " << spFloorMPs.size() << " " << spWallMPs.size() << std::endl;
+		std::cout << "pe = " << spFloorMPs.size() << " " << spWallMPs.size() << std::endl;
 
 		map->ClearPlanarMPs();
 		{
@@ -535,6 +536,13 @@ namespace EdgeSLAM {
 			pModel->mpFloor->mbInit = PlaneInitialization2(matFloorData, param, inliers, outliers, nTrial, fDistance, fRatio);
 						
 			if (pModel->mpFloor->mbInit) {
+
+				////임시로
+				if (!Segmentator::floorPlane) {
+					Segmentator::floorPlane = pModel->mpFloor;
+				}
+
+
 				auto idx = CalcSphericalCoordinate(param.rowRange(0, 3));
 				hist.at<int>(idx)++;
 				//std::cout<<"PE = "<<param.t()<<std::endl;
