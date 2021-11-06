@@ -588,8 +588,8 @@ namespace EdgeSLAM {
 		}
 		
 		//cv::imshow("yolo", dst); cv::waitKey(1);
-		//system->mpVisualizer->ResizeImage(dst, dst);
-		//system->mpVisualizer->SetOutputImage(dst, 2);
+		system->mpVisualizer->ResizeImage(dst, dst);
+		system->mpVisualizer->SetOutputImage(dst, 2);
 
 	}
 	void Segmentator::ProcessDepthEstimation(ThreadPool::ThreadPool* pool, SLAM* system, std::string user, int id)

@@ -213,7 +213,7 @@ namespace EdgeSLAM {
 		if (trackState == UserState::Success) {
 			
 			////오브젝트 검출 요청
-			//Segmentator::RequestObjectDetection(user->userName, frame->mnFrameID);
+			Segmentator::RequestObjectDetection(user->userName, frame->mnFrameID);
 
 			if (user->mbDeviceTracking) {
 				//SendDeviceTrackingData
