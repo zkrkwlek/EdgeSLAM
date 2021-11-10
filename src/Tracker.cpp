@@ -277,10 +277,13 @@ namespace EdgeSLAM {
 		system->UpdateTrackingTime(t_test1);
 
 		////visualization
-		if (mapState == MapState::Initialized && userState != UserState::NotEstimated) {
+		if (mapState == MapState::Initialized  && user->GetVisID() <= 3 && userState != UserState::NotEstimated) {
+
+			cv::Scalar color = Segmentator::mvObjectLabelColors[user->GetVisID()+1];
+
 			for (int i = 0; i < frame->mvKeys.size(); i++) {
 				auto pMP = frame->mvpMapPoints[i];
-				cv::Scalar color = cv::Scalar(255, 0, 255);
+				//cv::Scalar color = cv::Scalar(255, 0, 255);
 				int r = 2;
 				if (pMP && !pMP->isBad())
 				{
@@ -296,14 +299,13 @@ namespace EdgeSLAM {
 						
 					}
 					r++;*/
-					color.val[1] = 255;
-					color.val[2] = 0;
+					/*color.val[1] = 255;
+					color.val[2] = 0;*/
 					cv::circle(img, frame->mvKeys[i].pt, r, color, -1);
 				}
 			}
 			system->mpVisualizer->ResizeImage(img, img);
-			if(user->GetVisID() <= 3)
-				system->mpVisualizer->SetOutputImage(img, user->GetVisID());
+			system->mpVisualizer->SetOutputImage(img, user->GetVisID());
 
 			/////save image
 			/*std::stringstream sss;
@@ -842,7 +844,7 @@ namespace EdgeSLAM {
 	void Tracker::SendTrackingResults(SLAM* system, User* user, int nFrameID, int n, cv::Mat R, cv::Mat t) {
 		
 		auto q = Converter::toQuaternion(R.t());
-		cv::Mat data = cv::Mat::zeros(8, 1, CV_32FC1);
+		cv::Mat data = cv::Mat::zeros(400, 1, CV_32FC1);
 		data.at<float>(0) = (float)n;
 		data.at<float>(1) = q[0];
 		data.at<float>(2) = q[1];
@@ -851,17 +853,15 @@ namespace EdgeSLAM {
 		data.at<float>(5) = t.at<float>(0);
 		data.at<float>(6) = t.at<float>(1);
 		data.at<float>(7) = t.at<float>(2);
+		for (int i = 8; i < data.rows; i++) {
+			data.at<float>(i) = i;
+		}
 		
 		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 		std::stringstream ss;
-		ss << "/Store?keyword=MappingResult&id=" << nFrameID << "&src=" << user->userName << "&type2=" << user->userName;
-
-		std::chrono::high_resolution_clock::time_point s1 = std::chrono::high_resolution_clock::now();
+		ss << "/Store?keyword=MappingResult&id=" << nFrameID << "&src=" << user->userName;// << "&type2=" << user->userName;
 		auto res = mpAPI->Send(ss.str(), data.data, sizeof(float)*data.rows);
-		std::chrono::high_resolution_clock::time_point s2 = std::chrono::high_resolution_clock::now();
-		auto d = std::chrono::duration_cast<std::chrono::milliseconds>(s2 - s1).count();
-		float t2 = d / 1000.0;
-		std::cout << "sending time1 = " << t2 << std::endl;
+
 	}
 
 	void Tracker::SendDeviceTrackingData(SLAM* system, User* user, LocalMap* pLocalMap, Frame* frame, int nInlier, int id) {
@@ -886,11 +886,11 @@ namespace EdgeSLAM {
 				int nObs = pLocalMap->mvpLocalMPs[i]->Observations();
 				uchar cobs = std::min(nObs, 255);
 				obs.at<uchar>(i, 0) = cobs;
-				cv::Mat X = pLocalMap->mvpLocalMPs[i]->GetWorldPos().t();
-				X.copyTo(pts.row(i));
+				cv::Mat X = pLocalMap                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ->mvpLocalMPs[i]->GetWorldPos().t();
+				X.copyTo(pts.row(i))  ;
 			}
 
-			std::chrono::high_resolution_clock::time_point s1 = std::chrono::high_resolution_clock::now();
+			
 			{
 				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 				std::stringstream ss;
@@ -927,11 +927,6 @@ namespace EdgeSLAM {
 				ss << "/Store?keyword=LocalMapPointObservation&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
 				auto res = mpAPI->Send(ss.str(), obs.data, obs.rows);
 			}
-
-			std::chrono::high_resolution_clock::time_point s2 = std::chrono::high_resolution_clock::now();
-			auto d = std::chrono::duration_cast<std::chrono::milliseconds>(s2 - s1).count();
-			float t = d / 1000.0;  
-			std::cout << "sending time2 = " << t << std::endl;
 
 			//cv::Mat testMat;
 			//scales.convertTo(testMat, CV_8UC1);

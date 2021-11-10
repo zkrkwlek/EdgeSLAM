@@ -183,8 +183,6 @@ namespace EdgeSLAM {
 		//float mHalfBaseline; // Only for visualization
 
 		Map* mpMap;
-
-		std::mutex mMutexPose;
 		std::mutex mMutexConnections;
 		std::mutex mMutexFeatures;
 	};

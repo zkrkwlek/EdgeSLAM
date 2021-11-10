@@ -21,7 +21,8 @@ namespace EdgeSLAM {
 	class User;
 	class MapPoint;
 	class Plane;
-
+	class FeatureDetector;
+	class FeatureTracker;
 	
 	class Object{
 	public:
@@ -56,6 +57,11 @@ namespace EdgeSLAM {
 		static void Init();
 		
 	public:
+		static FeatureDetector* Detector; //이거랑 매쳐는 삭제?
+		static FeatureTracker* Matcher;
+		
+
+
 		static NewMapClass<int, cv::Mat> SegmentedFrames;
 		static NewMapClass<int, Object*> ObjectPoints;
 		static NewMapClass<int, cv::Mat> KFObjCounts;

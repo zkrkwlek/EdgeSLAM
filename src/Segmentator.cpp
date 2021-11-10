@@ -10,6 +10,7 @@
 #include <Visualizer.h>
 #include <Plane.h>
 
+#include <FeatureDetector.h>
 #include <SearchPoints.h>
 #include <Converter.h>
 #include <Utils.h>
@@ -138,8 +139,6 @@ namespace EdgeSLAM {
 		auto res = mpAPI->Send(ss.str(), "");
 		int n2 = res.size();
 
-		std::cout << "Æò¸é Ã¼Å©ºÎÅÍ!!!" << std::endl;
-
 		cv::Mat fdata = cv::Mat::zeros(5, 3, CV_32FC1);
 		std::memcpy(fdata.data, res.data(), res.size());
 		
@@ -208,10 +207,16 @@ namespace EdgeSLAM {
 		float depth = PlaneProcessor::CalculateDepth(Xnorm, Pinv);
 		cv::Mat Xw = PlaneProcessor::CreateWorldPoint(Xnorm, Tinv, depth);
 		std::cout << Xw.t() << std::endl;
+
+		cv::Mat data = cv::Mat::ones(400, 1, CV_32FC1);
+		data.at<float>(0) = Xw.at<float>(0);
+		data.at<float>(1) = Xw.at<float>(1);
+		data.at<float>(2) = Xw.at<float>(2);
+
 		////Store Content
 		ss.str("");
-		ss << "/Store?keyword=Content&id=" << ++mnContentID << "&src=ContentServer&type2=" << user->userName<<"&id2="<<id;
-		res = mpAPI->Send(ss.str(), Xw.data, Xw.rows * sizeof(float));
+		ss << "/Store?keyword=Content&id=" << ++mnContentID << "&src=ContentServer&type2=" << user->userName;//<< "&id2=" << id;
+		res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
 		
 	}
 
@@ -557,7 +562,7 @@ namespace EdgeSLAM {
 		cv::imwrite(ssa.str(), segcolor);
 
 		ssa.str("");
-		ssa << "../../bin/SLAM/Images/img_" << F->mnFrameID << "_ori.jpg";
+		ssa << "../../bin/SLAM/Images/img_" << F->mnFrameID << "_ ori.jpg";
 		cv::imwrite(ssa.str(), F->imgColor);*/
 		////save image
 	}
@@ -575,22 +580,96 @@ namespace EdgeSLAM {
 		cv::Mat dst = F->imgColor.clone();
 		std::memcpy(data.data, res.data(), res.size());
 
+		cv::Mat objImg = F->imgGray.clone();//(maxRect)
+		
+		std::chrono::high_resolution_clock::time_point s1 = std::chrono::high_resolution_clock::now();
+
+		auto vpMPs = F->mvpMapPoints;
+
+		cv::Ptr<cv::Feature2D> detector = cv::ORB::create(2000);
 		for (int j = 0; j < n; j++) {
 			int label = (int)data.at<float>(j, 0);
 			float conf = data.at<float>(j, 1);
 			std::stringstream ss;
-			ss << mvStrObjectLabels[label] << "(" << conf << ")" << std::endl;
+			ss << mvStrObjectLabels[label] << "(" << conf << ")" ;
 			cv::Point2f left(data.at<float>(j, 2), data.at<float>(j, 3));
 			cv::Point2f right(data.at<float>(j, 4), data.at<float>(j, 5));
 			
 			rectangle(dst,left, right, cv::Scalar(255, 255, 255));
 			cv::putText(dst, ss.str(), cv::Point(left.x, left.y - 6), 1, 1.5, cv::Scalar::all(255));
+
+			cv::Rect rect = cv::Rect(left, right);
+			/*if (rect.area() > maxArea) {
+				maxArea = rect.area();
+				maxRect = rect;
+			}*/
+
+			////»ï°¢È­
+			cv::Subdiv2D subdiv(rect);
+			std::vector<cv::Point2f> vecPTs;
+			for (int i = 0; i < vpMPs.size(); i++)
+			{
+				if (vpMPs[i] && rect.contains(F->mvKeys[i].pt)) {
+					vecPTs.push_back(F->mvKeys[i].pt);
+					subdiv.insert(F->mvKeys[i].pt);
+				}
+			}
+			std::vector<cv::Vec6f> triangleList;
+			subdiv.getTriangleList(triangleList);
+			
+			for (size_t i = 0,iend = triangleList.size(); i < iend; i++) 
+			{
+				cv::Vec6f t = triangleList[i];
+				cv::Point2f pt1(t[0], t[1]);
+				cv::Point2f pt2(t[2], t[3]);
+				cv::Point2f pt3(t[4], t[5]);
+
+				if (rect.contains(pt1) && rect.contains(pt2) && rect.contains(pt3)) {
+					cv::line(objImg, pt1, pt2, cv::Scalar(255, 0, 0));
+					cv::line(objImg, pt1, pt3, cv::Scalar(255, 0, 0));
+					cv::line(objImg, pt3, pt2, cv::Scalar(255, 0, 0));
+				}
+			}
+			////»ï°¢È­
+
+			////Æ¯Â¡Á¡
+			cv::Mat mask = cv::Mat::zeros(dst.size(), CV_8UC1);
+			rectangle(mask, left, right, cv::Scalar(255, 255, 255),-1);
+			cv::Mat objDesc;
+			std::vector<cv::KeyPoint> vecObjKPs;
+			detector->detectAndCompute(objImg, mask, vecObjKPs, objDesc);
+			for (int i = 0, iend = vecObjKPs.size(); i < iend; i++) {
+				cv::circle(objImg, vecObjKPs[i].pt, 2, cv::Scalar(255, 0, 0), 1);
+			}
+			////Æ¯Â¡Á¡
 		}
+		std::chrono::high_resolution_clock::time_point s2 = std::chrono::high_resolution_clock::now();
+		auto d = std::chrono::duration_cast<std::chrono::milliseconds>(s2 - s1).count();
+		float t2 = d / 1000.0;
 		
-		//cv::imshow("yolo", dst); cv::waitKey(1);
 		system->mpVisualizer->ResizeImage(dst, dst);
 		system->mpVisualizer->SetOutputImage(dst, 2);
 
+		//if (maxRect.area() > 400) {
+		//	
+		//	
+		//	
+		//	
+		//	//rectangle(mask, cv::Point(maxRect.x, maxRect.y), cv::Point(maxRect.x + maxRect.width, maxRect.y + maxRect.height), cv::Scalar(255, 255, 255), -1);
+		//	//rectangle(objImg, cv::Point(maxRect.x, maxRect.y), cv::Point(maxRect.x + maxRect.width, maxRect.y + maxRect.height), cv::Scalar(255, 255, 255));
+
+		//	
+		//	//Detector->detectAndCompute(objImg, cv::Mat(), vecObjKPs, objDesc);
+		//	for (int i = 0, iend = vecObjKPs.size(); i < iend; i++) {
+		//		cv::circle(objImg, vecObjKPs[i].pt, 2, cv::Scalar(255, 0, 0), 1);
+		//	}
+
+		//	
+		//	
+		//	
+		//}
+		std::cout << "Object Test = " << t2 << std::endl;
+		cv::imshow("yolo", objImg); cv::waitKey(1);
 	}
 	void Segmentator::ProcessDepthEstimation(ThreadPool::ThreadPool* pool, SLAM* system, std::string user, int id)
 	{

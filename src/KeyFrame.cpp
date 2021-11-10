@@ -341,7 +341,7 @@ namespace EdgeSLAM {
 				vpMP[i]->EraseObservation(this);
 		{
 			std::unique_lock<std::mutex> lock(mMutexConnections);
-			std::unique_lock<std::mutex> lock1(mMutexFeatures);
+			//std::unique_lock<std::mutex> lock1(mMutexFeatures);
 
 			mConnectedKeyFrameWeights.clear();
 			mvpOrderedConnectedKeyFrames.clear();
@@ -466,7 +466,7 @@ namespace EdgeSLAM {
 
 	int KeyFrame::TrackedMapPoints(const int &minObs)
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
+ 		std::unique_lock<std::mutex> lock(mMutexFeatures);
 
 		int nPoints = 0;
 		const bool bCheckObs = minObs>0;
@@ -545,13 +545,11 @@ namespace EdgeSLAM {
 	float KeyFrame::ComputeSceneMedianDepth(const int q)
 	{
 		std::vector<MapPoint*> vpMapPoints;
-		cv::Mat Tcw_;
 		{
 			std::unique_lock<std::mutex> lock(mMutexFeatures);
-			std::unique_lock<std::mutex> lock2(mMutexPose);
 			vpMapPoints = mvpMapPoints;
-			Tcw_ = mpCamPose->GetPose();
 		}
+		cv::Mat Tcw_ = mpCamPose->GetPose();
 
 		std::vector<float> vDepths;
 		vDepths.reserve(N);

@@ -19,7 +19,8 @@ namespace EdgeSLAM {
 		Init();
 	}
 	SLAM::~SLAM(){}
-
+	FeatureDetector* Segmentator::Detector;
+	FeatureTracker* Segmentator::Matcher;
 	FeatureDetector* Frame::detector;
 	FeatureTracker* Frame::matcher;
 	FeatureTracker* KeyFrame::matcher;
@@ -35,10 +36,10 @@ namespace EdgeSLAM {
 		//LoadProcessingTime();
 
 		Segmentator::Init();
-		pool = new ThreadPool::ThreadPool(16);
+		pool = new ThreadPool::ThreadPool(24);
 		mpInitializer = new Initializer();
 		mpTracker = new Tracker();
-		mpFeatureTracker = new FlannFeatureTracker(1000);
+		mpFeatureTracker = new FlannFeatureTracker(1500);
 		mpLocalMapper = new LocalMapper();
 		mpLoopCloser = new LoopCloser();
 		mpVisualizer = new Visualizer(this);
@@ -48,6 +49,8 @@ namespace EdgeSLAM {
 		Frame::mpVoc = mpDBoWVoc;
 		Frame::detector = mpFeatureTracker->detector;
 		Frame::matcher = mpFeatureTracker;
+		Segmentator::Detector = mpFeatureTracker->detector;
+		Segmentator::Matcher = mpFeatureTracker;
 		KeyFrame::matcher = mpFeatureTracker;
 		MapPoint::mpDist = mpFeatureTracker;
 		mpInitializer->mpFeatureTracker = mpFeatureTracker;

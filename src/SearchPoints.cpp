@@ -379,16 +379,16 @@ namespace EdgeSLAM {
 		std::vector<int> rotHist[HISTO_LENGTH];
 		for (int i = 0; i<HISTO_LENGTH; i++)
 			rotHist[i].reserve(500);
-		const float factor = 1.0f / HISTO_LENGTH;
+		float factor = 1.0f / HISTO_LENGTH;
 		cv::Mat Tcw = curr->GetPose();
-		const cv::Mat Rcw = Tcw.rowRange(0, 3).colRange(0, 3);
-		const cv::Mat tcw = Tcw.rowRange(0, 3).col(3);
-		const cv::Mat twc = -Rcw.t()*tcw;
+		cv::Mat Rcw = Tcw.rowRange(0, 3).colRange(0, 3);
+		cv::Mat tcw = Tcw.rowRange(0, 3).col(3);
+		cv::Mat twc = -Rcw.t()*tcw;
 
 		cv::Mat Tlw = prev->GetPose();
-		const cv::Mat Rlw = Tlw.rowRange(0, 3).colRange(0, 3);
-		const cv::Mat tlw = Tlw.rowRange(0, 3).col(3);
-		const cv::Mat tlc = Rlw*twc + tlw;
+		cv::Mat Rlw = Tlw.rowRange(0, 3).colRange(0, 3);
+		cv::Mat tlw = Tlw.rowRange(0, 3).col(3);
+		cv::Mat tlc = Rlw*twc + tlw;
 
 		for (int i = 0; i<prev->N; i++)
 		{
@@ -402,9 +402,9 @@ namespace EdgeSLAM {
 					cv::Mat x3Dw = pMP->GetWorldPos();
 					cv::Mat x3Dc = Rcw*x3Dw + tcw;
 
-					const float xc = x3Dc.at<float>(0);
-					const float yc = x3Dc.at<float>(1);
-					const float invzc = 1.0 / x3Dc.at<float>(2);
+					float xc = x3Dc.at<float>(0);
+					float yc = x3Dc.at<float>(1);
+					float invzc = 1.0 / x3Dc.at<float>(2);
 
 					if (invzc<0)
 						continue;
@@ -427,21 +427,21 @@ namespace EdgeSLAM {
 					if (vIndices2.empty())
 						continue;
 
-					const cv::Mat dMP = pMP->GetDescriptor();
+					cv::Mat dMP = pMP->GetDescriptor();
 
 					int bestDist = 256;
 					int bestIdx2 = -1;
 
 					for (std::vector<size_t>::const_iterator vit = vIndices2.begin(), vend = vIndices2.end(); vit != vend; vit++)
 					{
-						const size_t i2 = *vit;
+						size_t i2 = *vit;
 						if (curr->mvpMapPoints[i2])
 							if (curr->mvpMapPoints[i2]->Observations()>0)
 								continue;
 
-						const cv::Mat &d = curr->mDescriptors.row(i2);
+						cv::Mat &d = curr->mDescriptors.row(i2);
 
-						const int dist = (int)curr->matcher->DescriptorDistance(dMP, d);
+						int dist = (int)curr->matcher->DescriptorDistance(dMP, d);
 
 						if (dist<bestDist)
 						{
