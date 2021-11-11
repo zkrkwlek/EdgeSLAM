@@ -520,7 +520,7 @@ namespace EdgeSLAM {
 	}
 	void LoopCloser::RunGlobalBundleAdjustment(SLAM* system, Map* map, KeyFrame* kf, int nLoopKF)
 	{
-		std::cout << "Starting Global Bundle Adjustment" << std::endl;
+		std::cout << "Starting Global Bundle Adjustment = " << map->mnFullBAIdx << std::endl;
 
 		int idx = map->mnFullBAIdx;
 		Optimizer::GlobalBundleAdjustemnt(map, 10, &map->mbStopGBA, nLoopKF, false);
@@ -536,7 +536,7 @@ namespace EdgeSLAM {
 
 			if (!map->mbStopGBA)
 			{
-				std::cout << "Global Bundle Adjustment finished" << std::endl;
+				std::cout << "Global Bundle Adjustment finished = " << map->mnFullBAIdx << std::endl;
 				std::cout << "Updating map ..." << std::endl;
 				map->RequestStop();
 				// Wait until Local Mapping has effectively stopped

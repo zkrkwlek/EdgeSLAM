@@ -59,7 +59,7 @@ namespace EdgeSLAM {
 		mpDBoWVoc->loadFromBinaryFile("../../bin/data/ORBvoc.bin");*/
 	}
 	void SLAM::Track(cv::Mat im, int id, User* user, double ts) {
-		pool->EnqueueJob(Tracker::TrackWithImage, pool, this, im, id, user, ts);
+		
 	}
 
 	void SLAM::Track(int id, User* user, double ts) {

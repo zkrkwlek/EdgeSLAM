@@ -131,7 +131,7 @@ namespace EdgeSLAM {
 				//global localization
 				//set reference keyframe and last keyframe
 				frame->reset_map_points();
-				nInliers = system->mpTracker->Relocalization(map, user, frame, system->mpFeatureTracker->min_descriptor_distance);
+				nInliers = Tracker::Relocalization(map, user, frame, system->mpFeatureTracker->min_descriptor_distance);
 				if (nInliers >= 50)
 				{
 					bTrack = true;
@@ -161,7 +161,7 @@ namespace EdgeSLAM {
 						Tpredict = user->PredictPose();
 					}
 					frame->SetPose(Tpredict);
-					bTrack = system->mpTracker->TrackWithPrevFrame(f_ref, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+					bTrack = Tracker::TrackWithPrevFrame(f_ref, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
 
 					if (!bTrack) {
 						std::cout << "track with reference frame :: start" << std::endl;
@@ -182,7 +182,7 @@ namespace EdgeSLAM {
 			}
 
 			if (bTrack) {
-				nInliers = system->mpTracker->TrackWithLocalMap(pLocalMap, user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+				nInliers = Tracker::TrackWithLocalMap(pLocalMap, user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
 				if (frame->mnFrameID < user->mnLastRelocFrameId + 30 && nInliers < 50) {
 					bTrack = false;
 				}
@@ -224,8 +224,8 @@ namespace EdgeSLAM {
 			user->UpdatePose(T);
 			//check keyframe
 			auto ref = map->GetKeyFrame(user->mnReferenceKeyFrameID);
-			if (user->mbMapping && system->mpTracker->NeedNewKeyFrame(map, system->mpLocalMapper, frame, ref, nInliers, user->mnLastKeyFrameID.load(), user->mnLastRelocFrameId.load())) {
-				system->mpTracker->CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, user);
+			if (user->mbMapping && Tracker::NeedNewKeyFrame(map, system->mpLocalMapper, frame, ref, nInliers, user->mnLastKeyFrameID.load(), user->mnLastRelocFrameId.load())) {
+				Tracker::CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, user);
 				Segmentator::RequestSegmentation(user->userName, frame->mnFrameID);
 			}
 			////frame line visualization
@@ -344,7 +344,7 @@ namespace EdgeSLAM {
 		//std::cout << "Track::LocalMap::Update::end" << std::endl;
 		//update visible
 
-		int nMatch = UpdateVisiblePoints(cur, pLocalMap->mvpLocalMPs, pLocalMap->mvpLocalTPs);
+		int nMatch = Tracker::UpdateVisiblePoints(cur, pLocalMap->mvpLocalMPs, pLocalMap->mvpLocalTPs);
 		//std::cout << "Track::LocalMap::Update::Visible::end" << std::endl;
 		if (nMatch == 0)
 			return 0;
@@ -356,7 +356,7 @@ namespace EdgeSLAM {
 		int a = SearchPoints::SearchMapByProjection(cur, pLocalMap->mvpLocalMPs, pLocalMap->mvpLocalTPs, thMaxDesc, thMinDesc, thRadius);
 		//std::cout << "match local map = " << vpLocalKFs.size() << " " << vpLocalMPs.size() <<", "<<nMatch<< "=" << a << std::endl;
 		Optimizer::PoseOptimization(cur);
-		return UpdateFoundPoints(cur);
+		return Tracker::UpdateFoundPoints(cur);
 	}
 
 	int Tracker::Relocalization(Map* map, User* user, Frame* cur, float thMinDesc) {
