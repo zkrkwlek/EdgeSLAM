@@ -63,8 +63,8 @@ namespace EdgeSLAM {
 
 	public:
 		cv::Mat imgColor, imgGray;
-		static FeatureDetector* detector;
-		static FeatureTracker* matcher;
+		//FeatureDetector* detector;
+		//FeatureTracker* matcher;
 		
 		double mdTimeStamp;
 		int mnFrameID;

@@ -178,7 +178,7 @@ namespace EdgeSLAM {
 			// Search matches that fullfil epipolar constraint
 			std::vector<std::pair<size_t, size_t> > vMatchedIndices;
 
-			SearchPoints::SearchForTriangulation(targetKF, pKF2, F12, vMatchedIndices, targetKF->matcher->max_descriptor_distance, targetKF->matcher->min_descriptor_distance);
+			SearchPoints::SearchForTriangulation(targetKF, pKF2, F12, vMatchedIndices);
 			
 			cv::Mat Rcw2 = pKF2->GetRotation();
 			cv::Mat Rwc2 = Rcw2.t();
@@ -344,7 +344,7 @@ namespace EdgeSLAM {
 		for (std::vector<KeyFrame*>::iterator vit = vpTargetKFs.begin(), vend = vpTargetKFs.end(); vit != vend; vit++)
 		{
 			KeyFrame* pKFi = *vit;
-			SearchPoints::Fuse(pKFi, vpMapPointMatches, targetKF->matcher->max_descriptor_distance, targetKF->matcher->min_descriptor_distance);
+			SearchPoints::Fuse(pKFi, vpMapPointMatches);
 		}
 
 		// Search matches by projection from target KFs in current KF
@@ -369,7 +369,7 @@ namespace EdgeSLAM {
 			}
 		}
 
-		int nFused =  SearchPoints::Fuse(targetKF, vpFuseCandidates, targetKF->matcher->max_descriptor_distance, targetKF->matcher->min_descriptor_distance);
+		int nFused =  SearchPoints::Fuse(targetKF, vpFuseCandidates);
 		// Update points
 		vpMapPointMatches = targetKF->GetMapPointMatches();
 		for (size_t i = 0, iend = vpMapPointMatches.size(); i<iend; i++)

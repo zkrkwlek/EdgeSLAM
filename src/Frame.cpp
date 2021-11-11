@@ -21,14 +21,21 @@ namespace EdgeSLAM {
 		
 	}
 	Frame::Frame(cv::Mat img, Camera* pCam, int id, double time_stamp):mnFrameID(id), mdTimeStamp(time_stamp), mpCamera(pCam),
-		K(pCam->K), D(pCam->D), InvK(pCam->Kinv), fx(pCam->fx),fy(pCam->fy), cx(pCam->cx), cy(pCam->cy), invfx(pCam->invfx), invfy(pCam->invfy), mnMinX(pCam->u_min), mnMaxX(pCam->u_max), mnMinY(pCam->v_min), mnMaxY(pCam->v_max), mfGridElementWidthInv(pCam->mfGridElementWidthInv), mfGridElementHeightInv(pCam->mfGridElementHeightInv), FRAME_GRID_COLS(pCam->mnGridCols), FRAME_GRID_ROWS(pCam->mnGridRows), mbDistorted(pCam->bDistorted),
-		mnScaleLevels(detector->mnScaleLevels), mfScaleFactor(detector->mfScaleFactor), mfLogScaleFactor(detector->mfLogScaleFactor), mvScaleFactors(detector->mvScaleFactors), mvInvScaleFactors(detector->mvInvScaleFactors), mvLevelSigma2(detector->mvLevelSigma2), mvInvLevelSigma2(detector->mvInvLevelSigma2)
+		K(pCam->K), D(pCam->D), InvK(pCam->Kinv), fx(pCam->fx),fy(pCam->fy), cx(pCam->cx), cy(pCam->cy), invfx(pCam->invfx), invfy(pCam->invfy), mnMinX(pCam->u_min), mnMaxX(pCam->u_max), mnMinY(pCam->v_min), mnMaxY(pCam->v_max), mfGridElementWidthInv(pCam->mfGridElementWidthInv), mfGridElementHeightInv(pCam->mfGridElementHeightInv), FRAME_GRID_COLS(pCam->mnGridCols), FRAME_GRID_ROWS(pCam->mnGridRows), mbDistorted(pCam->bDistorted)
 	{
 		mpCamPose = new CameraPose();
 		imgColor = img.clone();
 		cv::cvtColor(img, imgGray, cv::COLOR_BGR2GRAY);//COLOR_BGR2GRAY
 		FeatureDetector* mpDetector = new ORBDetector(1500);
 		mpDetector->detectAndCompute(imgGray, cv::Mat(), mvKeys, mDescriptors);
+		mnScaleLevels=(mpDetector->mnScaleLevels);
+		mfScaleFactor = (mpDetector->mfScaleFactor);
+		mfLogScaleFactor = (mpDetector->mfLogScaleFactor);
+		mvScaleFactors = (mpDetector->mvScaleFactors);
+		mvInvScaleFactors = (mpDetector->mvInvScaleFactors);
+		mvLevelSigma2 = (mpDetector->mvLevelSigma2);
+		mvInvLevelSigma2 = (mpDetector->mvInvLevelSigma2);
+
 		N = mvKeys.size();
 
 		if (mbDistorted)

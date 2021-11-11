@@ -307,7 +307,7 @@ namespace EdgeSLAM {
 			// Search matches that fullfil epipolar constraint
 			std::vector<std::pair<size_t, size_t> > vMatchedIndices;
 
-			SearchPoints::SearchForTriangulation(targetKF, pKF2, F12, vMatchedIndices, targetKF->matcher->max_descriptor_distance, targetKF->matcher->min_descriptor_distance);
+			SearchPoints::SearchForTriangulation(targetKF, pKF2, F12, vMatchedIndices);
 
 			cv::Mat Rcw2 = pKF2->GetRotation();
 			cv::Mat Rwc2 = Rcw2.t();

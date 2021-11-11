@@ -21,9 +21,7 @@ namespace EdgeSLAM {
 	SLAM::~SLAM(){}
 	FeatureDetector* Segmentator::Detector;
 	FeatureTracker* Segmentator::Matcher;
-	FeatureDetector* Frame::detector;
-	FeatureTracker* Frame::matcher;
-	FeatureTracker* KeyFrame::matcher;
+	
 	FeatureTracker* MapPoint::mpDist;
 	DBoW3::Vocabulary* KeyFrame::mpVoc;
 	DBoW3::Vocabulary* Frame::mpVoc;
@@ -47,11 +45,8 @@ namespace EdgeSLAM {
 		//set method
 		KeyFrame::mpVoc = mpDBoWVoc;
 		Frame::mpVoc = mpDBoWVoc;
-		Frame::detector = mpFeatureTracker->detector;
-		Frame::matcher = mpFeatureTracker;
 		Segmentator::Detector = mpFeatureTracker->detector;
 		Segmentator::Matcher = mpFeatureTracker;
-		KeyFrame::matcher = mpFeatureTracker;
 		MapPoint::mpDist = mpFeatureTracker;
 		mpInitializer->mpFeatureTracker = mpFeatureTracker;
 

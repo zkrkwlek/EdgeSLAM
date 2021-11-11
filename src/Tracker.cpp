@@ -315,202 +315,6 @@ namespace EdgeSLAM {
 		}
 		////visualization
 	}
-
-	void Tracker::TrackWithImage(ThreadPool::ThreadPool* pool, SLAM* system, cv::Mat im, int id, User* user, double ts) {
-		if (user->mbProgress)
-			return;
-		user->mbProgress = true;
-		auto cam = user->mpCamera;
-		auto map = user->mpMap;
-
-		LocalMap* pLocalMap = new LocalCovisibilityMap();
-		std::cout << "Frame = " << user->userName << "=start!!" << std::endl;
-
-		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-		Frame* frame = new Frame(im, cam, id, ts);
-		user->mnCurrFrameID = frame->mnFrameID;
-
-		//std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
-		
-		auto mapState = map->GetState();
-		auto userState = user->GetState();
-		auto trackState = UserState::NotEstimated;
-		int nInliers = 0;
-		if (mapState == MapState::NoImages) {
-			//set reference frame
-			map->SetState(MapState::NotInitialized);
-			system->mpInitializer->Init(frame);
-		}
-		if (mapState == MapState::NotInitialized) {
-			//initialization
-			auto res = system->mpInitializer->Initialize(frame, map);
-			map->SetState(res);
-			if (res == MapState::Initialized) {
-				trackState = UserState::Success;
-				auto kf1 = system->mpInitializer->mpInitKeyFrame1;
-				auto kf2 = system->mpInitializer->mpInitKeyFrame2;
-				map->mvpKeyFrameOrigins.push_back(kf1);
-				map->mvpKeyFrameOrigins.push_back(kf2);
-				/*user->mapKeyFrames[kf1->mnId] = kf1;
-				user->mapKeyFrames[kf2->mnId] = kf2;*/
-				user->mnReferenceKeyFrameID = kf2->mnId;
-				user->mnLastKeyFrameID = frame->mnFrameID;
-				pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf1);
-				pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf2);
-
-				for (int i = 0; i < frame->N; i++)
-				{
-					if (frame->mvpMapPoints[i])
-					{
-						if (!frame->mvbOutliers[i])
-						{
-							nInliers++;
-						}
-					}
-				}
-			}
-		}
-		if (mapState == MapState::Initialized) {
-			bool bTrack = false;
-			if (userState == UserState::NotEstimated || userState == UserState::Failed) {
-				//global localization
-				//set reference keyframe and last keyframe
-				frame->reset_map_points();
-				nInliers = system->mpTracker->Relocalization(map, user, frame, system->mpFeatureTracker->min_descriptor_distance);
-				if (nInliers >= 50)
-				{
-					bTrack = true;
-					user->mnLastRelocFrameId = frame->mnFrameID;
-					//trackState = UserState::Success;
-				}
-			}
-			else {
-				if (userState == UserState::Success) {
-					//std::cout << "Tracker::Start" << std::endl;
-					auto f_ref = user->mapFrames[user->mnPrevFrameID];
-					f_ref->check_replaced_map_points();
-					cv::Mat Tpredict = user->PredictPose();
-					frame->SetPose(Tpredict);
-					bTrack = system->mpTracker->TrackWithPrevFrame(f_ref, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
-
-					if (!bTrack) {
-						std::cout << "track with reference frame :: start" << std::endl;
-
-						std::cout << "track with reference frame :: end" << std::endl;
-					}
-				}
-				/*if (userState == UserState::Failed) {
-					frame->reset_map_points();
-					nInliers = system->mpTracker->Relocalization(map, user, frame, system->mpFeatureTracker->min_descriptor_distance);
-					if (nInliers >= 50) {
-						bTrack = true;
-						user->mnLastRelocFrameId = frame->mnFrameID;
-					}
-				}*/
-			}
-			
-			if (bTrack) {
-				
-				nInliers = system->mpTracker->TrackWithLocalMap(pLocalMap, user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
-				if (frame->mnFrameID < user->mnLastRelocFrameId + 30 && nInliers < 50) {
-					bTrack = false;
-				}
-				else if (nInliers < 30) {
-					bTrack = false;
-				}
-				else {
-					bTrack = true;
-				}
-			}
-			if (!bTrack)
-				trackState = UserState::Failed;
-			if (bTrack)
-				trackState = UserState::Success;
-		}
-
-		////update user frame
-		user->SetState(trackState);
-		if (trackState == UserState::Success) {
-			
-			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
-			std::stringstream ss;
-			ss << "/Store?keyword=Pose&id=" << id << "&src=" << user->userName<<"&type2="<<user->userName;
-			////data
-			cv::Mat T = frame->GetPose();
-			cv::Mat data = cv::Mat::zeros(13 + nInliers * 8, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
-			int nDataIdx = 0;
-			data.at<float>(nDataIdx++) = (float)nInliers;
-			data.at<float>(nDataIdx++) = T.at<float>(0, 0);
-			data.at<float>(nDataIdx++) = T.at<float>(0, 1);
-			data.at<float>(nDataIdx++) = T.at<float>(0, 2);
-			data.at<float>(nDataIdx++) = T.at<float>(1, 0);
-			data.at<float>(nDataIdx++) = T.at<float>(1, 1);
-			data.at<float>(nDataIdx++) = T.at<float>(1, 2);
-			data.at<float>(nDataIdx++) = T.at<float>(2, 0);
-			data.at<float>(nDataIdx++) = T.at<float>(2, 1);
-			data.at<float>(nDataIdx++) = T.at<float>(2, 2);
-			data.at<float>(nDataIdx++) = T.at<float>(0, 3);
-			data.at<float>(nDataIdx++) = T.at<float>(1, 3);
-			data.at<float>(nDataIdx++) = T.at<float>(2, 3);
-
-			for (int i = 0; i < frame->N; i++)
-			{
-				if (frame->mvpMapPoints[i])
-				{
-					if (!frame->mvbOutliers[i])
-					{
-						auto kp = frame->mvKeysUn[i];
-						auto mp = frame->mvpMapPoints[i]->GetWorldPos();
-						int octave = kp.octave;
-						data.at<float>(nDataIdx++) = kp.pt.x;
-						data.at<float>(nDataIdx++) = kp.pt.y;
-						data.at<float>(nDataIdx++) = (float)kp.octave;
-						data.at<float>(nDataIdx++) = kp.angle;
-						data.at<float>(nDataIdx++) = (float)frame->mvpMapPoints[i]->mnId;
-						data.at<float>(nDataIdx++) = mp.at<float>(0);
-						data.at<float>(nDataIdx++) = mp.at<float>(1);
-						data.at<float>(nDataIdx++) = mp.at<float>(2);
-					}
-				}
-			}
-			////data
-			auto res = mpAPI->Send(ss.str(), data.data, data.rows*sizeof(float));
-			//pose update
-			user->UpdatePose(T);
-			//check keyframe
-			auto ref = map->GetKeyFrame(user->mnReferenceKeyFrameID);
-			if (user->mbMapping && system->mpTracker->NeedNewKeyFrame(map, system->mpLocalMapper, frame, ref, nInliers, user->mnLastKeyFrameID.load(), user->mnLastRelocFrameId.load())) {
-				system->mpTracker->CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, user);
-				Segmentator::RequestSegmentation(user->userName,frame->mnFrameID);
-			}
-		}
-		user->mapFrames[frame->mnFrameID] = frame;
-		user->mnPrevFrameID = frame->mnFrameID;
-		user->mbProgress = false;
-		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-		float t_test1 = du_test1 / 1000.0;
-		std::cout <<"Frame = "<<user->userName<<" : "<< id <<", Matches = "<<nInliers<< ", time =" << t_test1 << std::endl;
-
-		////visualization
-		if (mapState == MapState::Initialized && userState != UserState::NotEstimated) {
-			for (int i = 0; i < frame->mvKeys.size(); i++) {
-				auto pMP = frame->mvpMapPoints[i];
-				cv::Scalar color = cv::Scalar(255, 0, 255);
-				int r = 2;
-				if (pMP && !pMP->isBad())
-				{
-					color.val[1] = 255;
-					color.val[2] = 0;
-					r++;
-					cv::circle(im, frame->mvKeys[i].pt, r, color, -1);
-				}
-			}
-			system->mpVisualizer->ResizeImage(im, im);
-			system->mpVisualizer->SetOutputImage(im, user->GetVisID());
-		}
-		////visualization
-	}
 	
 	bool Tracker::TrackWithPrevFrame(Frame* prev, Frame* cur, float thMaxDesc, float thMinDesc){
 		cur->reset_map_points();
@@ -590,7 +394,7 @@ namespace EdgeSLAM {
 			else
 			{
 				
-				int nmatches = SearchPoints::SearchFrameByBoW(cur->matcher, pKF, cur, vvpMapPointMatches[i], thMinDesc, 0.75);
+				int nmatches = SearchPoints::SearchFrameByBoW(pKF, cur, vvpMapPointMatches[i], thMinDesc, 0.75);
 				std::cout << "Match = " << i << "=" << nmatches << std::endl;
 				if (nmatches<15)
 				{
@@ -659,7 +463,7 @@ namespace EdgeSLAM {
 
 				if (nGood<50)
 				{
-					int nadditional = SearchPoints::SearchFrameByProjection(cur->matcher, cur, vpCandidateKFs[i], sFound, 10, 100);
+					int nadditional = SearchPoints::SearchFrameByProjection(cur, vpCandidateKFs[i], sFound, 10, 100);
 					if (nadditional + nGood >= 50)
 					{
 						nGood = Optimizer::PoseOptimization(cur);
@@ -672,7 +476,7 @@ namespace EdgeSLAM {
 							for (int ip = 0; ip<cur->N; ip++)
 								if (cur->mvpMapPoints[ip])
 									sFound.insert(cur->mvpMapPoints[ip]);
-							nadditional = SearchPoints::SearchFrameByProjection(cur->matcher, cur, vpCandidateKFs[i], sFound, 3, 64);
+							nadditional = SearchPoints::SearchFrameByProjection(cur, vpCandidateKFs[i], sFound, 3, 64);
 							// Final optimization
 							if (nGood + nadditional >= 50)
 							{

@@ -96,7 +96,7 @@ namespace EdgeSLAM {
 		cv::Mat GetTranslation();
 
 	public:
-		static FeatureTracker* matcher;
+		//static FeatureTracker* matcher;
 		int mnId;
 		const int mnFrameId;
 		const double mdTimeStamp;

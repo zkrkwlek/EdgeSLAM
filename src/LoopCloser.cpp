@@ -169,7 +169,7 @@ namespace EdgeSLAM {
 				vbDiscarded[i] = true;
 				continue;
 			}
-			int nmatches = SearchPoints::SearchKeyFrameByBoW(pKF->matcher, kf, pKF, vvpMapPointMatches[i], pKF->matcher->min_descriptor_distance, 0.75);
+			int nmatches = SearchPoints::SearchKeyFrameByBoW(kf, pKF, vvpMapPointMatches[i], 0.75);
 			if (nmatches<20)
 			{
 				vbDiscarded[i] = true;
@@ -225,7 +225,7 @@ namespace EdgeSLAM {
 					cv::Mat R = pSolver->GetEstimatedRotation();
 					cv::Mat t = pSolver->GetEstimatedTranslation();
 					const float s = pSolver->GetEstimatedScale();
-					SearchPoints::SearchBySim3(kf->matcher, kf, pKF, vpMapPointMatches, s, R, t, kf->matcher->max_descriptor_distance);
+					SearchPoints::SearchBySim3(kf, pKF, vpMapPointMatches, s, R, t);
 
 					g2o::Sim3 gScm(Converter::toMatrix3d(R), Converter::toVector3d(t), s);
 					const int nInliers = Optimizer::OptimizeSim3(kf, pKF, vpMapPointMatches, gScm, 10, map->mbFixScale);
@@ -274,7 +274,7 @@ namespace EdgeSLAM {
 			}
 		}
 		// Find more matches projecting with the computed Sim3
-		SearchPoints::SearchKeyByProjection(kf->matcher, kf, map->mScw, map->mvpLoopMapPoints, map->mvpCurrentMatchedPoints, kf->matcher->min_descriptor_distance);
+		SearchPoints::SearchKeyByProjection(kf, map->mScw, map->mvpLoopMapPoints, map->mvpCurrentMatchedPoints);
 		// If enough matches accept Loop
 		int nTotalMatches = 0;
 		for (size_t i = 0; i<map->mvpCurrentMatchedPoints.size(); i++)
@@ -503,7 +503,7 @@ namespace EdgeSLAM {
 			cv::Mat cvScw = Converter::toCvMat(g2oScw);
 
 			std::vector<MapPoint*> vpReplacePoints(map->mvpLoopMapPoints.size(), static_cast<MapPoint*>(nullptr));
-			SearchPoints::Fuse(pKF->matcher, pKF, cvScw, map->mvpLoopMapPoints, vpReplacePoints, pKF->matcher->min_descriptor_distance, 4.0);
+			SearchPoints::Fuse(pKF, cvScw, map->mvpLoopMapPoints, vpReplacePoints, 4.0);
 
 			// Get Map Mutex
 			std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
