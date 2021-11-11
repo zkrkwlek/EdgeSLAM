@@ -3,6 +3,7 @@
 #include <Camera.h>
 #include <CameraPose.h>
 #include <FeatureDetector.h>
+#include <ORBDetector.h>
 #include <Converter.h>
 
 namespace EdgeSLAM {
@@ -26,7 +27,8 @@ namespace EdgeSLAM {
 		mpCamPose = new CameraPose();
 		imgColor = img.clone();
 		cv::cvtColor(img, imgGray, cv::COLOR_BGR2GRAY);//COLOR_BGR2GRAY
-		detector->detectAndCompute(imgGray, cv::Mat(), mvKeys, mDescriptors);
+		FeatureDetector* mpDetector = new ORBDetector(1500);
+		mpDetector->detectAndCompute(imgGray, cv::Mat(), mvKeys, mDescriptors);
 		N = mvKeys.size();
 
 		if (mbDistorted)
