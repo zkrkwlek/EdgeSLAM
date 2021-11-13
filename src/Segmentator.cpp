@@ -366,11 +366,30 @@ namespace EdgeSLAM {
 		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 		auto res = mpAPI->Send(ss.str(), "");
 		int n2 = res.size();
+
+		std::cout << "seg = " << n2 << std::endl;
+
+		//����
+		cv::Mat temp = cv::Mat::zeros(n2, 1, CV_8UC1);
+		std::memcpy(temp.data, res.data(), res.size());
+		cv::Mat labeled = cv::imdecode(temp, cv::IMREAD_GRAYSCALE);
+
+		int w = labeled.cols;
+		int h = labeled.rows;
+
+		int oriw = pUser->mpCamera->mnWidth;
+		int orih = pUser->mpCamera->mnHeight;
+
+		float sw = ((float)w) / oriw;
+		float sh = ((float)h) / orih;
+
+		std::cout << w << " " << h << std::endl;
+
+		/*
+		//���� �ƴ�
 		
-		int w = pUser->mpCamera->mnWidth;
-		int h = pUser->mpCamera->mnHeight;
 		cv::Mat labeled = cv::Mat::zeros(h, w, CV_8UC1);
-		std::memcpy(labeled.data, res.data(), res.size());
+		std::memcpy(labeled.data, res.data(), res.size());*/
 
 		////segmentation image
 		/*std::vector<cv::Mat> vecBinaryLabelImages(mnMaxObjectLabel);
@@ -460,6 +479,8 @@ namespace EdgeSLAM {
 			if (!pMP || pMP->isBad())
 				continue;
 			auto pt = F->mvKeys[i].pt;
+			pt.x *= sw;
+			pt.y *= sh;
 			int label = labeled.at<uchar>(pt.y, pt.x)+1;
 			//count.at<int>(label)++;
 

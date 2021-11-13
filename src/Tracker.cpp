@@ -105,7 +105,6 @@ namespace EdgeSLAM {
 				auto kf1 = system->mpInitializer->mpInitKeyFrame1;
 				auto kf2 = system->mpInitializer->mpInitKeyFrame2;
 				map->mvpKeyFrameOrigins.push_back(kf1);
-				map->mvpKeyFrameOrigins.push_back(kf2);
 				/*user->mapKeyFrames[kf1->mnId] = kf1;
 				user->mapKeyFrames[kf2->mnId] = kf2;*/
 				user->mnReferenceKeyFrameID = kf2->mnId;
