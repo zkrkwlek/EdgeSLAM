@@ -13,8 +13,8 @@
 namespace EdgeSLAM {
 
 	float PlaneProcessor::HoughBinSize = 30.0;
-	NewMapClass<int, cv::Mat> PlaneProcessor::PlanarHoughImages;
-	NewMapClass<int, LocalIndoorModel*> PlaneProcessor::LocalPlanarMap;
+	ConcurrentMap<int, cv::Mat> PlaneProcessor::PlanarHoughImages;
+	ConcurrentMap<int, LocalIndoorModel*> PlaneProcessor::LocalPlanarMap;
 
 	float PlaneProcessor::fHistSize = 0.02f;
 	int PlaneProcessor::nTrial = 1500;

@@ -5,6 +5,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <atomic>
+#include <ConcurrentMap.h>
 
 namespace EdgeSLAM {
 
@@ -14,9 +15,11 @@ namespace EdgeSLAM {
 	class MotionModel;
 	class Frame;
 	class KeyFrame;
+	class ObjectFrame;
 	class Camera;
 	class CameraPose;
 	class Map;
+	
 	class User {
 	public:
 		User();
@@ -43,7 +46,9 @@ namespace EdgeSLAM {
 		CameraPose* mpCamPose;
 		bool mbMapping, mbIMU, mbDeviceTracking;
 
-		std::map<int, Frame*> mapFrames;
+		//std::map<int, Frame*> mapFrames;
+		ConcurrentMap<int, Frame*> mapFrames;
+		ConcurrentMap<int, ObjectFrame*> objFrames;
 		//std::map<int, KeyFrame*> mapKeyFrames;
 		std::atomic<bool> mbProgress;
 		std::atomic<int> mnReferenceKeyFrameID, mnLastKeyFrameID, mnPrevFrameID, mnCurrFrameID, mnLastRelocFrameId;

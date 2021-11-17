@@ -6,7 +6,7 @@
 #include <opencv2/core.hpp>
 #include <ThreadPool.h>
 #include <WebAPI.h>
-#include <NewMapClass.h>
+#include <ConcurrentMap.h>
 
 namespace EdgeSLAM {
 	
@@ -62,9 +62,9 @@ namespace EdgeSLAM {
 		
 
 
-		static NewMapClass<int, cv::Mat> SegmentedFrames;
-		static NewMapClass<int, Object*> ObjectPoints;
-		static NewMapClass<int, cv::Mat> KFObjCounts;
+		static ConcurrentMap<int, cv::Mat> SegmentedFrames;
+		static ConcurrentMap<int, Object*> ObjectPoints;
+		static ConcurrentMap<int, cv::Mat> KFObjCounts;
 		static int mnMaxObjectLabel;
 		static std::set<MapPoint*> mspAllFloorPoints;
 		static std::set<MapPoint*> mspAllWallPoints;

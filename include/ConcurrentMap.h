@@ -6,10 +6,10 @@
 #include <mutex>
 
 template <class T1, class T2>
-class NewMapClass {
+class ConcurrentMap {
 public:
-	NewMapClass();
-	virtual ~NewMapClass();
+	ConcurrentMap();
+	virtual ~ConcurrentMap();
 private:
 	std::mutex mMutex;
 	std::map<T1, T2> mMap;
@@ -21,27 +21,27 @@ public:
 };
 
 template <class T1, class T2>
-NewMapClass<T1, T2>::NewMapClass() {}
+ConcurrentMap<T1, T2>::ConcurrentMap() {}
 template <class T1, class T2>
-NewMapClass<T1, T2>::~NewMapClass() {}
+ConcurrentMap<T1, T2>::~ConcurrentMap() {}
 template <class T1, class T2>
-size_t NewMapClass<T1, T2>::Count(T1 id) {
+size_t ConcurrentMap<T1, T2>::Count(T1 id) {
 	std::unique_lock<std::mutex> lock(mMutex);
 	return mMap.count(id);
 	//return mMap.count(id) ? true : false;
 }
 template <class T1, class T2>
-void NewMapClass<T1, T2>::Update(T1 id, T2 data) {
+void ConcurrentMap<T1, T2>::Update(T1 id, T2 data) {
 	std::unique_lock<std::mutex> lock(mMutex);
 	mMap[id] = data;
 }
 template <class T1, class T2>
-T2   NewMapClass<T1, T2>::Get(T1 id) {
+T2   ConcurrentMap<T1, T2>::Get(T1 id) {
 	std::unique_lock<std::mutex> lock(mMutex);
 	return mMap[id];
 }
 template <class T1, class T2>
-size_t NewMapClass<T1, T2>::Size() {
+size_t ConcurrentMap<T1, T2>::Size() {
 	std::unique_lock<std::mutex> lock(mMutex);
 	return mMap.size();
 }

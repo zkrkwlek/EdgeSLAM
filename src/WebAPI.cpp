@@ -44,6 +44,7 @@ std::string WebAPI::Send(std::string method, std::string input) {
 	while (mpConnection->outstanding()){
 		mpConnection->pump();
 	}
+	mpConnection->close();
 	return datastream.str();
 }
 
@@ -60,6 +61,7 @@ std::string WebAPI::Send(std::string method, const unsigned char* input, int nda
 	while (mpConnection->outstanding()) {
 		mpConnection->pump();
 	}
+	mpConnection->close();
 	return datastream.str();
 }
 

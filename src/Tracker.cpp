@@ -4,6 +4,7 @@
 #include <LocalMapper.h>
 #include <Frame.h>
 #include <KeyFrame.h>
+#include <ObjectFrame.h>
 #include <KeyFrameDB.h>
 #include <MapPoint.h>
 #include <User.h>
@@ -83,6 +84,8 @@ namespace EdgeSLAM {
 		/////save image
 		
 		Frame* frame = new Frame(img, cam, id, ts);
+		//user->mapFrames[frame->mnFrameID] = frame;
+		user->mapFrames.Update(frame->mnFrameID, frame);
 		user->mnCurrFrameID = frame->mnFrameID;
 		
 		//std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
@@ -146,7 +149,8 @@ namespace EdgeSLAM {
 				if (userState == UserState::Success) {
 					
 					//std::cout << "Tracker::Start" << std::endl;
-					auto f_ref = user->mapFrames[user->mnPrevFrameID];
+					//auto f_ref = user->mapFrames[user->mnPrevFrameID];
+					auto f_ref = user->mapFrames.Get(user->mnPrevFrameID);
 					f_ref->check_replaced_map_points();
 
 					cv::Mat Tpredict;
@@ -192,41 +196,36 @@ namespace EdgeSLAM {
 					bTrack = true;
 				}
 			}
-			if (!bTrack)
+			if (!bTrack) {
 				trackState = UserState::Failed;
+				nInliers = 0;
+				cv::Mat Rt = cv::Mat::eye(4, 4, CV_32FC1);
+				frame->SetPose(Rt);
+			}
 			if (bTrack)
 				trackState = UserState::Success;
+			pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, user, pLocalMap, frame, nInliers, id);
+
 		}
-
-		////update user frame
-		if (!user->mbDeviceTracking) {
-
-			{
-				//bool b = trackState == UserState::Success ? true : false;
-				pool->EnqueueJob(Tracker::SendTrackingResults, system, user, id, nInliers, frame->GetRotation(), frame->GetTranslation());
-			}
-		}
-
-
+		
 		user->SetState(trackState);
 		if (trackState == UserState::Success) {
 			
 			////오브젝트 검출 요청
-			Segmentator::RequestObjectDetection(user->userName, frame->mnFrameID);
-
-			if (user->mbDeviceTracking) {
-				//SendDeviceTrackingData
-				pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, user, pLocalMap, frame, nInliers, id);
-			}
+			//Segmentator::RequestObjectDetection(user->userName, frame->mnFrameID);
+			
 			//pose update
 			cv::Mat T = frame->GetPose();
 			user->UpdatePose(T);
 			//check keyframe
-			auto ref = map->GetKeyFrame(user->mnReferenceKeyFrameID);
-			if (user->mbMapping && Tracker::NeedNewKeyFrame(map, system->mpLocalMapper, frame, ref, nInliers, user->mnLastKeyFrameID.load(), user->mnLastRelocFrameId.load())) {
-				Tracker::CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, user);
-				Segmentator::RequestSegmentation(user->userName, frame->mnFrameID);
+			if (user->mbMapping) {
+				auto ref = map->GetKeyFrame(user->mnReferenceKeyFrameID);
+				if (Tracker::NeedNewKeyFrame(map, system->mpLocalMapper, frame, ref, nInliers, user->mnLastKeyFrameID.load(), user->mnLastRelocFrameId.load())) {
+					Tracker::CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, user);
+					Segmentator::RequestSegmentation(user->userName, frame->mnFrameID);
+				}
 			}
+			
 			////frame line visualization
 			/*if (!user->mbMapping) {
 				cv::Mat R, t;
@@ -261,7 +260,7 @@ namespace EdgeSLAM {
 			////frame line visualization
 		}
 		
-		user->mapFrames[frame->mnFrameID] = frame;
+		int tempID = user->mnPrevFrameID;
 		user->mnPrevFrameID = frame->mnFrameID;
 		user->mbProgress = false; 
 		
@@ -303,6 +302,22 @@ namespace EdgeSLAM {
 					cv::circle(img, frame->mvKeys[i].pt, r, color, -1);
 				}
 			}
+			if (user->objFrames.Count(tempID)) {
+				ObjectFrame* objFrame = user->objFrames.Get(tempID);
+				for (auto iter = objFrame->mapObjects.begin(), iend = objFrame->mapObjects.end(); iter != iend; iter++) {
+					auto box = iter->second;
+					cv::rectangle(img, box->rect, cv::Scalar(0, 255, 255));
+				}
+			}
+			if (user->objFrames.Count(id)) {
+				ObjectFrame* objFrame = user->objFrames.Get(id);
+				for (auto iter = objFrame->mapObjects.begin(), iend = objFrame->mapObjects.end(); iter != iend; iter++) {
+					auto box = iter->second;
+					cv::rectangle(img, box->rect, cv::Scalar(255, 0, 255));
+				}
+			}
+			
+
 			system->mpVisualizer->ResizeImage(img, img);
 			system->mpVisualizer->SetOutputImage(img, user->GetVisID());
 
@@ -668,82 +683,10 @@ namespace EdgeSLAM {
 	}
 
 	void Tracker::SendDeviceTrackingData(SLAM* system, User* user, LocalMap* pLocalMap, Frame* frame, int nInlier, int id) {
-		{
-			int N = std::min((int)pLocalMap->mvpLocalMPs.size(), 2000);
-			cv::Mat descs = cv::Mat::zeros(N, 32, CV_8UC1);
-			cv::Mat scales = cv::Mat::zeros(N, 1, CV_8UC1);
-			cv::Mat angles = cv::Mat::zeros(N, 1, CV_32FC1);
-			cv::Mat pts = cv::Mat::zeros(N, 3, CV_32FC1);
-			cv::Mat ids = cv::Mat::zeros(N, 1, CV_32SC1);
-			cv::Mat obs = cv::Mat::zeros(N, 1, CV_8UC1);
-
-			cv::Mat idxs = cv::Mat::zeros(N, 3, CV_16UC1);
-
-			for (int i = 0, iend = N; i < iend; i++) {
-				cv::Mat desc = pLocalMap->mvpLocalMPs[i]->GetDescriptor();
-				//std::cout << desc.size() << " " << descs.size() << " " << desc.type() << " " << descs.type() << std::endl;
-				desc.copyTo(descs.row(i));
-				scales.at<uchar>(i, 0) = (uchar)pLocalMap->mvpLocalTPs[i]->mnTrackScaleLevel;
-				angles.at<float>(i, 0) = pLocalMap->mvpLocalTPs[i]->mTrackViewCos;
-				ids.at<int>(i, 0) = pLocalMap->mvpLocalMPs[i]->mnId;
-				int nObs = pLocalMap->mvpLocalMPs[i]->Observations();
-				uchar cobs = std::min(nObs, 255);
-				obs.at<uchar>(i, 0) = cobs;
-				cv::Mat X = pLocalMap                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ->mvpLocalMPs[i]->GetWorldPos().t();
-				X.copyTo(pts.row(i))  ;
-			}
-
-			
-			{
-				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
-				std::stringstream ss;
-				ss << "/Store?keyword=LocalMap&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
-				auto res = mpAPI->Send(ss.str(), descs.data, descs.rows * descs.cols);
-			}
-			{
-				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
-				std::stringstream ss;
-				ss << "/Store?keyword=LocalMapScales&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
-				auto res = mpAPI->Send(ss.str(), scales.data, scales.rows);
-			}
-			{
-				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
-				std::stringstream ss;
-				ss << "/Store?keyword=LocalMapAngles&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
-				auto res = mpAPI->Send(ss.str(), angles.data, angles.rows * sizeof(float));
-			}
-			{
-				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
-				std::stringstream ss;
-				ss << "/Store?keyword=LocalMapPoints&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
-				auto res = mpAPI->Send(ss.str(), pts.data, pts.rows * 3 * sizeof(float));
-			}
-			{
-				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
-				std::stringstream ss;
-				ss << "/Store?keyword=LocalMapPointIDs&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
-				auto res = mpAPI->Send(ss.str(), ids.data, ids.rows * sizeof(int));
-			}
-			{
-				WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
-				std::stringstream ss;
-				ss << "/Store?keyword=LocalMapPointObservation&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
-				auto res = mpAPI->Send(ss.str(), obs.data, obs.rows);
-			}
-
-			//cv::Mat testMat;
-			//scales.convertTo(testMat, CV_8UC1);
-			//std::cout << "test = " << scales.rows << " " << testMat. << std::endl;
-
-			//cv::Mat data = cv::Mat::zeros(13 + nInliers * 8, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
-
-		}
-
-
 		
 		////data
 		cv::Mat T = frame->GetPose();
-		cv::Mat data = cv::Mat::zeros(13 + nInlier * 8, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
+		cv::Mat data = cv::Mat::zeros(13, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
 		int nDataIdx = 0;
 		data.at<float>(nDataIdx++) = (float)nInlier;
 		data.at<float>(nDataIdx++) = T.at<float>(0, 0);
@@ -759,40 +702,43 @@ namespace EdgeSLAM {
 		data.at<float>(nDataIdx++) = T.at<float>(1, 3);
 		data.at<float>(nDataIdx++) = T.at<float>(2, 3);
 
-		cv::Mat desc = cv::Mat::zeros(0, 32, CV_8UC1);
-		for (int i = 0; i < frame->N; i++)
-		{
-			if (frame->mvpMapPoints[i])
+		if (nInlier > 0)
+			for (int i = 0; i < frame->N; i++)
 			{
-				if (!frame->mvbOutliers[i])
+				if (frame->mvpMapPoints[i])
 				{
-					auto kp = frame->mvKeys[i];
-					auto mp = frame->mvpMapPoints[i]->GetWorldPos();
-					int octave = kp.octave;
-					data.at<float>(nDataIdx++) = kp.pt.x;
-					data.at<float>(nDataIdx++) = kp.pt.y;
-					data.at<float>(nDataIdx++) = (float)kp.octave;
-					data.at<float>(nDataIdx++) = kp.angle;
-					data.at<float>(nDataIdx++) = (float)frame->mvpMapPoints[i]->mnId;
-					data.at<float>(nDataIdx++) = mp.at<float>(0);
-					data.at<float>(nDataIdx++) = mp.at<float>(1);
-					data.at<float>(nDataIdx++) = mp.at<float>(2);
-					desc.push_back(frame->mDescriptors.row(i));
+					if (!frame->mvbOutliers[i] && !frame->mvpMapPoints[i]->isBad())
+					{
+						int nDataIdx = 0;
+						auto kp = frame->mvKeys[i];
+						auto mp = frame->mvpMapPoints[i]->GetWorldPos();
+						int octave = kp.octave;
+						cv::Mat temp = cv::Mat::zeros(8, 1, CV_32FC1);
+						temp.at<float>(nDataIdx++) = kp.pt.x;
+						temp.at<float>(nDataIdx++) = kp.pt.y;
+						temp.at<float>(nDataIdx++) = (float)kp.octave;
+						temp.at<float>(nDataIdx++) = kp.angle;
+						temp.at<float>(nDataIdx++) = (float)frame->mvpMapPoints[i]->mnId;
+						temp.at<float>(nDataIdx++) = mp.at<float>(0);
+						temp.at<float>(nDataIdx++) = mp.at<float>(1);
+						temp.at<float>(nDataIdx++) = mp.at<float>(2);
+						data.push_back(temp);
+					}
 				}
 			}
-		}
+		else
+			for (int i = 0; i < 500; i++) {
+				cv::Mat temp = cv::Mat::ones(8, 1, CV_32FC1);
+				data.push_back(temp);
+			}
+
 		{
 			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 			std::stringstream ss;
 			ss << "/Store?keyword=ReferenceFrame&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
 			auto res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
 		}
-		{
-			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
-			std::stringstream ss;
-			ss << "/Store?keyword=ReferenceFrameDesc&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
-			auto res = mpAPI->Send(ss.str(), desc.data, desc.rows*desc.cols);
-		}
+	
 		////data
 		
 	}

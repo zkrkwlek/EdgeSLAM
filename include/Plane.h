@@ -5,7 +5,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <mutex>
-#include <NewMapClass.h>
+#include <ConcurrentMap.h>
 
 namespace EdgeSLAM {
 	class SLAM;
@@ -51,8 +51,8 @@ namespace EdgeSLAM {
 	class PlaneProcessor {
 	public:
 		static float HoughBinSize;
-		static NewMapClass<int, cv::Mat> PlanarHoughImages;
-		static NewMapClass<int, LocalIndoorModel*> LocalPlanarMap;
+		static ConcurrentMap<int, cv::Mat> PlanarHoughImages;
+		static ConcurrentMap<int, LocalIndoorModel*> LocalPlanarMap;
 		//std::map<int, LocalIndoorModel*> LocalPlanarMap;
 	public:
 		static void EstimateLocalMapPlanes(SLAM* system, Map* map, KeyFrame* pKF);
