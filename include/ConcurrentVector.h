@@ -13,6 +13,7 @@ private:
 	std::mutex mMutex;
 	std::vector<T> mVector;
 public:
+	void Initialize(int N, T data);
 	void push_back(T data);
 	T get(int idx);
 	std::vector<T> get();
@@ -24,6 +25,12 @@ template <class T>
 ConcurrentVector<T>::ConcurrentVector() {}
 template <class T>
 ConcurrentVector<T>::~ConcurrentVector() {}
+
+template <class T>
+void ConcurrentVector<T>::Initialize(int N, T data) {
+	std::unique_lock<std::mutex> lock(mMutex);
+	mVector = std::vector<T>(N, data);
+}
 
 template <class T>
 void ConcurrentVector<T>::push_back(T data) {
