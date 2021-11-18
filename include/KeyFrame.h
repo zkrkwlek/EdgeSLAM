@@ -8,6 +8,7 @@
 //#include "DBoW2/BowVector.h"
 //#include "DBoW2/FeatureVector.h"
 //#include <ORBVocabulary.h>
+#include <ConcurrentVector.h>
 #include <atomic>
 #include <mutex>
 
@@ -162,7 +163,7 @@ namespace EdgeSLAM {
 		const cv::Mat K;
 
 		std::vector<bool> mvbOutliers;
-		std::vector<MapPoint*> mvpMapPoints;
+		ConcurrentVector<MapPoint*> mvpMapPoints;
 		std::vector< std::vector <std::vector<size_t> > > mGrid;
 
 		std::map<KeyFrame*, int> mConnectedKeyFrameWeights;
@@ -184,7 +185,6 @@ namespace EdgeSLAM {
 
 		Map* mpMap;
 		std::mutex mMutexConnections;
-		std::mutex mMutexFeatures;
 	};
 }
 

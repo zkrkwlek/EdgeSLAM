@@ -18,10 +18,11 @@ namespace EdgeSLAM {
 		mDescriptors(F->mDescriptors.clone()), mnScaleLevels(F->mnScaleLevels), mfScaleFactor(F->mfScaleFactor),
 		mfLogScaleFactor(F->mfLogScaleFactor), mvScaleFactors(F->mvScaleFactors), mvLevelSigma2(F->mvLevelSigma2),
 		mvInvLevelSigma2(F->mvInvLevelSigma2), mnMinX(F->mnMinX), mnMinY(F->mnMinY), mnMaxX(F->mnMaxX),
-		mnMaxY(F->mnMaxY), K(F->K), mvpMapPoints(F->mvpMapPoints), 
+		mnMaxY(F->mnMaxY), K(F->K), 
 		mbFirstConnection(true), mpParent(nullptr), mbNotErase(false),
 		mbToBeErased(false), mbBad(false), mpMap(pMap), mpCamera(F->mpCamera)
 	{
+		mvpMapPoints.Copy(F->mvpMapPoints);
 		F->mnKeyFrameId = this->mnId;
 		mGrid.resize(mnGridCols);
 		for (int i = 0; i<mnGridCols; i++)
@@ -38,7 +39,7 @@ namespace EdgeSLAM {
 		return mpCamera->is_in_image(x, y, z);
 	}
 	void KeyFrame::reset_map_points(){
-		mvpMapPoints = std::vector<MapPoint*>(mvKeysUn.size(), nullptr);
+		mvpMapPoints.Initialize(mvKeysUn.size(), nullptr);
 		mvbOutliers = std::vector<bool>(mvKeysUn.size(), false);
 	}
 
@@ -76,12 +77,7 @@ namespace EdgeSLAM {
 	{
 		std::map<KeyFrame*, int> KFcounter;
 
-		std::vector<MapPoint*> vpMP;
-
-		{
-			std::unique_lock<std::mutex> lockMPs(mMutexFeatures);
-			vpMP = mvpMapPoints;
-		}
+		std::vector<MapPoint*> vpMP = mvpMapPoints.get();
 
 		//For all map points in keyframe check in which other keyframes are they seen
 		//Increase counter for those keyframes
@@ -327,12 +323,8 @@ namespace EdgeSLAM {
 			}
 		}
 		
-		std::vector<MapPoint*> vpMP;
-		{
-			std::unique_lock<std::mutex> lockMPs(mMutexFeatures);
-			vpMP = mvpMapPoints;
-		}
-
+		std::vector<MapPoint*> vpMP = mvpMapPoints.get();
+		
 		for (std::map<KeyFrame*, int>::iterator mit = mConnectedKeyFrameWeights.begin(), mend = mConnectedKeyFrameWeights.end(); mit != mend; mit++)
 			mit->first->EraseConnection(this);
 
@@ -424,41 +416,34 @@ namespace EdgeSLAM {
 	////Map Point
 	void KeyFrame::AddMapPoint(MapPoint *pMP, const size_t &idx)
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
-		mvpMapPoints[idx] = pMP;
+		mvpMapPoints.update(idx, pMP);
 	}
 
 	void KeyFrame::EraseMapPointMatch(const size_t &idx)
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
-		mvpMapPoints[idx] = static_cast<MapPoint*>(nullptr);
+		mvpMapPoints.update(idx, nullptr);
 	}
 
 	void KeyFrame::EraseMapPointMatch(MapPoint* pMP)
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
 		int idx = pMP->GetIndexInKeyFrame(this);
 		if (idx >= 0)
-			mvpMapPoints[idx] = static_cast<MapPoint*>(nullptr);
+			mvpMapPoints.update(idx, nullptr);
 	}
 
 
 	void KeyFrame::ReplaceMapPointMatch(const size_t &idx, MapPoint* pMP)
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
-		mvpMapPoints[idx] = pMP;
+		mvpMapPoints.update(idx, pMP);
 	}
 
 	std::set<MapPoint*> KeyFrame::GetMapPoints()
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
 		std::set<MapPoint*> s;
 		for (size_t i = 0, iend = mvpMapPoints.size(); i<iend; i++)
 		{
-			if (!mvpMapPoints[i])
-				continue;
-			MapPoint* pMP = mvpMapPoints[i];
-			if (!pMP->isBad())
+			auto pMP = mvpMapPoints.get(i);
+			if (!pMP && !pMP->isBad())
 				s.insert(pMP);
 		}
 		return s;
@@ -466,25 +451,20 @@ namespace EdgeSLAM {
 
 	int KeyFrame::TrackedMapPoints(const int &minObs)
 	{
- 		std::unique_lock<std::mutex> lock(mMutexFeatures);
-
 		int nPoints = 0;
 		const bool bCheckObs = minObs>0;
 		for (int i = 0; i<N; i++)
 		{
-			MapPoint* pMP = mvpMapPoints[i];
-			if (pMP)
+			MapPoint* pMP = mvpMapPoints.get(i);
+			if (pMP && !pMP->isBad())
 			{
-				if (!pMP->isBad())
+				if (bCheckObs)
 				{
-					if (bCheckObs)
-					{
-						if (mvpMapPoints[i]->Observations() >= minObs)
-							nPoints++;
-					}
-					else
+					if (pMP->Observations() >= minObs)
 						nPoints++;
 				}
+				else
+					nPoints++;
 			}
 		}
 
@@ -493,14 +473,12 @@ namespace EdgeSLAM {
 
 	std::vector<MapPoint*> KeyFrame::GetMapPointMatches()
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
-		return mvpMapPoints;
+		return mvpMapPoints.get();
 	}
 
 	MapPoint* KeyFrame::GetMapPoint(const size_t &idx)
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
-		return mvpMapPoints[idx];
+		return mvpMapPoints.get(idx);
 	}
 	std::vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, const float &r) const
 	{
@@ -544,11 +522,7 @@ namespace EdgeSLAM {
 	}
 	float KeyFrame::ComputeSceneMedianDepth(const int q)
 	{
-		std::vector<MapPoint*> vpMapPoints;
-		{
-			std::unique_lock<std::mutex> lock(mMutexFeatures);
-			vpMapPoints = mvpMapPoints;
-		}
+		std::vector<MapPoint*> vpMapPoints = mvpMapPoints.get();
 		cv::Mat Tcw_ = mpCamPose->GetPose();
 
 		std::vector<float> vDepths;

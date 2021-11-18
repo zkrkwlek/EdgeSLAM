@@ -272,14 +272,14 @@ namespace EdgeSLAM {
 		int nFrameID = kf->mnId;
 		for (int i = 0; i<kf->N; i++)
 		{
-			auto pMP = kf->mvpMapPoints[i];
+			auto pMP = kf->mvpMapPoints.get(i);
 			if (pMP && !pMP->isBad()) {
 				const std::map<KeyFrame*, size_t> observations = pMP->GetObservations();
 				for (std::map<KeyFrame*, size_t>::const_iterator it = observations.begin(), itend = observations.end(); it != itend; it++)
 					keyframeCounter[it->first]++;
 			}
 			else {
-				kf->mvpMapPoints[i] = nullptr;
+				kf->mvpMapPoints.update(i,nullptr);
 			}
 		}
 

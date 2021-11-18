@@ -14,6 +14,8 @@ private:
 	std::vector<T> mVector;
 public:
 	void Initialize(int N, T data);
+	void Copy(std::vector<T> src);
+	void Copy(ConcurrentVector<T> vec);
 	void push_back(T data);
 	T get(int idx);
 	std::vector<T> get();
@@ -30,6 +32,19 @@ template <class T>
 void ConcurrentVector<T>::Initialize(int N, T data) {
 	std::unique_lock<std::mutex> lock(mMutex);
 	mVector = std::vector<T>(N, data);
+}
+
+template <class T>
+void ConcurrentVector<T>::Copy(std::vector<T> src) {
+	std::unique_lock<std::mutex> lock(mMutex);
+	mVector = std::vector<T>(src.begin(), src.end());
+}
+
+template <class T>
+void ConcurrentVector<T>::Copy(ConcurrentVector<T> vec) {
+	std::unique_lock<std::mutex> lock(mMutex);
+	std::vector<T> src = vec->get();
+	mVector = std::vector<T>(src.begin(), src.end());
 }
 
 template <class T>
