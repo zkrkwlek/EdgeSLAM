@@ -732,8 +732,21 @@ namespace EdgeSLAM {
 
 		int w = pUser->mpCamera->mnWidth;
 		int h = pUser->mpCamera->mnHeight;
-		cv::Mat depthImg = cv::Mat::zeros(h, w, CV_32FC1);
-		std::memcpy(depthImg.data, res.data(), res.size());
+
+		cv::Mat temp = cv::Mat::zeros(n2, 1, CV_8UC1);
+		std::memcpy(temp.data, res.data(), res.size());
+		cv::Mat depthsrc= cv::imdecode(temp, cv::IMREAD_UNCHANGED);
+		cv::Mat depthImg = cv::Mat(h, w, CV_32FC1, depthsrc.data);
+		//std::cout <<n2<<" "<< depthImg.type() <<" "<<CV_8UC3<<" "<<CV_8UC4<< " " << CV_32FC1 << std::endl;
+		//cv::cvtColor(depthImg, depthImg, cv::COLOR_BGRA2GRAY);
+		//depthImg.convertTo(depthImg, CV_32FC1);
+
+		//int w = labeled.cols;
+		//int h = labeled.rows;
+
+		
+		//cv::Mat depthImg = cv::Mat::zeros(h, w, CV_32FC1);
+		//std::memcpy(depthImg.data, res.data(), res.size());
 
 		{
 			cv::Mat depth;
