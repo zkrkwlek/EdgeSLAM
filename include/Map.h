@@ -9,6 +9,7 @@
 #include <mutex>
 #include <atomic>
 #include <LoopClosingTypes.h>
+#include <ConcurrentVariable.h>
 
 namespace EdgeSLAM {
 	
@@ -122,6 +123,8 @@ namespace EdgeSLAM {
 		////Plane Test
 		////Depth Test
 	public:
+		//테스트용 코드 변경할껏.
+		ConcurrentVariable<cv::Mat> mObjectTest;
 		std::vector<cv::Mat> GetDepthMPs();
 		void ClearDepthMPs();
 		void AddDepthMP(cv::Mat m);

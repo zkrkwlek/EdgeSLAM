@@ -235,14 +235,24 @@ namespace EdgeSLAM {
 				{
 					
 					
-					for (int i = 0, iend = 3; i < iend; i++) {
-						auto vMPs = pMap->GetPlanarMPs(i);
-						for (int j = 0; j < vMPs.size(); j++) {
-							cv::Mat x3D = vMPs[j];
-							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
-							tpt += mVisMidPt;
-							cv::circle(tempVis, tpt, 4, planeColors[i], -1);
-						}
+					//for (int i = 0, iend = 3; i < iend; i++) {
+					//	//auto vMPs = pMap->GetPlanarMPs(i);
+					//	auto vMPs = pMap->GetDepthMPs();
+					//	for (int j = 0; j < vMPs.size(); j++) {
+					//		cv::Mat x3D = vMPs[j];
+					//		cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+					//		tpt += mVisMidPt;
+					//		cv::circle(tempVis, tpt, 4, planeColors[i], -1);
+					//	}
+					//}
+					cv::Mat objMap = pMap->mObjectTest.Get().clone();
+					for (int i = 0; i < objMap.rows; i++) {
+						cv::Mat x3D = objMap.row(i).colRange(0,3);
+						int label = (int)objMap.at<float>(i, 3);
+						cv::Scalar color = Segmentator::mvObjectLabelColors[label];
+						cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+						tpt += mVisMidPt;
+						cv::circle(tempVis, tpt, 4, color, -1);
 					}
 				}
 			}

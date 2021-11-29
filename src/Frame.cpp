@@ -163,6 +163,7 @@ namespace EdgeSLAM {
 	}
 	void Frame::reset_map_points(){
 		mvpMapPoints = std::vector<MapPoint*>(mvKeysUn.size(), nullptr);
+		mvpTrackPoints = std::vector<TrackPoint*>(mvKeysUn.size(), nullptr);
 		mvbOutliers = std::vector<bool>(mvKeysUn.size(), false);
 	}
 

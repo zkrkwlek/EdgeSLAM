@@ -302,7 +302,7 @@ namespace EdgeSLAM {
 					cv::circle(img, frame->mvKeys[i].pt, r, color, -1);
 				}
 			}
-			if (user->objFrames.Count(tempID)) {
+			/*if (user->objFrames.Count(tempID)) {
 				ObjectFrame* objFrame = user->objFrames.Get(tempID);
 				for (auto iter = objFrame->mapObjects.begin(), iend = objFrame->mapObjects.end(); iter != iend; iter++) {
 					auto box = iter->second;
@@ -316,6 +316,9 @@ namespace EdgeSLAM {
 					cv::rectangle(img, box->rect, cv::Scalar(255, 0, 255));
 				}
 			}
+			else {
+				std::cout << std::endl << std::endl << std::endl << std::endl;
+			}*/
 			
 
 			system->mpVisualizer->ResizeImage(img, img);
@@ -687,8 +690,9 @@ namespace EdgeSLAM {
 		////data
 		cv::Mat T = frame->GetPose();
 		cv::Mat data = cv::Mat::zeros(13, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
-		int nDataIdx = 0;
-		data.at<float>(nDataIdx++) = (float)nInlier;
+		
+		
+		int nDataIdx = 1;
 		data.at<float>(nDataIdx++) = T.at<float>(0, 0);
 		data.at<float>(nDataIdx++) = T.at<float>(0, 1);
 		data.at<float>(nDataIdx++) = T.at<float>(0, 2);
@@ -702,7 +706,8 @@ namespace EdgeSLAM {
 		data.at<float>(nDataIdx++) = T.at<float>(1, 3);
 		data.at<float>(nDataIdx++) = T.at<float>(2, 3);
 
-		if (nInlier > 0)
+		if (nInlier > 0){
+			int nres = 0;
 			for (int i = 0; i < frame->N; i++)
 			{
 				if (frame->mvpMapPoints[i])
@@ -723,15 +728,19 @@ namespace EdgeSLAM {
 						temp.at<float>(nDataIdx++) = mp.at<float>(1);
 						temp.at<float>(nDataIdx++) = mp.at<float>(2);
 						data.push_back(temp);
+						nres++;
 					}
 				}
 			}
-		else
+			data.at<float>(0) = (float)nres;
+		}
+		else{
 			for (int i = 0; i < 500; i++) {
 				cv::Mat temp = cv::Mat::ones(8, 1, CV_32FC1);
 				data.push_back(temp);
 			}
-
+			data.at<float>(0) = 0.0;
+		}
 		{
 			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 			std::stringstream ss;

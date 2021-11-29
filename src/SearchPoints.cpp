@@ -820,6 +820,7 @@ namespace EdgeSLAM {
 					continue;
 				}
 				F->mvpMapPoints[bestIdx] = pMP;
+				F->mvpTrackPoints[bestIdx] = pTP;
 				nmatches++;
 			}
 		}

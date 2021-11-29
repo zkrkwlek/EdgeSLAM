@@ -44,6 +44,7 @@ namespace EdgeSLAM {
 
 		normal.copyTo(matPlaneParam.rowRange(0, 3));
 		matPlaneParam.at<float>(3) = distance;
+
 	}
 	void Plane::SetParam(cv::Mat n, float d) {
 		std::unique_lock<std::mutex> lockTemp(mMutexParam);

@@ -14,6 +14,7 @@ namespace EdgeSLAM {
 		mbStopGBA(false), mpThreadGBA(nullptr), mbFixScale(bFixScale), mnFullBAIdx(0)
 	{
 		mpKeyFrameDB = new KeyFrameDB(voc);
+		mObjectTest.Update(cv::Mat::zeros(0, 4, CV_32FC1));
 		mvvPlanarMPs = std::vector<std::vector<cv::Mat>>(3);
 	}
 	/*Map::Map(ORBVocabulary* voc) : mnNumMappingFrames(0), mnNextKeyFrameID(0), mnNextMapPointID(0), mState(MapState::NoImages) {

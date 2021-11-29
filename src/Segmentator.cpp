@@ -605,10 +605,12 @@ namespace EdgeSLAM {
 		
 		//auto F = pUser->mapFrames[id];
 		Frame* F = nullptr;
-		if (pUser->mapFrames.Count(id))
-			F = pUser->mapFrames.Get(id);
-		if (!F)
-			return;
+		while (!F) {
+			if (pUser->mapFrames.Count(id))
+				F = pUser->mapFrames.Get(id);
+			continue;
+		}
+			
 		cv::Mat dst = F->imgColor.clone();
 		std::memcpy(data.data, res.data(), res.size());
 
@@ -718,12 +720,15 @@ namespace EdgeSLAM {
 		//	
 		//	
 		//}
-		std::cout << "Object Test = " << t2 << std::endl;
-		cv::imshow("yolo", objImg); cv::waitKey(1);
+		
+		/*std::cout << "Object Test = " << t2 << std::endl;
+		cv::imshow("yolo", objImg); cv::waitKey(1);*/
 	}
 	void Segmentator::ProcessDepthEstimation(ThreadPool::ThreadPool* pool, SLAM* system, std::string user, int id)
 	{
 		auto pUser = system->GetUser(user);
+		if (!pUser)
+			return;
 		std::stringstream ss;
 		ss << "/Load?keyword=DepthEstimation" << "&id=" << id << "&src=" << user;
 		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
@@ -744,14 +749,97 @@ namespace EdgeSLAM {
 		//int w = labeled.cols;
 		//int h = labeled.rows;
 
-		
 		//cv::Mat depthImg = cv::Mat::zeros(h, w, CV_32FC1);
 		//std::memcpy(depthImg.data, res.data(), res.size());
+		
+		Frame* F = nullptr;
+		while (!F) {
+			if (pUser->mapFrames.Count(id))
+				F = pUser->mapFrames.Get(id);
+			continue;
+		}
+		auto map = system->GetMap(pUser->mapName);
+		
+		////depth scale
+		cv::Mat R, t;
+		R = F->GetRotation();
+		t = F->GetTranslation();
+		cv::Mat Rcw2 = R.row(2);
+		Rcw2 = Rcw2.t();
+		float zcw = t.at<float>(2);
+		auto vpMPs = F->mvpMapPoints;
+		cv::Mat s = cv::Mat::zeros(0, 1, CV_32FC1);
+		for (size_t i = 0, iend = F->N; i < iend; i++) {
+			auto pMPi = vpMPs[i];
+			if (!pMPi || pMPi->isBad())
+				continue;
+			auto pt = F->mvKeysUn[i].pt;
+			cv::Mat x3Dw = pMPi->GetWorldPos();
+			float z = (float)Rcw2.dot(x3Dw) + zcw;
+			std::tuple<cv::Point2f, float, int> data = std::make_tuple(std::move(pt), 1.0 / z, pMPi->Observations());//cv::Point2f(pt.x / 2, pt.y / 2)
+			
+			float depth = depthImg.at<float>(pt);
+			cv::Mat temp = cv::Mat::zeros(1, 1, CV_32FC1);
+			temp.at<float>(0) = z / depth;
+			s.push_back(temp);
+		}
+		float scale = cv::mean(s).val[0];
+		////depth scale
 
+		////depth 3d visualization
+		
+		if (pUser->objFrames.Count(id)) {
+			ObjectFrame* objFrame = pUser->objFrames.Get(id);
+			auto objBox = objFrame->mapObjects;
+			cv::Mat invK = F->InvK.clone();
+			cv::Mat Rinv, Tinv;
+			cv::Mat Pinv = F->GetPoseInverse();
+			Rinv = Pinv.colRange(0, 3).rowRange(0, 3);
+			Tinv = Pinv.col(3).rowRange(0, 3);
+			
+			int inc = 1;
+			cv::Mat test = cv::Mat::zeros(0, 4, CV_32FC1);//map->mObjectTest.Get();//
+			for (auto iter = objBox.begin(), iend = objBox.end(); iter != iend; iter++) {
+				auto box = iter->second;
+
+				int w = box->rect.width + box->rect.x;
+				int h = box->rect.height+box->rect.y;
+				
+				for (int x = box->rect.x; x < w; x++) {
+					for (int y = box->rect.y; y < h; y++) {
+						cv::Point2i pt(x, y);
+						float depth = depthImg.at<float>(pt)*scale;
+						if (depth < 0.0001)
+							continue;
+						cv::Mat a = Rinv*(invK*(cv::Mat_<float>(3, 1) << pt.x, pt.y, 1.0)*depth) + Tinv;
+						cv::Mat b = cv::Mat::zeros(1, 4, CV_32FC1);
+						b.at<float>(0) = a.at<float>(0);
+						b.at<float>(1) = a.at<float>(1);
+						b.at<float>(2) = a.at<float>(2);
+						b.at<float>(3) = (float)box->label;
+						test.push_back(b);
+					}
+				}
+				//
+			}
+			map->mObjectTest.Update(test);
+
+		}
+		////depth 3d visualization
+		
 		{
 			cv::Mat depth;
 			cv::normalize(depthImg, depth, 0, 255, cv::NORM_MINMAX, CV_8UC1);
 			cv::cvtColor(depth, depth, cv::COLOR_GRAY2BGR);
+			if (pUser->objFrames.Count(id)) {
+				ObjectFrame* objFrame = pUser->objFrames.Get(id);
+				auto objBox = objFrame->mapObjects;
+				for (auto iter = objBox.begin(), iend = objBox.end(); iter != iend; iter++) {
+					auto box = iter->second;
+					cv::rectangle(depth, box->rect, cv::Scalar(255, 0, 0));
+				}
+			}
+
 			/////save image
 			/*std::stringstream sss;
 			sss << "../../bin/img/" << pUser->userName << "/Depth/" << id << ".jpg";
@@ -788,33 +876,29 @@ namespace EdgeSLAM {
 		
 		//////////////////
 		//auto F = pUser->mapFrames[id];
-		Frame* F = nullptr;
-		if (pUser->mapFrames.Count(id))
-			F = pUser->mapFrames.Get(id);
-		if (!F)
-			return;
-		auto map = system->GetMap(pUser->mapName);
+		
 		std::vector<std::tuple<cv::Point2f, float, int>> vecTuples;
 
-		cv::Mat R, t;
-		R = F->GetRotation();
-		t = F->GetTranslation();
+		//cv::Mat R, t;
+		//R = F->GetRotation();
+		//t = F->GetTranslation();
 
-		////depth 정보 저장 및 포인트와 웨이트 정보를 튜플로 저장
-		cv::Mat Rcw2 = R.row(2);
-		Rcw2 = Rcw2.t();
-		float zcw = t.at<float>(2);
-		auto vpMPs = F->mvpMapPoints;
-		for (size_t i = 0, iend = F->N; i < iend; i++) {
-			auto pMPi = vpMPs[i];
-			if (!pMPi || pMPi->isBad())
-				continue;
-			auto pt = F->mvKeysUn[i].pt;
-			cv::Mat x3Dw = pMPi->GetWorldPos();
-			float z = (float)Rcw2.dot(x3Dw) + zcw;
-			std::tuple<cv::Point2f, float, int> data = std::make_tuple(std::move(pt), 1.0 / z, pMPi->Observations());//cv::Point2f(pt.x / 2, pt.y / 2)
-			vecTuples.push_back(data);
-		}
+		//////depth 정보 저장 및 포인트와 웨이트 정보를 튜플로 저장
+		//cv::Mat Rcw2 = R.row(2);
+		//Rcw2 = Rcw2.t();
+		//float zcw = t.at<float>(2);
+		//auto vpMPs = F->mvpMapPoints;
+		//for (size_t i = 0, iend = F->N; i < iend; i++) {
+		//	auto pMPi = vpMPs[i];
+		//	if (!pMPi || pMPi->isBad())
+		//		continue;
+		//	auto pt = F->mvKeysUn[i].pt;
+		//	cv::Mat x3Dw = pMPi->GetWorldPos();
+		//	float z = (float)Rcw2.dot(x3Dw) + zcw;
+		//	std::tuple<cv::Point2f, float, int> data = std::make_tuple(std::move(pt), 1.0 / z, pMPi->Observations());//cv::Point2f(pt.x / 2, pt.y / 2)
+		//	vecTuples.push_back(data);
+		//}
+
 		////웨이트와 포인트 정보로 정렬
 		std::sort(vecTuples.begin(), vecTuples.end(),
 			[](std::tuple<cv::Point2f, float, int> const &t1, std::tuple<cv::Point2f, float, int> const &t2) {

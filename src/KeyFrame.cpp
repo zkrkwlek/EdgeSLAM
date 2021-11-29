@@ -443,7 +443,7 @@ namespace EdgeSLAM {
 		for (size_t i = 0, iend = mvpMapPoints.size(); i<iend; i++)
 		{
 			auto pMP = mvpMapPoints.get(i);
-			if (!pMP && !pMP->isBad())
+			if (pMP && !pMP->isBad())
 				s.insert(pMP);
 		}
 		return s;
@@ -452,10 +452,11 @@ namespace EdgeSLAM {
 	int KeyFrame::TrackedMapPoints(const int &minObs)
 	{
 		int nPoints = 0;
+		auto vpMPs = mvpMapPoints.get();
 		const bool bCheckObs = minObs>0;
-		for (int i = 0; i<N; i++)
+		for (int i = 0, iend = vpMPs.size(); i<iend; i++)
 		{
-			MapPoint* pMP = mvpMapPoints.get(i);
+			auto pMP = vpMPs[i];
 			if (pMP && !pMP->isBad())
 			{
 				if (bCheckObs)
