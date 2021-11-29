@@ -1,9 +1,0 @@
-diff a/src/Tracker.cpp b/src/Tracker.cpp	(rejected hunks)
-@@ -212,6 +212,7 @@
- 
- 		user->SetState(trackState);
- 		if (trackState == UserState::Success) {
-+			std::cout << "a" << std::endl;
- 			////������Ʈ ���� ��û
- 			//Segmentator::RequestObjectDetection(user->userName, frame->mnFrameID);
- 
