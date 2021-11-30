@@ -368,7 +368,7 @@ namespace EdgeSLAM {
 		auto res = mpAPI->Send(ss.str(), "");
 		int n2 = res.size();
 
-		std::cout << "seg = " << n2 << std::endl;
+		//std::cout << "seg = " << n2 << std::endl;
 
 		//����
 		cv::Mat temp = cv::Mat::zeros(n2, 1, CV_8UC1);
@@ -384,7 +384,7 @@ namespace EdgeSLAM {
 		float sw = ((float)w) / oriw;
 		float sh = ((float)h) / orih;
 
-		std::cout << w << " " << h << std::endl;
+		//std::cout << w << " " << h << std::endl;
 
 		/*
 		//���� �ƴ�

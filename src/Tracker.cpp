@@ -88,6 +88,8 @@ namespace EdgeSLAM {
 		user->mapFrames.Update(frame->mnFrameID, frame);
 		user->mnCurrFrameID = frame->mnFrameID;
 		
+		//time analysis
+		float t_local = 1000.0;
 		//std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
 
 		auto mapState = map->GetState();
@@ -183,9 +185,13 @@ namespace EdgeSLAM {
 				}
 				}*/
 			}
-
+			
 			if (bTrack) {
+				std::chrono::high_resolution_clock::time_point t_local_start = std::chrono::high_resolution_clock::now();
 				nInliers = Tracker::TrackWithLocalMap(pLocalMap, user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+				std::chrono::high_resolution_clock::time_point t_local_end = std::chrono::high_resolution_clock::now();
+				auto du_local = std::chrono::duration_cast<std::chrono::milliseconds>(t_local_end - t_local_start).count();
+				t_local = du_local / 1000.0;
 				if (frame->mnFrameID < user->mnLastRelocFrameId + 30 && nInliers < 50) {
 					bTrack = false;
 				}
@@ -271,7 +277,7 @@ namespace EdgeSLAM {
 		auto du_test2 = std::chrono::duration_cast<std::chrono::milliseconds>(end - received).count();
 		float t_test2 = du_test2 / 1000.0;
 
-		std::cout << "Frame = " << user->userName << " : " << id << ", Matches = " << nInliers << ", time =" << t_test1 <<", "<< t_test2<< std::endl;
+		std::cout << "Frame = " << user->userName << " : " << id << ", Matches = " << nInliers << ", time =" << t_test1 <<", "<< t_test2<<", "<< t_local << std::endl;
 		system->UpdateTrackingTime(t_test1);
 
 		////visualization
@@ -357,7 +363,13 @@ namespace EdgeSLAM {
 	int Tracker::TrackWithLocalMap(LocalMap* pLocalMap, User* user, Frame* cur, float thMaxDesc, float thMinDesc){
 
 		//std::cout << "Track::LocalMap::Update::start" << std::endl;
+		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 		pLocalMap->UpdateLocalMap(user, cur);
+		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+		float t_test1 = du_test1 / 1000.0;
+		std::cout << "Update Local Map = "<<pLocalMap->mvpLocalKFs.size()<<" "<<pLocalMap->mvpLocalMPs.size()<<"="<< t_test1 << std::endl;
+
 		//std::cout << "Track::LocalMap::Update::end" << std::endl;
 		//update visible
 

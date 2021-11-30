@@ -6,6 +6,7 @@
 #include <opencv2/core.hpp>
 #include <DBoW3.h>
 #include <ThreadPool.h>
+#include <ConcurrentMap.h>
 #include <atomic>
 //#include <ORBVocabulary.h>
 
@@ -62,10 +63,14 @@ namespace EdgeSLAM {
 		void AddMap(std::string name, Map* pMap);
 		Map* GetMap(std::string name);
 		void RemoveMap(std::string name);
+
+		ConcurrentMap<std::string, User*> Users;
+		ConcurrentMap<std::string, Map*> Maps;
+
 	private:
-		std::mutex mMutexUserList, mMutexMapList;
+		/*std::mutex mMutexUserList, mMutexMapList;
 		std::map<std::string, User*> mmpConnectedUserList;
-		std::map<std::string, Map*> mmpMapList;
+		std::map<std::string, Map*> mmpMapList;*/
 	////Manage Visualize ID
 	public:
 		void SetUserVisID(User* user);

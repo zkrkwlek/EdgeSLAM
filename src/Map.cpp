@@ -485,6 +485,8 @@ namespace EdgeSLAM {
 		std::set<MapPoint*> spMPs;
 		for (std::vector<KeyFrame*>::const_iterator itKF = vpLocalKFs.begin(), itEndKF = vpLocalKFs.end(); itKF != itEndKF; itKF++)
 		{
+			if (spMPs.size() >= 4000)
+				break;
 			KeyFrame* pKF = *itKF;
 			const std::vector<MapPoint*> vpMPs = pKF->GetMapPointMatches();
 

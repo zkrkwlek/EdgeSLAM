@@ -105,17 +105,19 @@ namespace EdgeSLAM {
 	}
 
 	bool SLAM::CheckMap(std::string str){
-		std::unique_lock<std::mutex> lock(mMutexMapList);
+		return Maps.Count(str) > 0;
+		/*std::unique_lock<std::mutex> lock(mMutexMapList);
 		if (mmpMapList.count(str))
 			return true;
-		return false;
+		return false;*/
 	}
 	bool SLAM::CheckUser(std::string str){
-		std::unique_lock<std::mutex> lock(mMutexUserList);
+		return Users.Count(str) > 0;
+		/*std::unique_lock<std::mutex> lock(mMutexUserList);
 		if (mmpConnectedUserList.count(str)) {
 			return true;
 		}
-		return false;
+		return false;*/
 	}
 	void SLAM::UpdateDeviceGyroSensor(std::string user, int id) {
 		if (!CheckUser(user))
@@ -143,34 +145,32 @@ namespace EdgeSLAM {
 		//pUser->AddDevicePosition(pos);
 	}
 	void SLAM::AddUser(std::string id, User* user) {
-		std::unique_lock<std::mutex> lock(mMutexUserList);
-		/*for (int i = 0; i < mapVisID.size(); i++) {
-			if (!mapVisID[i].second) {
-				mapVisID[i].second = true;
-				user->mnVisID = mapVisID[i].first;
-				break;
-			}
-		}*/
+		Users.Update(id, user);
+		/*std::unique_lock<std::mutex> lock(mMutexUserList);
 		SetUserVisID(user);
-		mmpConnectedUserList[id] = user;
+		mmpConnectedUserList[id] = user;*/
 	}
 	User* SLAM::GetUser(std::string id) {
-		std::unique_lock<std::mutex> lock(mMutexUserList);
+		if(Users.Count(id))
+			return Users.Get(id);
+		return nullptr;
+		/*std::unique_lock<std::mutex> lock(mMutexUserList);
 		if (mmpConnectedUserList.count(id)) {
 			return mmpConnectedUserList[id];
 		}
-		return nullptr;
+		return nullptr;*/
 	}
 	std::vector<User*> SLAM::GetAllUsersInMap(std::string map) {
 		std::vector<User*> res;
 		if (!CheckMap(map))
 			return res;
 		////string compare
-		std::map<std::string, User*> mapUserLists;
-		{
+
+		std::map<std::string, User*> mapUserLists = Users.Get();
+		/*{
 			std::unique_lock<std::mutex> lock(mMutexUserList); 
 			mapUserLists = mmpConnectedUserList;
-		}
+		}*/
 		for (auto iter = mapUserLists.begin(), iend = mapUserLists.end(); iter != iend; iter++) {
 			auto user = iter->second;
 			if (user->mapName != map)
@@ -182,12 +182,16 @@ namespace EdgeSLAM {
 	void SLAM::RemoveUser(std::string id) {
 		bool bDelete = false;
 		{
-			std::unique_lock<std::mutex> lock(mMutexUserList);
+			if (Users.Count(id)) {
+				Users.Erase(id);
+				bDelete = true;
+			}
+			/*std::unique_lock<std::mutex> lock(mMutexUserList);
 			if (mmpConnectedUserList.count(id)) {
 				auto user = mmpConnectedUserList[id];
 				mmpConnectedUserList.erase(id);
 				bDelete = true;
-			}
+			}*/
 		}
 		if(bDelete)
 			UpdateUserVisID();
@@ -203,11 +207,11 @@ namespace EdgeSLAM {
 	}
 	void SLAM::UpdateUserVisID(){
 		std::unique_lock<std::mutex> lock(mMutexVisID);
-		std::map<std::string, User*> mapUserLists;
-		{
+		std::map<std::string, User*> mapUserLists = Users.Get();
+		/*{
 			std::unique_lock<std::mutex> lock(mMutexUserList);
 			mapUserLists = mmpConnectedUserList;
-		}
+		}*/
 		mnVisID = 0;
 		for (auto iter = mapUserLists.begin(), iend = mapUserLists.end(); iter != iend; iter++) {
 			auto user = iter->second;
@@ -322,18 +326,24 @@ namespace EdgeSLAM {
 		f.close();
 	}
 	void SLAM::AddMap(std::string name, Map* pMap) {
-		std::unique_lock<std::mutex> lock(mMutexMapList);
-		mmpMapList[name] = pMap;
+		Maps.Update(name, pMap);
+		/*std::unique_lock<std::mutex> lock(mMutexMapList);
+		mmpMapList[name] = pMap;*/
 	}
 	Map* SLAM::GetMap(std::string name) {
-		std::unique_lock<std::mutex> lock(mMutexMapList);
+		if (Maps.Count(name))
+			return Maps.Get(name);
+		return nullptr;
+		/*std::unique_lock<std::mutex> lock(mMutexMapList);
 		if (mmpMapList.count(name)) {
 			return mmpMapList[name];
 		}
-		return nullptr;
+		return nullptr;*/
 	}
 	void SLAM::RemoveMap(std::string name) {
-		std::unique_lock<std::mutex> lock(mMutexMapList);
-		mmpMapList.erase(name);
+		if (Maps.Count(name))
+			Maps.Erase(name);
+		/*std::unique_lock<std::mutex> lock(mMutexMapList);
+		mmpMapList.erase(name);*/
 	}
 }
