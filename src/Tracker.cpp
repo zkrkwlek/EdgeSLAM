@@ -52,6 +52,8 @@ namespace EdgeSLAM {
 		cv::Mat fdata = cv::Mat::zeros(3, 3, CV_32FC1);
 		std::memcpy(fdata.data, res.data(), res.size());
 		user->UpdateGyro(fdata);
+
+		delete mpAPI;
 	}
 	void Tracker::Track(ThreadPool::ThreadPool* pool, SLAM* system, int id, User* user, double ts) {
 		if (user->mbProgress)
@@ -59,6 +61,13 @@ namespace EdgeSLAM {
 		user->mbProgress = true;
 		auto cam = user->mpCamera;
 		auto map = user->mpMap;
+
+		//time analysis
+		float t_local = 1000.0;
+		float t_send = 1000.0;
+		float t_prev = 1000.0;
+		float t_init = 1000.0;
+		float t_frame = 1000.0;
 
 		LocalMap* pLocalMap = new LocalCovisibilityMap();
 
@@ -83,13 +92,15 @@ namespace EdgeSLAM {
 		cv::imwrite(sss.str(), img);*/
 		/////save image
 		
+		std::chrono::high_resolution_clock::time_point t_frame_s = std::chrono::high_resolution_clock::now();
 		Frame* frame = new Frame(img, cam, id, ts);
-		//user->mapFrames[frame->mnFrameID] = frame;
+		std::chrono::high_resolution_clock::time_point t_frame_e = std::chrono::high_resolution_clock::now();
+		auto du_frame = std::chrono::duration_cast<std::chrono::milliseconds>(t_frame_e - t_frame_s).count();
+		t_frame = du_frame / 1000.0;
+		
 		user->mapFrames.Update(frame->mnFrameID, frame);
 		user->mnCurrFrameID = frame->mnFrameID;
 		
-		//time analysis
-		float t_local = 1000.0;
 		//std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
 
 		auto mapState = map->GetState();
@@ -101,6 +112,7 @@ namespace EdgeSLAM {
 			map->SetState(MapState::NotInitialized);
 			system->mpInitializer->Init(frame);
 		}
+
 		if (mapState == MapState::NotInitialized) {
 			//initialization
 			auto res = system->mpInitializer->Initialize(frame, map);
@@ -129,6 +141,7 @@ namespace EdgeSLAM {
 				}
 			}
 		}
+
 		if (mapState == MapState::Initialized) {
 			bool bTrack = false;
 			if (userState == UserState::NotEstimated || userState == UserState::Failed) {
@@ -166,8 +179,14 @@ namespace EdgeSLAM {
 						Tpredict = user->PredictPose();
 					}
 					frame->SetPose(Tpredict);
+					std::chrono::high_resolution_clock::time_point t_prev_start = std::chrono::high_resolution_clock::now();
 					bTrack = Tracker::TrackWithPrevFrame(f_ref, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+					std::chrono::high_resolution_clock::time_point t_prev_end = std::chrono::high_resolution_clock::now();
+					auto du_prev = std::chrono::duration_cast<std::chrono::milliseconds>(t_prev_end - t_prev_start).count();
+					t_prev = du_prev / 1000.0;
 
+					auto du_init = std::chrono::duration_cast<std::chrono::milliseconds>(t_prev_start - received).count();
+					t_init = du_init / 1000.0;
 					if (!bTrack) {
 						std::cout << "track with reference frame :: start" << std::endl;
 						std::cout << "track with reference frame :: end" << std::endl;
@@ -210,8 +229,9 @@ namespace EdgeSLAM {
 			}
 			if (bTrack)
 				trackState = UserState::Success;
+			
 			pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, user, pLocalMap, frame, nInliers, id);
-
+			
 		}
 		
 		user->SetState(trackState);
@@ -277,7 +297,10 @@ namespace EdgeSLAM {
 		auto du_test2 = std::chrono::duration_cast<std::chrono::milliseconds>(end - received).count();
 		float t_test2 = du_test2 / 1000.0;
 
-		std::cout << "Frame = " << user->userName << " : " << id << ", Matches = " << nInliers << ", time =" << t_test1 <<", "<< t_test2<<", "<< t_local << std::endl;
+		delete pLocalMap;
+		delete mpAPI;
+
+		std::cout << "Frame = " << user->userName << " : " << id << ", Matches = " << nInliers << ", time =" << t_test1 <<", "<< t_test2<<"="<< t_local <<" "<<t_prev<<" "<< t_init <<" "<<t_frame<< std::endl;
 		system->UpdateTrackingTime(t_test1);
 
 		////visualization
@@ -342,7 +365,6 @@ namespace EdgeSLAM {
 	bool Tracker::TrackWithPrevFrame(Frame* prev, Frame* cur, float thMaxDesc, float thMinDesc){
 		cur->reset_map_points();
 		int res =SearchPoints::SearchFrameByProjection(prev, cur, thMaxDesc, thMinDesc);
-
 		if (res < 20) {
 			cur->reset_map_points();
 			res = SearchPoints::SearchFrameByProjection(prev, cur, thMaxDesc, thMinDesc, 30.0);
@@ -351,6 +373,7 @@ namespace EdgeSLAM {
 			std::cout << "Matching prev fail!!!" << std::endl;
 			return false;
 		}
+		
 		int nopt = Optimizer::PoseOptimization(cur);
 		
 		// Discard outliers
@@ -425,6 +448,7 @@ namespace EdgeSLAM {
 				
 				int nmatches = SearchPoints::SearchFrameByBoW(pKF, cur, vvpMapPointMatches[i], thMinDesc, 0.75);
 				std::cout << "Match = " << i << "=" << nmatches << std::endl;
+				std::cout << vvpMapPointMatches[i].size() << std::endl;
 				if (nmatches<15)
 				{
 					vbDiscarded[i] = true;
@@ -442,7 +466,7 @@ namespace EdgeSLAM {
 				}*/
 			}
 		}
-		
+		std::cout << "Reloc = temp = "<< nKFs<<" "<<nCandidates << std::endl;
 		// Alternatively perform some iterations of P4P RANSAC
 		// Until we found a camera pose supported by enough inliers
 		bool bMatch = false;
@@ -477,7 +501,7 @@ namespace EdgeSLAM {
 						sFound.insert(vvpMapPointMatches[i][j]);
 					}
 				}
-
+				std::cout << "1" << std::endl;
 				nGood = Optimizer::PoseOptimization(cur);
 				//vnGoods[i] = nGood;
 				std::cout << "relocalization="<<i<<"=init::ngood=" << nGood << std::endl;

@@ -13,19 +13,19 @@ namespace EdgeSLAM {
 
 		mN1 = vpMatched12.size();
 
-		mvpMapPoints1.reserve(mN1);
-		mvpMapPoints2.reserve(mN1);
+		//mvpMapPoints1.reserve(mN1);
+		//mvpMapPoints2.reserve(mN1);
 		mvpMatches12 = vpMatched12;
-		mvnIndices1.reserve(mN1);
-		mvX3Dc1.reserve(mN1);
-		mvX3Dc2.reserve(mN1);
+		//mvnIndices1.reserve(mN1);
+		//mvX3Dc1.reserve(mN1);
+		//mvX3Dc2.reserve(mN1);
 
 		cv::Mat Rcw1 = pKF1->GetRotation();
 		cv::Mat tcw1 = pKF1->GetTranslation();
 		cv::Mat Rcw2 = pKF2->GetRotation();
 		cv::Mat tcw2 = pKF2->GetTranslation();
 
-		mvAllIndices.reserve(mN1);
+		//mvAllIndices.reserve(mN1);
 
 		size_t idx = 0;
 		for (int i1 = 0; i1<mN1; i1++)
@@ -356,7 +356,7 @@ namespace EdgeSLAM {
 		const float &cy = K.at<float>(1, 2);
 
 		vP2D.clear();
-		vP2D.reserve(vP3Dw.size());
+		//vP2D.reserve(vP3Dw.size());
 
 		for (size_t i = 0, iend = vP3Dw.size(); i<iend; i++)
 		{
@@ -377,7 +377,7 @@ namespace EdgeSLAM {
 		const float &cy = K.at<float>(1, 2);
 
 		vP2D.clear();
-		vP2D.reserve(vP3Dc.size());
+		//vP2D.reserve(vP3Dc.size());
 
 		for (size_t i = 0, iend = vP3Dc.size(); i<iend; i++)
 		{

@@ -231,6 +231,7 @@ namespace EdgeSLAM {
 					
 					cv::circle(tempVis, tpt, 2, color, -1);
 				}
+				std::vector<MapPoint*>().swap(mmpMap);
 
 				{
 					
@@ -254,6 +255,7 @@ namespace EdgeSLAM {
 						tpt += mVisMidPt;
 						cv::circle(tempVis, tpt, 4, color, -1);
 					}
+					objMap.release();
 				}
 			}
 
@@ -334,6 +336,7 @@ namespace EdgeSLAM {
 						cv::circle(tempVis, pt1, 2, userColors[i], -1);
 					}
 				}
+				std::vector<User*>().swap(vpUsers);
 			}
 
 			SetOutputImage(tempVis, 4);

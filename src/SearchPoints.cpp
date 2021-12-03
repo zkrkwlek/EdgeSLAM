@@ -11,18 +11,13 @@ namespace EdgeSLAM {
 
 		// Rotation Histogram (to check rotation consistency)
 		std::vector<int> rotHist[HISTO_LENGTH];
-		for (int i = 0; i<HISTO_LENGTH; i++)
-			rotHist[i].reserve(500);
 		const float factor = 1.0f / HISTO_LENGTH;
-
-
+		
 		std::vector<bool> bMatches = std::vector<bool>(curr->N, false);
 		DBoW3::FeatureVector::const_iterator KFit = fvec.begin();
 		DBoW3::FeatureVector::const_iterator Fit = curr->mFeatVec.begin();
 		DBoW3::FeatureVector::const_iterator KFend = fvec.end();
 		DBoW3::FeatureVector::const_iterator Fend = curr->mFeatVec.end();
-
-		FeatureTracker* mpFeatureTracker = new FlannFeatureTracker(1500);
 
 		while (KFit != KFend && Fit != Fend)
 		{
@@ -50,7 +45,7 @@ namespace EdgeSLAM {
 
 						const cv::Mat &dF = curr->mDescriptors.row(realIdxF);
 
-						const int dist = (int)mpFeatureTracker->DescriptorDistance(dKF, dF);
+						const int dist = (int)Matcher->DescriptorDistance(dKF, dF);
 						std::cout <<"a "<< dist << std::endl;
 						if (dist<bestDist1)
 						{
@@ -113,12 +108,14 @@ namespace EdgeSLAM {
 				matches.push_back(std::make_pair(i, bestIdx2));
 			}
 		}*/
+		/*for (int i = 0; i < HISTO_LENGTH; i++)
+			std::vector<int>().swap(rotHist[i]);*/
 		return nmatches;
 	}
 
 	int SearchPoints::SearchKeyFrameByBoW(KeyFrame* pKF1, KeyFrame *pKF2, std::vector<MapPoint*> &vpMatches12, float thMatchRatio, bool bCheckOri)
 	{
-		FeatureTracker* mpFeatureTracker = new FlannFeatureTracker(1500);
+		
 		const std::vector<cv::KeyPoint> &vKeysUn1 = pKF1->mvKeysUn;
 		const DBoW3::FeatureVector &vFeatVec1 = pKF1->mFeatVec;
 		const std::vector<MapPoint*> vpMapPoints1 = pKF1->GetMapPointMatches();
@@ -133,9 +130,7 @@ namespace EdgeSLAM {
 		std::vector<bool> vbMatched2(vpMapPoints2.size(), false);
 
 		std::vector<int> rotHist[HISTO_LENGTH];
-		for (int i = 0; i<HISTO_LENGTH; i++)
-			rotHist[i].reserve(500);
-
+		
 		const float factor = 1.0f / HISTO_LENGTH;
 
 		int nmatches = 0;
@@ -179,7 +174,7 @@ namespace EdgeSLAM {
 
 						const cv::Mat &d2 = Descriptors2.row(idx2);
 
-						int dist = mpFeatureTracker->DescriptorDistance(d1, d2);
+						int dist = Matcher->DescriptorDistance(d1, d2);
 
 						if (dist<bestDist1)
 						{
@@ -193,7 +188,7 @@ namespace EdgeSLAM {
 						}
 					}
 
-					if (bestDist1<mpFeatureTracker->min_descriptor_distance)
+					if (bestDist1<Matcher->min_descriptor_distance)
 					{
 						if (static_cast<float>(bestDist1)<thMatchRatio*static_cast<float>(bestDist2))
 						{
@@ -248,21 +243,22 @@ namespace EdgeSLAM {
 				}
 			}
 		}
-
+		/*for (int i = 0; i < HISTO_LENGTH; i++)
+			std::vector<int>().swap(rotHist[i]);*/
 		return nmatches;
 	}
 	int SearchPoints::SearchFrameByBoW(KeyFrame* pKF, Frame *F, std::vector<MapPoint*> &vpMapPointMatches, float thMinDesc, float thMatchRatio, bool bCheckOri) {
-		FeatureTracker* mpFeatureTracker = new FlannFeatureTracker(1500);
+		
 		const auto vpMapPointsKF = pKF->GetMapPointMatches();
 		
 		vpMapPointMatches = std::vector<MapPoint*>(F->N, static_cast<MapPoint*>(nullptr));
-
+		std::cout << "???" << vpMapPointMatches.size() << " " << F->N << std::endl;
 		const DBoW3::FeatureVector &vFeatVecKF = pKF->mFeatVec;
 		int nmatches = 0;
 
 		std::vector<int> rotHist[HISTO_LENGTH];
-		for (int i = 0; i<HISTO_LENGTH; i++)
-			rotHist[i].reserve(500);
+		/*for (int i = 0; i<HISTO_LENGTH; i++)
+			rotHist[i].reserve(500);*/
 		const float factor = 1.0f / HISTO_LENGTH;
 
 		// We perform the matching over ORB that belong to the same vocabulary node (at a certain level)
@@ -302,7 +298,7 @@ namespace EdgeSLAM {
 
 						const cv::Mat &dF = F->mDescriptors.row(realIdxF);
 
-						const int dist = (int)mpFeatureTracker->DescriptorDistance(dKF, dF);
+						const int dist = (int)Matcher->DescriptorDistance(dKF, dF);
 
 						if (dist<bestDist1)
 						{
@@ -372,18 +368,19 @@ namespace EdgeSLAM {
 				}
 			}
 		}
+		/*for(int i = 0; i < HISTO_LENGTH; i++)
+			std::vector<int>().swap(rotHist[i]);*/
 		return nmatches;
 	}
 
 	int SearchPoints::SearchFrameByProjection(Frame* prev, Frame* curr, float thMaxDesc, float thMinDesc, float thProjection, bool bCheckOri) {
 
 		int nmatches = 0;
-		FeatureTracker* mpFeatureTracker = new FlannFeatureTracker(1500);
-
+		
 		// Rotation Histogram (to check rotation consistency)
 		std::vector<int> rotHist[HISTO_LENGTH];
-		for (int i = 0; i<HISTO_LENGTH; i++)
-			rotHist[i].reserve(500);
+		/*for (int i = 0; i<HISTO_LENGTH; i++)
+			rotHist[i].reserve(500);*/
 		float factor = 1.0f / HISTO_LENGTH;
 		cv::Mat Tcw = curr->GetPose();
 		cv::Mat Rcw = Tcw.rowRange(0, 3).colRange(0, 3);
@@ -446,7 +443,7 @@ namespace EdgeSLAM {
 
 						cv::Mat &d = curr->mDescriptors.row(i2);
 
-						int dist = (int)mpFeatureTracker->DescriptorDistance(dMP, d);
+						int dist = (int)Matcher->DescriptorDistance(dMP, d);
 
 						if (dist<bestDist)
 						{
@@ -496,13 +493,14 @@ namespace EdgeSLAM {
 				}
 			}
 		}
+		/*for (int i = 0; i < HISTO_LENGTH; i++)
+			std::vector<int>().swap(rotHist[i]);*/
 		return nmatches;
 	}
 
 	int SearchPoints::SearchFrameByProjection(Frame *pF, KeyFrame *pKF, const std::set<MapPoint*> &sAlreadyFound, const float th, const int ORBdist, bool bCheckOri) {
-		FeatureTracker* mpFeatureTracker = new FlannFeatureTracker(1500);
+		
 		int nmatches = 0;
-
 
 		const cv::Mat Rcw = pF->GetRotation();
 		const cv::Mat tcw = pF->GetTranslation();
@@ -510,8 +508,8 @@ namespace EdgeSLAM {
 
 		// Rotation Histogram (to check rotation consistency)
 		std::vector<int> rotHist[HISTO_LENGTH];
-		for (int i = 0; i<HISTO_LENGTH; i++)
-			rotHist[i].reserve(500);
+		/*for (int i = 0; i<HISTO_LENGTH; i++)
+			rotHist[i].reserve(500);*/
 		const float factor = 1.0f / HISTO_LENGTH;
 
 		const auto vpMPs = pKF->GetMapPointMatches();
@@ -583,7 +581,7 @@ namespace EdgeSLAM {
 
 						const cv::Mat &d = pF->mDescriptors.row(i2);
 
-						const int dist = (int)mpFeatureTracker->DescriptorDistance(dMP, d);
+						const int dist = (int)Matcher->DescriptorDistance(dMP, d);
 
 						if (dist<bestDist)
 						{
@@ -634,11 +632,12 @@ namespace EdgeSLAM {
 				}
 			}
 		}
-
+		/*for (int i = 0; i < HISTO_LENGTH; i++)
+			std::vector<int>().swap(rotHist[i]);*/
 		return nmatches;
 	}
 	int SearchPoints::SearchKeyByProjection(KeyFrame* pKF, cv::Mat Scw, const std::vector<MapPoint*> &vpPoints, std::vector<MapPoint*> &vpMatched, float thRadius) {
-		FeatureTracker* mpFeatureTracker = new FlannFeatureTracker(1500);
+		
 		// Get Calibration Parameters for later projection
 		const float &fx = pKF->fx;
 		const float &fy = pKF->fy;
@@ -732,7 +731,7 @@ namespace EdgeSLAM {
 
 				const cv::Mat &dKF = pKF->mDescriptors.row(idx);
 
-				const int dist = mpFeatureTracker->DescriptorDistance(dMP, dKF);
+				const int dist = Matcher->DescriptorDistance(dMP, dKF);
 
 				if (dist<bestDist)
 				{
@@ -741,7 +740,7 @@ namespace EdgeSLAM {
 				}
 			}
 
-			if (bestDist <= mpFeatureTracker->min_descriptor_distance)
+			if (bestDist <= Matcher->min_descriptor_distance)
 			{
 				vpMatched[bestIdx] = pMP;
 				nmatches++;
@@ -753,7 +752,7 @@ namespace EdgeSLAM {
 	}
 	int SearchPoints::SearchMapByProjection(Frame *F, const std::vector<MapPoint*> &vpMapPoints, const std::vector<TrackPoint*> &vpTrackPoints, float thMaxDesc, float thMinDesc, float thRadius, float thMatchRatio, bool bCheckOri)
 	{
-		FeatureTracker* mpFeatureTracker = new FlannFeatureTracker(1500);
+		
 		int nmatches = 0;
 		const bool bFactor = thRadius != 1.0;
 
@@ -797,7 +796,7 @@ namespace EdgeSLAM {
 				}
 				const cv::Mat &d = F->mDescriptors.row(idx);
 
-				const int dist = (int)mpFeatureTracker->DescriptorDistance(MPdescriptor, d);
+				const int dist = (int)Matcher->DescriptorDistance(MPdescriptor, d);
 
 				if (dist<bestDist)
 				{
@@ -831,7 +830,7 @@ namespace EdgeSLAM {
 	int SearchPoints::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint*> &vpMatches12,
 		const float &s12, const cv::Mat &R12, const cv::Mat &t12, float thRadius)
 	{
-		FeatureTracker* mpFeatureTracker = new FlannFeatureTracker(1500);
+		
 		const float &fx = pKF1->fx;
 		const float &fy = pKF1->fy;
 		const float &cx = pKF1->cx;
@@ -939,7 +938,7 @@ namespace EdgeSLAM {
 
 				const cv::Mat &dKF = pKF2->mDescriptors.row(idx);
 
-				const int dist = mpFeatureTracker->DescriptorDistance(dMP, dKF);
+				const int dist = Matcher->DescriptorDistance(dMP, dKF);
 
 				if (dist<bestDist)
 				{
@@ -948,7 +947,7 @@ namespace EdgeSLAM {
 				}
 			}
 
-			if (bestDist <= mpFeatureTracker->max_descriptor_distance)
+			if (bestDist <= Matcher->max_descriptor_distance)
 			{
 				vnMatch1[i1] = bestIdx;
 			}
@@ -1019,7 +1018,7 @@ namespace EdgeSLAM {
 
 				const cv::Mat &dKF = pKF1->mDescriptors.row(idx);
 
-				const int dist = mpFeatureTracker->DescriptorDistance(dMP, dKF);
+				const int dist = Matcher->DescriptorDistance(dMP, dKF);
 
 				if (dist<bestDist)
 				{
@@ -1028,7 +1027,7 @@ namespace EdgeSLAM {
 				}
 			}
 
-			if (bestDist <= mpFeatureTracker->max_descriptor_distance)
+			if (bestDist <= Matcher->max_descriptor_distance)
 			{
 				vnMatch2[i2] = bestIdx;
 			}
@@ -1056,7 +1055,7 @@ namespace EdgeSLAM {
 	}
 
 	int SearchPoints::SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2, cv::Mat F12, std::vector<std::pair<size_t, size_t> > &vMatchedPairs, float thRatio, bool bCheckOri) {
-		FeatureTracker* mpFeatureTracker = new FlannFeatureTracker(1500);
+		
 		const DBoW3::FeatureVector &vFeatVec1 = pKF1->mFeatVec;
 		const DBoW3::FeatureVector &vFeatVec2 = pKF2->mFeatVec;
 
@@ -1078,8 +1077,8 @@ namespace EdgeSLAM {
 		std::vector<int> vMatches12(pKF1->N, -1);
 
 		std::vector<int> rotHist[HISTO_LENGTH];
-		for (int i = 0; i<HISTO_LENGTH; i++)
-			rotHist[i].reserve(500);
+		/*for (int i = 0; i<HISTO_LENGTH; i++)
+			rotHist[i].reserve(500);*/
 
 		const float factor = 1.0f / HISTO_LENGTH;
 
@@ -1106,7 +1105,7 @@ namespace EdgeSLAM {
 
 					const cv::Mat &d1 = pKF1->mDescriptors.row(idx1);
 
-					int bestDist = mpFeatureTracker->min_descriptor_distance;
+					int bestDist = Matcher->min_descriptor_distance;
 					int bestIdx2 = -1;
 					
 					for (size_t i2 = 0, iend2 = f2it->second.size(); i2<iend2; i2++)
@@ -1121,9 +1120,9 @@ namespace EdgeSLAM {
 
 						const cv::Mat &d2 = pKF2->mDescriptors.row(idx2);
 
-						const int dist = (int)mpFeatureTracker->DescriptorDistance(d1, d2);
+						const int dist = (int)Matcher->DescriptorDistance(d1, d2);
 
-						if (dist>mpFeatureTracker->min_descriptor_distance || dist>bestDist)
+						if (dist>Matcher->min_descriptor_distance || dist>bestDist)
 							continue;
 
 						const cv::KeyPoint &kp2 = pKF2->mvKeysUn[idx2];
@@ -1197,7 +1196,7 @@ namespace EdgeSLAM {
 		}
 
 		vMatchedPairs.clear();
-		vMatchedPairs.reserve(nmatches);
+		//vMatchedPairs.reserve(nmatches);
 
 		for (size_t i = 0, iend = vMatches12.size(); i<iend; i++)
 		{
@@ -1211,8 +1210,7 @@ namespace EdgeSLAM {
 
 	int SearchPoints::Fuse(KeyFrame *pKF, const std::vector<MapPoint *> &vpMapPoints, const float th)
 	{
-		FeatureTracker* mpFeatureTracker = new FlannFeatureTracker(1500);
-
+		
 		cv::Mat Rcw = pKF->GetRotation();
 		cv::Mat tcw = pKF->GetTranslation();
 
@@ -1308,7 +1306,7 @@ namespace EdgeSLAM {
 
 				const cv::Mat &dKF = pKF->mDescriptors.row(idx);
 
-				const int dist = (int)mpFeatureTracker->DescriptorDistance(dMP, dKF);
+				const int dist = (int)Matcher->DescriptorDistance(dMP, dKF);
 
 				if (dist<bestDist)
 				{
@@ -1318,7 +1316,7 @@ namespace EdgeSLAM {
 			}
 
 			// If there is already a MapPoint replace otherwise add new measurement
-			if (bestDist <= mpFeatureTracker->min_descriptor_distance)
+			if (bestDist <= Matcher->min_descriptor_distance)
 			{
 				MapPoint* pMPinKF = pKF->GetMapPoint(bestIdx);
 				if (pMPinKF)
@@ -1344,8 +1342,6 @@ namespace EdgeSLAM {
 	}
 
 	int SearchPoints::Fuse(KeyFrame *pKF, cv::Mat Scw, const std::vector<MapPoint *> &vpPoints, std::vector<MapPoint *> &vpReplacePoint, float thRadius) {
-
-		FeatureTracker* mpFeatureTracker = new FlannFeatureTracker(1500);
 
 		// Get Calibration Parameters for later projection
 		const float &fx = pKF->fx;
@@ -1440,7 +1436,7 @@ namespace EdgeSLAM {
 
 				const cv::Mat &dKF = pKF->mDescriptors.row(idx);
 
-				int dist = mpFeatureTracker->DescriptorDistance(dMP, dKF);
+				int dist = Matcher->DescriptorDistance(dMP, dKF);
 
 				if (dist<bestDist)
 				{
@@ -1450,7 +1446,7 @@ namespace EdgeSLAM {
 			}
 
 			// If there is already a MapPoint replace otherwise add new measurement
-			if (bestDist <= mpFeatureTracker->min_descriptor_distance)
+			if (bestDist <= Matcher->min_descriptor_distance)
 			{
 				MapPoint* pMPinKF = pKF->GetMapPoint(bestIdx);
 				if (pMPinKF)

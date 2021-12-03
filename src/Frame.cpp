@@ -21,12 +21,14 @@ namespace EdgeSLAM {
 		
 	}
 	Frame::Frame(cv::Mat img, Camera* pCam, int id, double time_stamp):mnFrameID(id), mdTimeStamp(time_stamp), mpCamera(pCam),
-		K(pCam->K), D(pCam->D), InvK(pCam->Kinv), fx(pCam->fx),fy(pCam->fy), cx(pCam->cx), cy(pCam->cy), invfx(pCam->invfx), invfy(pCam->invfy), mnMinX(pCam->u_min), mnMaxX(pCam->u_max), mnMinY(pCam->v_min), mnMaxY(pCam->v_max), mfGridElementWidthInv(pCam->mfGridElementWidthInv), mfGridElementHeightInv(pCam->mfGridElementHeightInv), FRAME_GRID_COLS(pCam->mnGridCols), FRAME_GRID_ROWS(pCam->mnGridRows), mbDistorted(pCam->bDistorted)
+		K(pCam->K), D(pCam->D), InvK(pCam->Kinv), fx(pCam->fx),fy(pCam->fy), cx(pCam->cx), cy(pCam->cy), invfx(pCam->invfx), invfy(pCam->invfy), mnMinX(pCam->u_min), mnMaxX(pCam->u_max), mnMinY(pCam->v_min), mnMaxY(pCam->v_max), mfGridElementWidthInv(pCam->mfGridElementWidthInv), mfGridElementHeightInv(pCam->mfGridElementHeightInv), FRAME_GRID_COLS(pCam->mnGridCols), FRAME_GRID_ROWS(pCam->mnGridRows), mbDistorted(pCam->bDistorted),
+		mnScaleLevels(Detector->mnScaleLevels), mfScaleFactor(Detector->mfScaleFactor), mfLogScaleFactor(Detector->mfLogScaleFactor), mvScaleFactors(Detector->mvScaleFactors), mvInvScaleFactors(Detector->mvInvScaleFactors), mvLevelSigma2(Detector->mvLevelSigma2), mvInvLevelSigma2(Detector->mvInvLevelSigma2)
 	{
 		mpCamPose = new CameraPose();
 		imgColor = img.clone();
 		cv::cvtColor(img, imgGray, cv::COLOR_BGR2GRAY);//COLOR_BGR2GRAY
-		FeatureDetector* mpDetector = new ORBDetector(1500);
+		Detector->detectAndCompute(imgGray, cv::Mat(), mvKeys, mDescriptors);
+		/*FeatureDetector* mpDetector = new ORBDetector(1500);
 		mpDetector->detectAndCompute(imgGray, cv::Mat(), mvKeys, mDescriptors);
 		mnScaleLevels=(mpDetector->mnScaleLevels);
 		mfScaleFactor = (mpDetector->mfScaleFactor);
@@ -34,7 +36,7 @@ namespace EdgeSLAM {
 		mvScaleFactors = (mpDetector->mvScaleFactors);
 		mvInvScaleFactors = (mpDetector->mvInvScaleFactors);
 		mvLevelSigma2 = (mpDetector->mvLevelSigma2);
-		mvInvLevelSigma2 = (mpDetector->mvInvLevelSigma2);
+		mvInvLevelSigma2 = (mpDetector->mvInvLevelSigma2);*/
 
 		N = mvKeys.size();
 
@@ -49,7 +51,35 @@ namespace EdgeSLAM {
 		
 		AssignFeaturesToGrid();
 	}
-	Frame::~Frame(){}
+	Frame::~Frame(){
+		for (int i = 0; i < FRAME_GRID_COLS; i++)
+		{
+			for (int j = 0; j < FRAME_GRID_ROWS; j++)
+			{
+				std::vector<size_t>().swap(mGrid[i][j]);
+			}
+			delete[] mGrid[i];
+		}
+		delete[] mGrid;
+		/*
+		delete mGrid;*/
+		//delete mpCamPose;
+		//mpCamera = nullptr;
+				
+		std::vector<float>().swap(mvScaleFactors);
+		std::vector<float>().swap(mvInvScaleFactors);
+		std::vector<float>().swap(mvLevelSigma2);
+		std::vector<float>().swap(mvInvLevelSigma2);
+		std::vector<cv::KeyPoint>().swap(mvKeys);
+		std::vector<cv::KeyPoint>().swap(mvKeysUn);
+		std::vector<MapPoint*>().swap(mvpMapPoints);
+		std::set<MapPoint*>().swap(mspMapPoints);
+		std::vector<TrackPoint*>().swap(mvpTrackPoints);
+		std::vector<bool>().swap(mvbOutliers);
+		imgColor.release();
+		imgGray.release();
+		mDescriptors.release();
+	}
 	bool Frame::is_in_frustum(MapPoint* pMP, TrackPoint* pTP, float viewingCosLimit) {
 		
 		cv::Mat P = pMP->GetWorldPos();
@@ -162,6 +192,11 @@ namespace EdgeSLAM {
 		return mpCamera->is_in_image(x, y, z);
 	}
 	void Frame::reset_map_points(){
+
+		std::vector<MapPoint*>().swap(mvpMapPoints);
+		std::vector<TrackPoint*>().swap(mvpTrackPoints);
+		std::vector<bool>().swap(mvbOutliers);
+
 		mvpMapPoints = std::vector<MapPoint*>(mvKeysUn.size(), nullptr);
 		mvpTrackPoints = std::vector<TrackPoint*>(mvKeysUn.size(), nullptr);
 		mvbOutliers = std::vector<bool>(mvKeysUn.size(), false);
@@ -208,7 +243,7 @@ namespace EdgeSLAM {
 
 	std::vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const float  &r, const int minLevel, const int maxLevel)const{
 		std::vector<size_t> vIndices;
-		vIndices.reserve(N);
+		//vIndices.reserve(N);
 
 		const int nMinCellX = std::max(0, (int)floor((x - mnMinX - r)*mfGridElementWidthInv));
 		if (nMinCellX >= FRAME_GRID_COLS)
@@ -282,9 +317,9 @@ namespace EdgeSLAM {
 	}
 	void Frame::AssignFeaturesToGrid(){
 		int nReserve = 0.5f*N / (FRAME_GRID_COLS*FRAME_GRID_ROWS);
-		for (unsigned int i = 0; i<FRAME_GRID_COLS; i++)
+		/*for (unsigned int i = 0; i<FRAME_GRID_COLS; i++)
 			for (unsigned int j = 0; j<FRAME_GRID_ROWS; j++)
-				mGrid[i][j].reserve(nReserve);
+				mGrid[i][j].reserve(nReserve);*/
 
 		for (int i = 0; i<N; i++)
 		{

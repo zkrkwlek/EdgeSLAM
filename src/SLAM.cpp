@@ -11,6 +11,7 @@
 #include <MapPoint.h>
 #include <Visualizer.h>
 #include <Segmentator.h>
+#include <SearchPoints.h>
 #include <Converter.h>
 
 namespace EdgeSLAM {
@@ -19,8 +20,10 @@ namespace EdgeSLAM {
 		Init();
 	}
 	SLAM::~SLAM(){}
+	FeatureDetector* Frame::Detector;
 	FeatureDetector* Segmentator::Detector;
 	FeatureTracker* Segmentator::Matcher;
+	FeatureTracker* SearchPoints::Matcher;
 	
 	FeatureTracker* MapPoint::mpDist;
 	DBoW3::Vocabulary* KeyFrame::mpVoc;
@@ -45,9 +48,11 @@ namespace EdgeSLAM {
 		//set method
 		KeyFrame::mpVoc = mpDBoWVoc;
 		Frame::mpVoc = mpDBoWVoc;
+		Frame::Detector = mpFeatureTracker->detector;
 		Segmentator::Detector = mpFeatureTracker->detector;
 		Segmentator::Matcher = mpFeatureTracker;
 		MapPoint::mpDist = mpFeatureTracker;
+		SearchPoints::Matcher = mpFeatureTracker;
 		mpInitializer->mpFeatureTracker = mpFeatureTracker;
 
 		mnVisID = 0;
@@ -145,6 +150,7 @@ namespace EdgeSLAM {
 		//pUser->AddDevicePosition(pos);
 	}
 	void SLAM::AddUser(std::string id, User* user) {
+		SetUserVisID(user);
 		Users.Update(id, user);
 		/*std::unique_lock<std::mutex> lock(mMutexUserList);
 		SetUserVisID(user);
@@ -183,7 +189,9 @@ namespace EdgeSLAM {
 		bool bDelete = false;
 		{
 			if (Users.Count(id)) {
+				auto user = Users.Get(id);
 				Users.Erase(id);
+				delete user;
 				bDelete = true;
 			}
 			/*std::unique_lock<std::mutex> lock(mMutexUserList);

@@ -112,7 +112,7 @@ namespace EdgeSLAM {
 		int th = 15;
 
 		std::vector<std::pair<int, KeyFrame*> > vPairs;
-		vPairs.reserve(KFcounter.size());
+		//vPairs.reserve(KFcounter.size());
 		for (std::map<KeyFrame*, int>::iterator mit = KFcounter.begin(), mend = KFcounter.end(); mit != mend; mit++)
 		{
 			if (mit->second>nmax)
@@ -163,7 +163,7 @@ namespace EdgeSLAM {
 	{
 		std::unique_lock<std::mutex> lock(mMutexConnections);
 		std::vector<std::pair<int, KeyFrame*> > vPairs;
-		vPairs.reserve(mConnectedKeyFrameWeights.size());
+		//vPairs.reserve(mConnectedKeyFrameWeights.size());
 		for (std::map<KeyFrame*, int>::iterator mit = mConnectedKeyFrameWeights.begin(), mend = mConnectedKeyFrameWeights.end(); mit != mend; mit++)
 			vPairs.push_back(std::make_pair(mit->second, mit->first));
 
@@ -484,7 +484,7 @@ namespace EdgeSLAM {
 	std::vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, const float &r) const
 	{
 		std::vector<size_t> vIndices;
-		vIndices.reserve(N);
+		//vIndices.reserve(N);
 
 		const int nMinCellX = std::max(0, (int)floor((x - mnMinX - r)*mfGridElementWidthInv));
 		if (nMinCellX >= mnGridCols)
@@ -527,7 +527,7 @@ namespace EdgeSLAM {
 		cv::Mat Tcw_ = mpCamPose->GetPose();
 
 		std::vector<float> vDepths;
-		vDepths.reserve(N);
+		//vDepths.reserve(N);
 		cv::Mat Rcw2 = Tcw_.row(2).colRange(0, 3);
 		Rcw2 = Rcw2.t();
 		float zcw = Tcw_.at<float>(2, 3);

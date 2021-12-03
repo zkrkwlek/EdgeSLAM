@@ -10,7 +10,7 @@ namespace EdgeSLAM {
 		mpCamPose = new CameraPose(_T);
 	}
 	MotionModel::~MotionModel(){
-	
+		delete mpCamPose;
 	}
 	
 	cv::Mat MotionModel::predict(){

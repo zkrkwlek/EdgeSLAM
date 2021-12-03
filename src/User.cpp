@@ -1,4 +1,5 @@
 #include <User.h>
+#include <Frame.h>
 #include <Map.h>
 #include <Camera.h>
 #include <CameraPose.h>
@@ -20,7 +21,25 @@ namespace EdgeSLAM {
 		mpMap = nullptr;
 	}
 	User::~User() {
+		//delete mpCamera;
+		delete mpCamPose;
+		delete mpMotionModel;
+		mpMap = nullptr;
 
+		auto vecFrames = mapFrames.Get();
+		for (auto iter = vecFrames.begin(), iend = vecFrames.end(); iter != iend; iter++) {
+			auto frame = iter->second;
+			delete frame;
+		}
+		auto vecObjFrames = objFrames.Get();
+		for (auto iter = vecObjFrames.begin(), iend = vecObjFrames.end(); iter != iend; iter++) {
+			auto frame = iter->second;
+			delete frame;
+		}
+		mapFrames.Release();
+		objFrames.Release();
+		std::vector<cv::Mat>().swap(mVecDevicePositions);
+		//delete mapFrames;
 	}
 
 	bool mbMotionModel;

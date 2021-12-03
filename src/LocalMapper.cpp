@@ -349,7 +349,7 @@ namespace EdgeSLAM {
 
 		// Search matches by projection from target KFs in current KF
 		std::vector<MapPoint*> vpFuseCandidates;
-		vpFuseCandidates.reserve(vpTargetKFs.size()*vpMapPointMatches.size());
+		//vpFuseCandidates.reserve(vpTargetKFs.size()*vpMapPointMatches.size());
 
 		for (std::vector<KeyFrame*>::iterator vitKF = vpTargetKFs.begin(), vendKF = vpTargetKFs.end(); vitKF != vendKF; vitKF++)
 		{

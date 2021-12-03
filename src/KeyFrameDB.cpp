@@ -155,7 +155,7 @@ namespace EdgeSLAM {
 
 		std::set<KeyFrame*> spAlreadyAddedKF;
 		std::vector<KeyFrame*> vpLoopCandidates;
-		vpLoopCandidates.reserve(lAccScoreAndMatch.size());
+		//vpLoopCandidates.reserve(lAccScoreAndMatch.size());
 
 		for (auto it = lAccScoreAndMatch.begin(), itend = lAccScoreAndMatch.end(); it != itend; it++)
 		{
@@ -268,7 +268,7 @@ namespace EdgeSLAM {
 		float minScoreToRetain = 0.75f*bestAccScore;
 		std::set<KeyFrame*> spAlreadyAddedKF;
 		std::vector<KeyFrame*> vpRelocCandidates;
-		vpRelocCandidates.reserve(lAccScoreAndMatch.size());
+		//vpRelocCandidates.reserve(lAccScoreAndMatch.size());
 		for (auto it = lAccScoreAndMatch.begin(), itend = lAccScoreAndMatch.end(); it != itend; it++)
 		{
 			const float &si = it->first;

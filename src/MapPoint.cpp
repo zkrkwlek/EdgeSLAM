@@ -206,7 +206,7 @@ namespace EdgeSLAM {
 		if (observations.empty())
 			return;
 
-		vDescriptors.reserve(observations.size());
+		//vDescriptors.reserve(observations.size());
 
 		for (std::map<KeyFrame*, size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
 		{

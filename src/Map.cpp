@@ -256,12 +256,16 @@ namespace EdgeSLAM {
 
 	////////////////Local Map
 	LocalMap::LocalMap(){}
-	LocalMap::~LocalMap(){}
+	LocalMap::~LocalMap(){
+		for (int i = 0; i < mvpLocalTPs.size(); i++)
+			delete mvpLocalTPs[i];
+		std::vector<MapPoint*>().swap(mvpLocalMPs);
+		std::vector<KeyFrame*>().swap(mvpLocalKFs);
+		std::vector<TrackPoint*>().swap(mvpLocalTPs);
+	}
 	LocalCovisibilityMap::LocalCovisibilityMap() :LocalMap()
 	{}
-	LocalCovisibilityMap::~LocalCovisibilityMap() {
-
-	}
+	LocalCovisibilityMap::~LocalCovisibilityMap() {	}
 	/////////////keyframe
 	void LocalCovisibilityMap::UpdateLocalMap(KeyFrame* kf, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs){
 		UpdateLocalKeyFrames(kf, vpLocalKFs);
