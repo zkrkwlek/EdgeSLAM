@@ -331,7 +331,7 @@ namespace EdgeSLAM {
 		auto vpKFs =  pMap->GetAllKeyFrames();
 
 		std::stringstream ss;
-		ss << "../bin/trajectory/" << user->mapName <<"_"<<user->mnQuality<<"_"<< newtime.tm_year + 1900 <<"_"<< newtime.tm_mon+1<<"_"<< newtime.tm_mday<<"_"<< newtime.tm_hour<<"_"<< newtime.tm_min<< ".txt";
+		ss << "../bin/trajectory/" << user->mapName <<"_"<<user->userName<<"_"<<user->mnQuality<<"_"<< newtime.tm_year + 1900 <<"_"<< newtime.tm_mon+1<<"_"<< newtime.tm_mday<<"_"<< newtime.tm_hour<<"_"<< newtime.tm_min<< ".txt";
 		std::ofstream f;
 		f.open(ss.str().c_str());
 		f << std::fixed;
