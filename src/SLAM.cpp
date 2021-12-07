@@ -103,8 +103,8 @@ namespace EdgeSLAM {
 		auto pNewMap = new Map(mpDBoWVoc);
 		AddMap(name, pNewMap);
 	}
-	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, bool _b, bool _bTracking, bool _bimu){
-		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _d5, _b, _bTracking, _bimu);
+	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, bool _b, bool _bTracking, bool _bimu){
+		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _d5, quality, _b, _bTracking, _bimu);
 		pNewUser->mpMap = GetMap(_map);
 		AddUser(_user, pNewUser);
 	}
@@ -204,6 +204,9 @@ namespace EdgeSLAM {
 		if(bDelete)
 			UpdateUserVisID();
 	}
+	int SLAM::GetConnectedDevice() {
+		return Users.Size();
+	}
 	void SLAM::SetUserVisID(User* user){
 		std::unique_lock<std::mutex> lock(mMutexVisID);
 		if (user->mbMapping) {
@@ -211,7 +214,7 @@ namespace EdgeSLAM {
 		}
 		user->SetVisID(mnVisID);
 		mnVisID++;
-		std::cout << user->userName << " " << user->GetVisID() << std::endl;
+		std::cout << user->userName << "=" << user->GetVisID() << std::endl;
 	}
 	void SLAM::UpdateUserVisID(){
 		std::unique_lock<std::mutex> lock(mMutexVisID);
@@ -229,6 +232,8 @@ namespace EdgeSLAM {
 			mnVisID++;
 		}
 	}
+
+	/*
 	void SLAM::UpdateTrackingTime(float ts){
 		std::unique_lock<std::mutex> lock(mMutexTrackingTime);
 		nTotalTrack++;
@@ -247,75 +252,86 @@ namespace EdgeSLAM {
 		fSumMapping += ts;
 		fSumMapping2 += (ts*ts);
 	}
+	*/
+	void SLAM::InitProcessingTime() {
+		//ProcessingTime
+		for (int i = 1; i < 9; i++) {
+			std::map<std::string, ProcessTime*> vec;
+			std::stringstream ss;
+			ss << "../bin/time/tracking_" << i << ".txt";
+			vec.insert(std::make_pair("tracking", new ProcessTime(ss.str())));
+			ss.str("");
+			ss << "../bin/time/mapping_" << i << ".txt";
+			vec.insert(std::make_pair("mapping", new ProcessTime(ss.str())));
+			ss.str("");
+			ss << "../bin/time/reloc_" << i << ".txt";
+			vec.insert(std::make_pair("reloc", new ProcessTime(ss.str())));
+			ss.str("");
+			ss << "../bin/time/download_" << i << ".txt";
+			vec.insert(std::make_pair("download", new ProcessTime(ss.str())));
+			ss.str("");
+			ss << "../bin/time/upload" << i << ".txt";
+			vec.insert(std::make_pair("upload", new ProcessTime(ss.str())));
+			ss.str("");
+			ProcessingTime.Update(i, vec);
+		}
+	}
 	void SLAM::SaveProcessingTime() {
-		{
-			std::ofstream file;
-			file.open("../bin/time/tracking.txt");
-			std::string s;
-			std::stringstream ss;
-			ss << nTotalTrack << " " << fSumTrack << " " << fSumTrack2;
-			file.write(ss.str().c_str(), ss.str().size());
-			file.close();
-		}
-		{
-			std::ofstream file;
-			file.open("../bin/time/mapping.txt");
-			std::string s;
-			std::stringstream ss;
-			ss << nTotalMapping << " " << fSumMapping << " " << fSumMapping2;
-			file.write(ss.str().c_str(), ss.str().size());
-			file.close();
-		}
-		{
-			std::ofstream file;
-			file.open("../bin/time/reloc.txt");
-			std::string s;
-			std::stringstream ss;
-			ss << nTotalReloc << " " << fSumReloc << " " << fSumReloc2;
-			file.write(ss.str().c_str(), ss.str().size());
-			file.close();
+		
+		auto AllData = ProcessingTime.Get();
+		for (auto iter = AllData.begin(), iend = AllData.end(); iter != iend; iter++) {
+			auto vec = iter->second;
+			for (auto jter = vec.begin(), jend = vec.end(); jter != jend; jter++) {
+				auto temp = jter->second;
+				temp->update();
+				temp->save(temp->getname());
+			}
 		}
 	}
 	void SLAM::LoadProcessingTime(){
 		
-		{
-			std::ifstream file;
-			file.open("../bin/time/tracking.txt");
-			std::string s;
-			getline(file, s);
+		for (int i = 1; i < 9; i++) {
+			std::map<std::string,ProcessTime*> vec;
 			std::stringstream ss;
-			ss << s;
-			ss >> nTotalTrack >> fSumTrack >> fSumTrack2;
-			file.close();
+			ss << "../bin/time/tracking_" << i << ".txt";
+			auto p1 = new ProcessTime(ss.str());
+			p1->load(ss.str());
+			ss.str("");
+			ss << "../bin/time/mapping_" << i << ".txt";
+			auto p2 = new ProcessTime(ss.str());
+			p2->load(ss.str());
+			ss.str("");
+			ss << "../bin/time/reloc_" << i << ".txt";
+			auto p3 = new ProcessTime(ss.str());
+			p3->load(ss.str());
+			ss.str("");
+			ss << "../bin/time/download_" << i << ".txt";
+			auto p4 = new ProcessTime(ss.str());
+			p4->load(ss.str());
+			ss.str("");
+			ss << "../bin/time/upload_" << i << ".txt";
+			auto p5 = new ProcessTime(ss.str());
+			p5->load(ss.str());
+			vec.insert(std::make_pair("tracking", p1));
+			vec.insert(std::make_pair("mapping", p2));
+			vec.insert(std::make_pair("reloc", p3));
+			vec.insert(std::make_pair("download", p4));
+			vec.insert(std::make_pair("upload", p5));
+			ProcessingTime.Update(i, vec);
 		}
-		{
-			std::ifstream file;
-			file.open("../bin/time/mapping.txt");
-			std::string s;
-			getline(file, s);
-			std::stringstream ss;
-			ss << s;
-			ss >> nTotalMapping >> fSumMapping >> fSumMapping2;
-			file.close();
-		}
-		{
-			std::ifstream file;
-			file.open("../bin/time/reloc.txt");
-			std::string s;
-			getline(file, s);
-			std::stringstream ss;
-			ss << s;
-			ss >> nTotalReloc >> fSumReloc >> fSumReloc2;
-			file.close();
-		}
+
 	}
 	void SLAM::SaveTrajectory(User* user) {
+		__time64_t long_time;
+		_time64(&long_time);
+		struct tm newtime;
+		_localtime64_s(&newtime, &long_time);
 
 		auto pMap = GetMap(user->mapName);
 		auto vpKFs =  pMap->GetAllKeyFrames();
 
 		std::stringstream ss;
-		ss << "../bin/trajectory/" << user->mapName << ".txt";
+		ss << "../bin/trajectory/" << user->mapName <<"_"<<user->mnQuality<<"_"<< newtime.tm_year + 1900 <<"_"<< newtime.tm_mon+1<<"_"<< newtime.tm_mday<<"_"<< newtime.tm_hour<<"_"<< newtime.tm_min<< ".txt";
 		std::ofstream f;
 		f.open(ss.str().c_str());
 		f << std::fixed;

@@ -158,7 +158,8 @@ namespace EdgeSLAM {
 				std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 				auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 				float t_test1 = du_test1 / 1000.0;
-				system->UpdateRelocTime(t_test1);
+				
+				//system->UpdateRelocTime(t_test1);
 			}
 			else {
 				if (userState == UserState::Success) {
@@ -300,8 +301,13 @@ namespace EdgeSLAM {
 		delete pLocalMap;
 		delete mpAPI;
 
+		int N = system->GetConnectedDevice();
+		system->ProcessingTime.Get(N)["download"]->add(t_test1);
+		system->ProcessingTime.Get(N)["tracking"]->add(t_test2);
+
 		std::cout << "Frame = " << user->userName << " : " << id << ", Matches = " << nInliers << ", time =" << t_test1 <<", "<< t_test2<<"="<< t_local <<" "<<t_prev<<" "<< t_init <<" "<<t_frame<< std::endl;
-		system->UpdateTrackingTime(t_test1);
+		
+		//system->UpdateTrackingTime(t_test1);
 
 		////visualization
 		if (mapState == MapState::Initialized  && user->GetVisID() <= 3 && userState != UserState::NotEstimated) {

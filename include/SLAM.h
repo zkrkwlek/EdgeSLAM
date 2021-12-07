@@ -6,6 +6,7 @@
 #include <opencv2/core.hpp>
 #include <DBoW3.h>
 #include <ThreadPool.h>
+#include <Evaluation.h>
 #include <ConcurrentMap.h>
 #include <atomic>
 //#include <ORBVocabulary.h>
@@ -51,7 +52,7 @@ namespace EdgeSLAM {
 	/////Multi user and multi map
 	public:
 		void CreateMap(std::string name);
-		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, bool _b, bool _bTracking = false, bool _b2 = false);
+		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, bool _b, bool _bTracking = false, bool _b2 = false);
 		bool CheckMap(std::string str);
 		bool CheckUser(std::string str);
 		void AddUser(std::string id, User* user);
@@ -73,6 +74,7 @@ namespace EdgeSLAM {
 		std::map<std::string, Map*> mmpMapList;*/
 	////Manage Visualize ID
 	public:
+		int GetConnectedDevice();
 		void SetUserVisID(User* user);
 		void UpdateUserVisID();
 	private:
@@ -82,7 +84,9 @@ namespace EdgeSLAM {
 
 	//////Save Data
 	public:
-
+		ConcurrentMap<int, std::map<std::string, ProcessTime*>> ProcessingTime;
+		//std::map<int, std::vector<ProcessTime*>> ProcessTime;
+		/*
 		int nTotalTrack, nTotalReloc, nTotalMapping, nTotalSeg, nTotalDepth;
 		float nAvgTrack, nAvgReloc, nAvgMapping,  nAvgSeg, nAvgDepth;
 		float nStdDevTrack, nStdDevReloc, nStdDevMapping, nStdDevSeg, nStdDevDepth;
@@ -90,6 +94,8 @@ namespace EdgeSLAM {
 		void UpdateTrackingTime(float ts);
 		void UpdateRelocTime(float ts);
 		void UpdateMappingTime(float ts);
+		*/
+		void InitProcessingTime();
 		void SaveProcessingTime();
 		void LoadProcessingTime();
 		void SaveTrajectory(User* user);
