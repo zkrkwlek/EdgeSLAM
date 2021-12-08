@@ -390,20 +390,11 @@ namespace EdgeSLAM {
 		return false;
 	}
 	int Tracker::TrackWithLocalMap(LocalMap* pLocalMap, User* user, Frame* cur, float thMaxDesc, float thMinDesc){
-
-		//std::cout << "Track::LocalMap::Update::start" << std::endl;
-		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+		
 		pLocalMap->UpdateLocalMap(user, cur);
-		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-		float t_test1 = du_test1 / 1000.0;
-		std::cout << "Update Local Map = "<<pLocalMap->mvpLocalKFs.size()<<" "<<pLocalMap->mvpLocalMPs.size()<<"="<< t_test1 << std::endl;
-
-		//std::cout << "Track::LocalMap::Update::end" << std::endl;
+		
 		//update visible
-
 		int nMatch = Tracker::UpdateVisiblePoints(cur, pLocalMap->mvpLocalMPs, pLocalMap->mvpLocalTPs);
-		//std::cout << "Track::LocalMap::Update::Visible::end" << std::endl;
 		if (nMatch == 0)
 			return 0;
 
@@ -412,7 +403,6 @@ namespace EdgeSLAM {
 			thRadius = 5.0;
 
 		int a = SearchPoints::SearchMapByProjection(cur, pLocalMap->mvpLocalMPs, pLocalMap->mvpLocalTPs, thMaxDesc, thMinDesc, thRadius);
-		//std::cout << "match local map = " << vpLocalKFs.size() << " " << vpLocalMPs.size() <<", "<<nMatch<< "=" << a << std::endl;
 		Optimizer::PoseOptimization(cur);
 		return Tracker::UpdateFoundPoints(cur);
 	}

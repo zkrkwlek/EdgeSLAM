@@ -485,25 +485,25 @@ namespace EdgeSLAM
 		n1.UR = cv::Point2i(UL.x + halfX, UL.y);
 		n1.BL = cv::Point2i(UL.x, UL.y + halfY);
 		n1.BR = cv::Point2i(UL.x + halfX, UL.y + halfY);
-		//n1.vKeys.reserve(vKeys.size());
+		n1.vKeys.reserve(vKeys.size());
 
 		n2.UL = n1.UR;
 		n2.UR = UR;
 		n2.BL = n1.BR;
 		n2.BR = cv::Point2i(UR.x, UL.y + halfY);
-		//n2.vKeys.reserve(vKeys.size());
+		n2.vKeys.reserve(vKeys.size());
 
 		n3.UL = n1.BL;
 		n3.UR = n1.BR;
 		n3.BL = BL;
 		n3.BR = cv::Point2i(n1.BR.x, BL.y);
-		//n3.vKeys.reserve(vKeys.size());
+		n3.vKeys.reserve(vKeys.size());
 
 		n4.UL = n3.UR;
 		n4.UR = n2.BR;
 		n4.BL = n3.BR;
 		n4.BR = BR;
-		//n4.vKeys.reserve(vKeys.size());
+		n4.vKeys.reserve(vKeys.size());
 
 		//Associate points to childs
 		for (size_t i = 0; i<vKeys.size(); i++)
@@ -553,7 +553,7 @@ namespace EdgeSLAM
 			ni.UR = cv::Point2i(hX*static_cast<float>(i + 1), 0);
 			ni.BL = cv::Point2i(ni.UL.x, maxY - minY);
 			ni.BR = cv::Point2i(ni.UR.x, maxY - minY);
-			//ni.vKeys.reserve(vToDistributeKeys.size());
+			ni.vKeys.reserve(vToDistributeKeys.size());
 
 			lNodes.push_back(ni);
 			vpIniNodes[i] = &lNodes.back();
@@ -586,7 +586,7 @@ namespace EdgeSLAM
 		int iteration = 0;
 
 		vector<pair<int, ExtractorNode*> > vSizeAndPointerToNode;
-		//vSizeAndPointerToNode.reserve(lNodes.size() * 4);
+		vSizeAndPointerToNode.reserve(lNodes.size() * 4);
 
 		while (!bFinish)
 		{
@@ -737,7 +737,7 @@ namespace EdgeSLAM
 
 		// Retain the best point in each node
 		vector<cv::KeyPoint> vResultKeys;
-		//vResultKeys.reserve(nfeatures);
+		vResultKeys.reserve(nfeatures);
 		for (list<ExtractorNode>::iterator lit = lNodes.begin(); lit != lNodes.end(); lit++)
 		{
 			vector<cv::KeyPoint> &vNodeKeys = lit->vKeys;
@@ -768,7 +768,6 @@ namespace EdgeSLAM
 		long long d1 = 0;
 		long long d2 = 0;
 		long long d3 = 0;
-		std::chrono::high_resolution_clock::time_point t0 = std::chrono::high_resolution_clock::now();
 		for (int level = 0; level < nlevels; ++level)
 		{
 			const int minBorderX = EDGE_THRESHOLD - 3;
@@ -777,7 +776,7 @@ namespace EdgeSLAM
 			const int maxBorderY = vImagePyramid[level].rows - EDGE_THRESHOLD + 3;
 
 			vector<cv::KeyPoint> vToDistributeKeys;
-			//vToDistributeKeys.reserve(nfeatures * 10);
+			vToDistributeKeys.reserve(nfeatures * 10);
 
 			const float width = (maxBorderX - minBorderX);
 			const float height = (maxBorderY - minBorderY);
@@ -807,7 +806,6 @@ namespace EdgeSLAM
 						maxX = maxBorderX;
 
 					vector<cv::KeyPoint> vKeysCell;
-					std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 					FAST(vImagePyramid[level].rowRange(iniY, maxY).colRange(iniX, maxX), vKeysCell, iniThFAST, true);
 					if (vKeysCell.empty())
 					{
@@ -823,15 +821,11 @@ namespace EdgeSLAM
 							vToDistributeKeys.push_back(*vit);
 						}
 					}
-					std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-					auto dt = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
-					d1 += dt;
 				}
 			}
 
-			std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 			vector<KeyPoint> & keypoints = allKeypoints[level];
-			//keypoints.reserve(nfeatures);
+			keypoints.reserve(nfeatures);
 			keypoints = DistributeOctTree(vToDistributeKeys, minBorderX, maxBorderX, minBorderY, maxBorderY, mnFeaturesPerLevel[level], level);
 			
 			const int scaledPatchSize = PATCH_SIZE*mvScaleFactor[level];
@@ -845,26 +839,11 @@ namespace EdgeSLAM
 				keypoints[i].octave = level;
 				keypoints[i].size = scaledPatchSize;
 			}
-			std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-			long long dtemp = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
-			d2 += dtemp;
 		}
 
 		// compute orientations
-		std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 		for (int level = 0; level < nlevels; ++level)
 			computeOrientation(vImagePyramid[level], allKeypoints[level], umax);
-		std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-		d3 = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
-
-		auto d5 = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-		auto d4 = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t0).count();
-
-		float t11 = d1 / 1000.0;
-		float t22 = d2 / 1000.0;
-		float t33 = d3 / 1000.0;
-		float t4 = d4 / 1000.0;
-		std::cout << "Test = " <<d4<<" "<<d5<<"="<< t11 << " " << t22 << " " << t33 <<"="<<d1<< std::endl;
 	}
 
 	static void computeDescriptors(const Mat& image, vector<KeyPoint>& keypoints, Mat& descriptors,
@@ -881,19 +860,16 @@ namespace EdgeSLAM
 	{
 		if (_image.empty())
 			return;
-		std::chrono::high_resolution_clock::time_point t_frame_s = std::chrono::high_resolution_clock::now();
 		Mat image = _image.getMat();
 		assert(image.type() == CV_8UC1);
 
 		// Pre-compute the scale pyramid
 		std::vector<cv::Mat> vImagePyramid(nlevels);
 		ComputePyramid(image, vImagePyramid);
-		std::chrono::high_resolution_clock::time_point t_frame_1 = std::chrono::high_resolution_clock::now();
 		
 		vector < vector<KeyPoint> > allKeypoints;
 		ComputeKeyPointsOctTree(vImagePyramid, allKeypoints);
 		//ComputeKeyPointsOld(allKeypoints);
-		std::chrono::high_resolution_clock::time_point t_frame_2 = std::chrono::high_resolution_clock::now();
 		Mat descriptors;
 
 		int nkeypoints = 0;
@@ -906,9 +882,9 @@ namespace EdgeSLAM
 			_descriptors.create(nkeypoints, 32, CV_8U);
 			descriptors = _descriptors.getMat();
 		}
-		std::chrono::high_resolution_clock::time_point t_frame_3 = std::chrono::high_resolution_clock::now();
+
 		_keypoints.clear();
-		//_keypoints.reserve(nkeypoints);
+		_keypoints.reserve(nkeypoints);
 
 		int offset = 0;
 		for (int level = 0; level < nlevels; ++level)
@@ -940,20 +916,6 @@ namespace EdgeSLAM
 			// And add the keypoints to the output
 			_keypoints.insert(_keypoints.end(), keypoints.begin(), keypoints.end());
 		}
-		std::chrono::high_resolution_clock::time_point t_frame_e = std::chrono::high_resolution_clock::now();
-		auto du_frame = std::chrono::duration_cast<std::chrono::milliseconds>(t_frame_e - t_frame_s).count();
-		float t_frame = du_frame / 1000.0;
-
-		auto du_frame1 = std::chrono::duration_cast<std::chrono::milliseconds>(t_frame_1 - t_frame_s).count();
-		auto du_frame2 = std::chrono::duration_cast<std::chrono::milliseconds>(t_frame_2 - t_frame_1).count();
-		auto du_frame3 = std::chrono::duration_cast<std::chrono::milliseconds>(t_frame_3 - t_frame_2).count();
-		auto du_frame4 = std::chrono::duration_cast<std::chrono::milliseconds>(t_frame_e - t_frame_3).count();
-		float t_frame1 = du_frame1 / 1000.0;
-		float t_frame2 = du_frame2 / 1000.0;
-		float t_frame3 = du_frame3 / 1000.0;
-		float t_frame4 = du_frame4 / 1000.0;
-
-		std::cout << "Frame Detector = " << t_frame <<"="<<t_frame1<<" "<<t_frame2<<" "<<t_frame3<<" "<<t_frame4<< std::endl;
 	}
 
 	void ORBextractor::ComputePyramid(cv::Mat image, std::vector<cv::Mat>& vImagePyramid)

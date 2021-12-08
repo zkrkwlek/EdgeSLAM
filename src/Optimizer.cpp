@@ -205,8 +205,8 @@ namespace EdgeSLAM {
 
 		std::vector<g2o::EdgeSE3ProjectXYZOnlyPose*> vpEdgesMono;
 		std::vector<size_t> vnIndexEdgeMono;
-		//vpEdgesMono.reserve(N);
-		//vnIndexEdgeMono.reserve(N);
+		vpEdgesMono.reserve(N);
+		vnIndexEdgeMono.reserve(N);
 		
 		float deltaMono = sqrt(5.991);
 
@@ -414,13 +414,13 @@ namespace EdgeSLAM {
 		const int nExpectedSize = (lLocalKeyFrames.size() + lFixedCameras.size())*lLocalMapPoints.size();
 
 		std::vector<g2o::EdgeSE3ProjectXYZ*> vpEdgesMono;
-		//vpEdgesMono.reserve(nExpectedSize);
+		vpEdgesMono.reserve(nExpectedSize);
 
 		std::vector<KeyFrame*> vpEdgeKFMono;
-		//vpEdgeKFMono.reserve(nExpectedSize);
+		vpEdgeKFMono.reserve(nExpectedSize);
 
 		std::vector<MapPoint*> vpMapPointEdgeMono;
-		//vpMapPointEdgeMono.reserve(nExpectedSize);
+		vpMapPointEdgeMono.reserve(nExpectedSize);
 
 		const float thHuberMono = sqrt(5.991);
 
@@ -512,7 +512,7 @@ namespace EdgeSLAM {
 		}
 
 		std::vector<std::pair<KeyFrame*, MapPoint*> > vToErase;
-		//vToErase.reserve(vpEdgesMono.size());
+		vToErase.reserve(vpEdgesMono.size());
 
 		// Check inlier observations       
 		for (size_t i = 0, iend = vpEdgesMono.size(); i<iend; i++)
@@ -875,9 +875,9 @@ namespace EdgeSLAM {
 		std::vector<g2o::EdgeInverseSim3ProjectXYZ*> vpEdges21;
 		std::vector<size_t> vnIndexEdge;
 
-		//vnIndexEdge.reserve(2 * N);
-		//vpEdges12.reserve(2 * N);
-		//vpEdges21.reserve(2 * N);
+		vnIndexEdge.reserve(2 * N);
+		vpEdges12.reserve(2 * N);
+		vpEdges21.reserve(2 * N);
 
 		const float deltaHuber = sqrt(th2);
 
