@@ -62,7 +62,7 @@ namespace EdgeSLAM {
 		float mnMaxY;
 
 	public:
-		cv::Mat imgColor, imgGray;
+		//cv::Mat imgColor, imgGray;
 		static FeatureDetector* Detector;
 		//FeatureTracker* matcher;
 		

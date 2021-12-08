@@ -25,9 +25,9 @@ namespace EdgeSLAM {
 		mnScaleLevels(Detector->mnScaleLevels), mfScaleFactor(Detector->mfScaleFactor), mfLogScaleFactor(Detector->mfLogScaleFactor), mvScaleFactors(Detector->mvScaleFactors), mvInvScaleFactors(Detector->mvInvScaleFactors), mvLevelSigma2(Detector->mvLevelSigma2), mvInvLevelSigma2(Detector->mvInvLevelSigma2)
 	{
 		mpCamPose = new CameraPose();
-		imgColor = img.clone();
-		cv::cvtColor(img, imgGray, cv::COLOR_BGR2GRAY);//COLOR_BGR2GRAY
-		Detector->detectAndCompute(imgGray, cv::Mat(), mvKeys, mDescriptors);
+		cv::Mat gray;
+		cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);//COLOR_BGR2GRAY
+		Detector->detectAndCompute(gray, cv::Mat(), mvKeys, mDescriptors);
 		/*FeatureDetector* mpDetector = new ORBDetector(1500);
 		mpDetector->detectAndCompute(imgGray, cv::Mat(), mvKeys, mDescriptors);
 		mnScaleLevels=(mpDetector->mnScaleLevels);
@@ -76,8 +76,6 @@ namespace EdgeSLAM {
 		std::set<MapPoint*>().swap(mspMapPoints);
 		std::vector<TrackPoint*>().swap(mvpTrackPoints);
 		std::vector<bool>().swap(mvbOutliers);
-		imgColor.release();
-		imgGray.release();
 		mDescriptors.release();
 	}
 	bool Frame::is_in_frustum(MapPoint* pMP, TrackPoint* pTP, float viewingCosLimit) {
