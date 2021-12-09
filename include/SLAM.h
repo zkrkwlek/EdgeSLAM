@@ -24,6 +24,7 @@ namespace EdgeSLAM {
 	class SLAM {
 	public:
 		SLAM();
+		SLAM(ThreadPool::ThreadPool* _pool);
 		virtual ~SLAM();
 	public:
 		void Init();
@@ -64,6 +65,8 @@ namespace EdgeSLAM {
 		void AddMap(std::string name, Map* pMap);
 		Map* GetMap(std::string name);
 		void RemoveMap(std::string name);
+
+		void VisualizeImage(cv::Mat src, int vid);
 
 		ConcurrentMap<std::string, User*> Users;
 		ConcurrentMap<std::string, Map*> Maps;

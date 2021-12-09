@@ -98,7 +98,7 @@ namespace EdgeSLAM {
 		auto du_frame = std::chrono::duration_cast<std::chrono::milliseconds>(t_frame_e - t_frame_s).count();
 		t_frame = du_frame / 1000.0;
 		
-		user->mapFrames.Update(frame->mnFrameID, frame);
+		//user->mapFrames.Update(frame->mnFrameID, frame);
 		user->mnCurrFrameID = frame->mnFrameID;
 		
 		//std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
@@ -140,9 +140,7 @@ namespace EdgeSLAM {
 					}
 				}
 			}
-		}
-
-		if (mapState == MapState::Initialized) {
+		}else if (mapState == MapState::Initialized) {
 			bool bTrack = false;
 			if (userState == UserState::NotEstimated || userState == UserState::Failed) {
 				//global localization
@@ -166,8 +164,8 @@ namespace EdgeSLAM {
 					
 					//std::cout << "Tracker::Start" << std::endl;
 					//auto f_ref = user->mapFrames[user->mnPrevFrameID];
-					auto f_ref = user->mapFrames.Get(user->mnPrevFrameID);
-					f_ref->check_replaced_map_points();
+					auto prevFrame = user->prevFrame;
+					prevFrame->check_replaced_map_points();
 
 					cv::Mat Tpredict;
 					if (user->mbIMU) {
@@ -181,7 +179,7 @@ namespace EdgeSLAM {
 					}
 					frame->SetPose(Tpredict);
 					std::chrono::high_resolution_clock::time_point t_prev_start = std::chrono::high_resolution_clock::now();
-					bTrack = Tracker::TrackWithPrevFrame(f_ref, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+					bTrack = Tracker::TrackWithPrevFrame(prevFrame, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
 					std::chrono::high_resolution_clock::time_point t_prev_end = std::chrono::high_resolution_clock::now();
 					auto du_prev = std::chrono::duration_cast<std::chrono::milliseconds>(t_prev_end - t_prev_start).count();
 					t_prev = du_prev / 1000.0;
@@ -243,7 +241,7 @@ namespace EdgeSLAM {
 			
 			//pose update
 			cv::Mat T = frame->GetPose();
-			user->UpdatePose(T);
+			user->UpdatePose(T, ts);
 			//check keyframe
 			if (user->mbMapping) {
 				auto ref = map->GetKeyFrame(user->mnReferenceKeyFrameID);
@@ -287,8 +285,11 @@ namespace EdgeSLAM {
 			////frame line visualization
 		}
 		
-		int tempID = user->mnPrevFrameID;
+		//int tempID = user->mnPrevFrameID;
 		user->mnPrevFrameID = frame->mnFrameID;
+		if (mapState == MapState::Initialized&&user->prevFrame)
+			delete user->prevFrame;
+		user->prevFrame = frame;
 		user->mbProgress = false; 
 		
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
@@ -715,6 +716,7 @@ namespace EdgeSLAM {
 		ss << "/Store?keyword=MappingResult&id=" << nFrameID << "&src=" << user->userName;// << "&type2=" << user->userName;
 		auto res = mpAPI->Send(ss.str(), data.data, sizeof(float)*data.rows);
 
+		delete mpAPI;
 	}
 
 	void Tracker::SendDeviceTrackingData(SLAM* system, User* user, LocalMap* pLocalMap, Frame* frame, int nInlier, int id) {
@@ -778,6 +780,7 @@ namespace EdgeSLAM {
 			std::stringstream ss;
 			ss << "/Store?keyword=ReferenceFrame&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
 			auto res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
+			delete mpAPI;
 		}
 	
 		////data

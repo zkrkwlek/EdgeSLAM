@@ -26,7 +26,7 @@ namespace EdgeSLAM {
 		delete mpMotionModel;
 		mpMap = nullptr;
 
-		auto vecFrames = mapFrames.Get();
+		/*auto vecFrames = mapFrames.Get();
 		for (auto iter = vecFrames.begin(), iend = vecFrames.end(); iter != iend; iter++) {
 			auto frame = iter->second;
 			delete frame;
@@ -38,6 +38,11 @@ namespace EdgeSLAM {
 		}
 		mapFrames.Release();
 		objFrames.Release();
+		*/
+		for (int i = 0, iend = vecTrajectories.size(); i < iend; i++)
+			vecTrajectories[i].release();
+		std::vector<cv::Mat>().swap(vecTrajectories);
+		std::vector<double>().swap(vecTimestamps);
 		std::vector<cv::Mat>().swap(mVecDevicePositions);
 		//delete mapFrames;
 	}
@@ -61,6 +66,13 @@ namespace EdgeSLAM {
 	void User::UpdatePose(cv::Mat Tnew) {
 		mpCamPose->SetPose(Tnew);
 		mpMotionModel->update(Tnew);
+		vecTrajectories.push_back(Tnew);
+	}
+	void User::UpdatePose(cv::Mat Tnew, double ts) {
+		mpCamPose->SetPose(Tnew);
+		mpMotionModel->update(Tnew);
+		vecTrajectories.push_back(Tnew);
+		vecTimestamps.push_back(ts);
 	}
 	void User::UpdateGyro(cv::Mat _R) {
 		std::unique_lock<std::mutex> lock(mMutexGyro);

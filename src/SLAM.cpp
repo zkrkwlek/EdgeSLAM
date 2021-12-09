@@ -15,8 +15,10 @@
 #include <Converter.h>
 
 namespace EdgeSLAM {
-
-	SLAM::SLAM(){
+	SLAM::SLAM():pool(){
+	
+	}
+	SLAM::SLAM(ThreadPool::ThreadPool* _pool):pool(_pool){
 		Init();
 	}
 	SLAM::~SLAM(){}
@@ -37,7 +39,7 @@ namespace EdgeSLAM {
 		//LoadProcessingTime();
 
 		Segmentator::Init();
-		pool = new ThreadPool::ThreadPool(24);
+		
 		mpInitializer = new Initializer();
 		mpTracker = new Tracker();
 		mpFeatureTracker = new FlannFeatureTracker(1500);
@@ -233,6 +235,11 @@ namespace EdgeSLAM {
 		}
 	}
 
+	void SLAM::VisualizeImage(cv::Mat src, int vid) {
+		mpVisualizer->ResizeImage(src, src);
+		mpVisualizer->SetOutputImage(src, vid);
+	}
+
 	/*
 	void SLAM::UpdateTrackingTime(float ts){
 		std::unique_lock<std::mutex> lock(mMutexTrackingTime);
@@ -336,18 +343,34 @@ namespace EdgeSLAM {
 		f.open(ss.str().c_str());
 		f << std::fixed;
 
-		for (int i = 0; i < vpKFs.size(); i++) {
-			auto pKF = vpKFs[i];
+		if (user->mbMapping) {
+			for (int i = 0; i < vpKFs.size(); i++) {
+				auto pKF = vpKFs[i];
 
-			cv::Mat R = pKF->GetRotation();
-			cv::Mat t = pKF->GetTranslation();
-			R = R.t(); //inverse
-			t = -R*t;  //camera center
-			std::vector<float> q = Converter::toQuaternion(R);
-			f << std::setprecision(6) << pKF->mdTimeStamp << std::setprecision(7) << " " << t.at<float>(0) << " " << t.at<float>(1) << " " << t.at<float>(2)
-				<< " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
+				cv::Mat R = pKF->GetRotation();
+				cv::Mat t = pKF->GetTranslation();
+				R = R.t(); //inverse
+				t = -R*t;  //camera center
+				std::vector<float> q = Converter::toQuaternion(R);
+				f << std::setprecision(6) << pKF->mdTimeStamp << std::setprecision(7) << " " << t.at<float>(0) << " " << t.at<float>(1) << " " << t.at<float>(2)
+					<< " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
+			}
+			
+		}
+		else{
+			
+			for (int i = 0; i < user->vecTrajectories.size(); i++) {
+				cv::Mat R = user->vecTrajectories[i].rowRange(0, 3).colRange(0, 3);
+				cv::Mat t = user->vecTrajectories[i].rowRange(0, 3).col(3);
+				R = R.t(); //inverse
+				t = -R*t;  //camera center
+				std::vector<float> q = Converter::toQuaternion(R);
+				f << std::setprecision(6) << user->vecTimestamps[i] << std::setprecision(7) << " " << t.at<float>(0) << " " << t.at<float>(1) << " " << t.at<float>(2)
+					<< " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
+			}
 		}
 		f.close();
+		
 	}
 	void SLAM::AddMap(std::string name, Map* pMap) {
 		Maps.Update(name, pMap);

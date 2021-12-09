@@ -33,6 +33,7 @@ namespace EdgeSLAM {
 		cv::Mat GetInversePose();
 		cv::Mat PredictPose();
 		void UpdatePose(cv::Mat Tnew);
+		void UpdatePose(cv::Mat Tnew, double ts);
 		void UpdateGyro(cv::Mat _R);
 		cv::Mat GetGyro();
 
@@ -47,9 +48,16 @@ namespace EdgeSLAM {
 		CameraPose* mpCamPose;
 		bool mbMapping, mbIMU, mbDeviceTracking;
 
+		Frame* prevFrame;
+		std::vector<cv::Mat> vecTrajectories;
+		std::vector<double> vecTimestamps;
 		//std::map<int, Frame*> mapFrames;
-		ConcurrentMap<int, Frame*> mapFrames;
-		ConcurrentMap<int, ObjectFrame*> objFrames;
+		/*ConcurrentMap<int, Frame*> mapFrames;
+		ConcurrentMap<int, ObjectFrame*> objFrames;*/
+		
+		////frame id와 키프레임 id의 대응이 필요함.
+
+
 		//std::map<int, KeyFrame*> mapKeyFrames;
 		std::atomic<bool> mbProgress;
 		std::atomic<int> mnReferenceKeyFrameID, mnLastKeyFrameID, mnPrevFrameID, mnCurrFrameID, mnLastRelocFrameId;

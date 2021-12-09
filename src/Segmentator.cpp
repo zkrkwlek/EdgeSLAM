@@ -474,53 +474,54 @@ namespace EdgeSLAM {
 		//cv::Mat count = cv::Mat::zeros(nLabel, 1, CV_32SC1);
 
 		//auto F = pUser->mapFrames[id];
-		Frame* F = nullptr;
-		if (pUser->mapFrames.Count(id))
-			F = pUser->mapFrames.Get(id);
-		if (!F)
-			return;
+		
+		//Frame* F = nullptr;
+		//if (pUser->mapFrames.Count(id))
+		//	F = pUser->mapFrames.Get(id);
+		//if (!F)
+		//	return;
 
-		for (int i = 0; i < F->N; i++) {
-			auto pMP = F->mvpMapPoints[i];
-			if (!pMP || pMP->isBad())
-				continue;
-			auto pt = F->mvKeys[i].pt;
-			pt.x *= sw;
-			pt.y *= sh;
-			int label = labeled.at<uchar>(pt.y, pt.x)+1;
-			//count.at<int>(label)++;
+		//for (int i = 0; i < F->N; i++) {
+		//	auto pMP = F->mvpMapPoints[i];
+		//	if (!pMP || pMP->isBad())
+		//		continue;
+		//	auto pt = F->mvKeys[i].pt;
+		//	pt.x *= sw;
+		//	pt.y *= sh;
+		//	int label = labeled.at<uchar>(pt.y, pt.x)+1;
+		//	//count.at<int>(label)++;
 
-			////update object label
-			int nmpid = pMP->mnId;
-			Object* obj = nullptr;
-			if (ObjectPoints.Count(nmpid)) {
-				obj = ObjectPoints.Get(nmpid);
-			}
-			else {
-				obj = new Object();
-				ObjectPoints.Update(nmpid, obj);
-			}
-			obj->Update(label);
-			////update object label
-			
-			//////detect structure poitns
-			//label++;
-			//switch (label) {
-			//case (int)ObjectLabel::FLOOR:
-			//	if (mspAllFloorPoints.count(pMP))
-			//		continue;
-			//	mspAllFloorPoints.insert(pMP);
-			//	break;
-			//case (int)ObjectLabel::WALL:
-			//	if (mspAllWallPoints.count(pMP))
-			//		continue;
-			//	mspAllWallPoints.insert(pMP);
-			//	break;
-			//case (int)ObjectLabel::CEIL:
-			//	break;
-			//}
-			//////detect structure poitns
-		}
+		//	////update object label
+		//	int nmpid = pMP->mnId;
+		//	Object* obj = nullptr;
+		//	if (ObjectPoints.Count(nmpid)) {
+		//		obj = ObjectPoints.Get(nmpid);
+		//	}
+		//	else {
+		//		obj = new Object();
+		//		ObjectPoints.Update(nmpid, obj);
+		//	}
+		//	obj->Update(label);
+		//	////update object label
+		//	
+		//	//////detect structure poitns
+		//	//label++;
+		//	//switch (label) {
+		//	//case (int)ObjectLabel::FLOOR:
+		//	//	if (mspAllFloorPoints.count(pMP))
+		//	//		continue;
+		//	//	mspAllFloorPoints.insert(pMP);
+		//	//	break;
+		//	//case (int)ObjectLabel::WALL:
+		//	//	if (mspAllWallPoints.count(pMP))
+		//	//		continue;
+		//	//	mspAllWallPoints.insert(pMP);
+		//	//	break;
+		//	//case (int)ObjectLabel::CEIL:
+		//	//	break;
+		//	//}
+		//	//////detect structure poitns
+		//}
 		
 		////Connected Component Labeling
 		////put text
@@ -605,11 +606,11 @@ namespace EdgeSLAM {
 		
 		//auto F = pUser->mapFrames[id];
 		Frame* F = nullptr;
-		while (!F) {
+		/*while (!F) {
 			if (pUser->mapFrames.Count(id))
 				F = pUser->mapFrames.Get(id);
 			continue;
-		}
+		}*/
 
 		//cv::Mat dst = F->imgColor.clone();
 		//std::memcpy(data.data, res.data(), res.size());
@@ -736,11 +737,11 @@ namespace EdgeSLAM {
 		//std::memcpy(depthImg.data, res.data(), res.size());
 		
 		Frame* F = nullptr;
-		while (!F) {
+		/*while (!F) {
 			if (pUser->mapFrames.Count(id))
 				F = pUser->mapFrames.Get(id);
 			continue;
-		}
+		}*/
 		auto map = system->GetMap(pUser->mapName);
 		
 		////depth scale
@@ -771,66 +772,67 @@ namespace EdgeSLAM {
 
 		////depth 3d visualization
 		
-		if (pUser->objFrames.Count(id)) {
-			ObjectFrame* objFrame = pUser->objFrames.Get(id);
-			auto objBox = objFrame->mapObjects;
-			cv::Mat invK = F->InvK.clone();
-			cv::Mat Rinv, Tinv;
-			cv::Mat Pinv = F->GetPoseInverse();
-			Rinv = Pinv.colRange(0, 3).rowRange(0, 3);
-			Tinv = Pinv.col(3).rowRange(0, 3);
-			
-			int inc = 1;
-			cv::Mat test = cv::Mat::zeros(0, 4, CV_32FC1);//map->mObjectTest.Get();//
-			for (auto iter = objBox.begin(), iend = objBox.end(); iter != iend; iter++) {
-				auto box = iter->second;
+		//if (pUser->objFrames.Count(id)) {
+		//	ObjectFrame* objFrame = pUser->objFrames.Get(id);
+		//	auto objBox = objFrame->mapObjects;
+		//	cv::Mat invK = F->InvK.clone();
+		//	cv::Mat Rinv, Tinv;
+		//	cv::Mat Pinv = F->GetPoseInverse();
+		//	Rinv = Pinv.colRange(0, 3).rowRange(0, 3);
+		//	Tinv = Pinv.col(3).rowRange(0, 3);
+		//	
+		//	int inc = 1;
+		//	cv::Mat test = cv::Mat::zeros(0, 4, CV_32FC1);//map->mObjectTest.Get();//
+		//	for (auto iter = objBox.begin(), iend = objBox.end(); iter != iend; iter++) {
+		//		auto box = iter->second;
 
-				int w = box->rect.width + box->rect.x;
-				int h = box->rect.height+box->rect.y;
-				
-				for (int x = box->rect.x; x < w; x++) {
-					for (int y = box->rect.y; y < h; y++) {
-						cv::Point2i pt(x, y);
-						float depth = depthImg.at<float>(pt)*scale;
-						if (depth < 0.0001)
-							continue;
-						cv::Mat a = Rinv*(invK*(cv::Mat_<float>(3, 1) << pt.x, pt.y, 1.0)*depth) + Tinv;
-						cv::Mat b = cv::Mat::zeros(1, 4, CV_32FC1);
-						b.at<float>(0) = a.at<float>(0);
-						b.at<float>(1) = a.at<float>(1);
-						b.at<float>(2) = a.at<float>(2);
-						b.at<float>(3) = (float)box->label;
-						test.push_back(b);
-					}
-				}
-				//
-			}
-			map->mObjectTest.Update(test);
+		//		int w = box->rect.width + box->rect.x;
+		//		int h = box->rect.height+box->rect.y;
+		//		
+		//		for (int x = box->rect.x; x < w; x++) {
+		//			for (int y = box->rect.y; y < h; y++) {
+		//				cv::Point2i pt(x, y);
+		//				float depth = depthImg.at<float>(pt)*scale;
+		//				if (depth < 0.0001)
+		//					continue;
+		//				cv::Mat a = Rinv*(invK*(cv::Mat_<float>(3, 1) << pt.x, pt.y, 1.0)*depth) + Tinv;
+		//				cv::Mat b = cv::Mat::zeros(1, 4, CV_32FC1);
+		//				b.at<float>(0) = a.at<float>(0);
+		//				b.at<float>(1) = a.at<float>(1);
+		//				b.at<float>(2) = a.at<float>(2);
+		//				b.at<float>(3) = (float)box->label;
+		//				test.push_back(b);
+		//			}
+		//		}
+		//		//
+		//	}
+		//	map->mObjectTest.Update(test);
 
-		}
+		//}
+
 		////depth 3d visualization
 		
-		{
-			cv::Mat depth;
-			cv::normalize(depthImg, depth, 0, 255, cv::NORM_MINMAX, CV_8UC1);
-			cv::cvtColor(depth, depth, cv::COLOR_GRAY2BGR);
-			if (pUser->objFrames.Count(id)) {
-				ObjectFrame* objFrame = pUser->objFrames.Get(id);
-				auto objBox = objFrame->mapObjects;
-				for (auto iter = objBox.begin(), iend = objBox.end(); iter != iend; iter++) {
-					auto box = iter->second;
-					cv::rectangle(depth, box->rect, cv::Scalar(255, 0, 0));
-				}
-			}
+		//{
+		//	cv::Mat depth;
+		//	cv::normalize(depthImg, depth, 0, 255, cv::NORM_MINMAX, CV_8UC1);
+		//	cv::cvtColor(depth, depth, cv::COLOR_GRAY2BGR);
+		//	if (pUser->objFrames.Count(id)) {
+		//		ObjectFrame* objFrame = pUser->objFrames.Get(id);
+		//		auto objBox = objFrame->mapObjects;
+		//		for (auto iter = objBox.begin(), iend = objBox.end(); iter != iend; iter++) {
+		//			auto box = iter->second;
+		//			cv::rectangle(depth, box->rect, cv::Scalar(255, 0, 0));
+		//		}
+		//	}
 
-			/////save image
-			/*std::stringstream sss;
-			sss << "../../bin/img/" << pUser->userName << "/Depth/" << id << ".jpg";
-			cv::imwrite(sss.str(), depth);*/
-			/////save image
-			system->mpVisualizer->ResizeImage(depth, depth);
-			system->mpVisualizer->SetOutputImage(depth, 3);
-		}
+		//	/////save image
+		//	/*std::stringstream sss;
+		//	sss << "../../bin/img/" << pUser->userName << "/Depth/" << id << ".jpg";
+		//	cv::imwrite(sss.str(), depth);*/
+		//	/////save image
+		//	system->mpVisualizer->ResizeImage(depth, depth);
+		//	system->mpVisualizer->SetOutputImage(depth, 3);
+		//}
 		
 		return;
 
@@ -976,6 +978,7 @@ namespace EdgeSLAM {
 		std::stringstream ss;
 		ss << "/Store?keyword=RequestObjectDetection&id=" << id << "&src=" << user;
 		auto res = mpAPI->Send(ss.str(), "");
+		delete mpAPI;
 	}
 	void Segmentator::RequestSegmentation(std::string user, int id)
 	{
@@ -987,7 +990,7 @@ namespace EdgeSLAM {
 		ss.str("");
 		ss << "/Store?keyword=RequestSegmentation&id=" << id <<"&src="<<user;
 		res = mpAPI->Send(ss.str(), "");
-		
+		delete mpAPI;
 	}
 	void Segmentator::Init() {
 		cv::Mat colormap = cv::Mat::zeros(256, 3, CV_8UC1);
