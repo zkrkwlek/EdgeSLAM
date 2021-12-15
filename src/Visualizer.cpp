@@ -234,8 +234,6 @@ namespace EdgeSLAM {
 				std::vector<MapPoint*>().swap(mmpMap);
 
 				{
-					
-					
 					//for (int i = 0, iend = 3; i < iend; i++) {
 					//	//auto vMPs = pMap->GetPlanarMPs(i);
 					//	auto vMPs = pMap->GetDepthMPs();
@@ -319,7 +317,7 @@ namespace EdgeSLAM {
 					//	cv::line(tempVis, dirPtX1, dirPtX2, cv::Scalar(0, 0, 255), 2);
 
 					//}
-
+					
 					auto pos = user->GetPosition();
 					cv::Point2f pt1 = cv::Point2f(pos.at<float>(mnAxis1)* mnVisScale, pos.at<float>(mnAxis2)* mnVisScale);
 					pt1 += mVisMidPt;
@@ -328,13 +326,14 @@ namespace EdgeSLAM {
 					else {
 						cv::circle(tempVis, pt1, 4, userColors[i], -1);
 					}
-					auto dPoses = user->GetDevicePositions();
+					
+					/*auto dPoses = user->GetDevicePositions();
 					for (int j = 0, jend = dPoses.size(); j < jend; j++) {
 						auto pos = dPoses[j];
 						cv::Point2f pt1 = cv::Point2f(pos.at<float>(mnAxis1)* mnVisScale, pos.at<float>(mnAxis2)* mnVisScale);
 						pt1 += mVisMidPt;
 						cv::circle(tempVis, pt1, 2, userColors[i], -1);
-					}
+					}*/
 				}
 				std::vector<User*>().swap(vpUsers);
 			}

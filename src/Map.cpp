@@ -480,9 +480,9 @@ namespace EdgeSLAM {
 			}
 
 		}
-		if (pKFmax)
+		if (pKFmax && !pKFmax->isBad())
 		{
-			user->mnReferenceKeyFrameID = pKFmax->mnId;
+			user->mpRefKF = pKFmax;
 		}
 	}
 	void LocalCovisibilityMap::UpdateLocalMapPoitns(Frame* f, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs, std::vector<TrackPoint*>& vpLocalTPs){

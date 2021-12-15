@@ -52,8 +52,8 @@ namespace EdgeSLAM {
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		float t_test1 = du_test1 / 1000.0;
-		
-		//system->UpdateMappingTime(t_test1);
+		int N = system->GetConnectedDevice();
+		system->ProcessingTime.Get(N)["mapping"]->add(t_test1);
 	}
 	void LocalMapper::ProcessNewKeyFrame(Map* map, KeyFrame* targetKF) {
 		

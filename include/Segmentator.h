@@ -52,7 +52,7 @@ namespace EdgeSLAM {
 		static void RequestSegmentation(std::string user,int id);
 		static void RequestObjectDetection(std::string user, int id);
 		static void ProcessContentGeneration(SLAM* system, User* user, int id);
-		static void ProcessDevicePosition(SLAM* system, User* user, int id);
+		static void ProcessDevicePosition(SLAM* system, User* user, int id, double ts);
 		
 		static void Init();
 		

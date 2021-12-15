@@ -13,6 +13,8 @@
 #include <Segmentator.h>
 #include <SearchPoints.h>
 #include <Converter.h>
+#include <io.h>
+#include <direct.h>
 
 namespace EdgeSLAM {
 	SLAM::SLAM():pool(){
@@ -105,8 +107,8 @@ namespace EdgeSLAM {
 		auto pNewMap = new Map(mpDBoWVoc);
 		AddMap(name, pNewMap);
 	}
-	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, bool _b, bool _bTracking, bool _bimu){
-		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _d5, quality, _b, _bTracking, _bimu);
+	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, bool _b, bool _bTracking, bool _bimu, bool _bsave){
+		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _d5, quality, nskip, _b, _bTracking, _bimu, _bsave);
 		pNewUser->mpMap = GetMap(_map);
 		AddUser(_user, pNewUser);
 	}
@@ -133,23 +135,11 @@ namespace EdgeSLAM {
 		pool->EnqueueJob(Tracker::UpdateDeviceGyro, this, pUser, id);
 		
 	}
-	void SLAM::UpdateDevicePosition(std::string user, int id) {
+	void SLAM::UpdateDevicePosition(std::string user, int id, double ts) {
 		if (!CheckUser(user))
 			return;
 		auto pUser = GetUser(user);
-		pool->EnqueueJob(Segmentator::ProcessDevicePosition, this, pUser, id);
-		//////
-		//std::stringstream ss;
-		//ss << "/Load?keyword=DevicePosition" << "&id=" << id << "&src=" << user;
-		//WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
-		//auto res = mpAPI->Send(ss.str(), "");
-		//int n2 = res.size();
-		//
-		//cv::Mat pos = cv::Mat::zeros(12, 1, CV_32FC1);
-		//std::memcpy(pos.data, res.data(), res.size());
-		//std::cout << pos.t() << std::endl;
-
-		//pUser->AddDevicePosition(pos);
+		pool->EnqueueJob(Segmentator::ProcessDevicePosition, this, pUser, id, ts);
 	}
 	void SLAM::AddUser(std::string id, User* user) {
 		SetUserVisID(user);
@@ -282,11 +272,27 @@ namespace EdgeSLAM {
 			ss.str("");
 			ProcessingTime.Update(i, vec);
 		}
+		std::map<int, Ratio*> vec;
+		for (int i = 1; i < 15; i++) {
+			std::stringstream ss;
+			ss << "../bin/time/skipframe_" << i << ".txt";
+			vec.insert(std::make_pair(i, new Ratio(ss.str())));
+		}
+		SuccessRatio.Update("skipframe", vec);
 	}
 	void SLAM::SaveProcessingTime() {
 		
 		auto AllData = ProcessingTime.Get();
 		for (auto iter = AllData.begin(), iend = AllData.end(); iter != iend; iter++) {
+			auto vec = iter->second;
+			for (auto jter = vec.begin(), jend = vec.end(); jter != jend; jter++) {
+				auto temp = jter->second;
+				temp->update();
+				temp->save(temp->getname());
+			}
+		}
+		auto RatioData = SuccessRatio.Get();
+		for (auto iter = RatioData.begin(), iend = RatioData.end(); iter != iend; iter++) {
 			auto vec = iter->second;
 			for (auto jter = vec.begin(), jend = vec.end(); jter != jend; jter++) {
 				auto temp = jter->second;
@@ -327,8 +333,30 @@ namespace EdgeSLAM {
 			ProcessingTime.Update(i, vec);
 		}
 
+		std::map<int, Ratio*> vec;
+		for (int i = 1; i < 15; i++) {
+			std::stringstream ss;
+			ss << "../bin/time/skipframe_" << i << ".txt";
+			auto ratio = new Ratio(ss.str());
+			ratio->load(ss.str());
+			vec.insert(std::make_pair(i, ratio));
+		}
+		SuccessRatio.Update("skipframe", vec);
 	}
 	void SLAM::SaveTrajectory(User* user) {
+		if (!user->mbSaveTrajectory)
+			return;
+		
+		std::stringstream ssPath;
+		std::cout << "????" << std::endl;
+		std::cout << user->mnQuality << std::endl;
+		std::cout << user->mapName << std::endl;
+		ssPath << "../bin/trajectory/" << user->mapName << "_" << user->mnQuality;
+		
+		int resPath = _access(ssPath.str().c_str(), 0);
+		if (resPath == -1)
+			_mkdir(ssPath.str().c_str());
+
 		__time64_t long_time;
 		_time64(&long_time);
 		struct tm newtime;
@@ -338,7 +366,7 @@ namespace EdgeSLAM {
 		auto vpKFs =  pMap->GetAllKeyFrames();
 
 		std::stringstream ss;
-		ss << "../bin/trajectory/" << user->mapName <<"_"<<user->userName<<"_"<<user->mnQuality<<"_"<< newtime.tm_year + 1900 <<"_"<< newtime.tm_mon+1<<"_"<< newtime.tm_mday<<"_"<< newtime.tm_hour<<"_"<< newtime.tm_min<< ".txt";
+		ss <<ssPath.str()<< "/" << user->userName<<"_"<<user->mnSkip<<(user->mbMapping?("_MAPPING_"):("_TRACKING_"))<< newtime.tm_year + 1900 <<"_"<< newtime.tm_mon+1<<"_"<< newtime.tm_mday<<"_"<< newtime.tm_hour<<"_"<< newtime.tm_min<<"_"<<newtime.tm_sec<< ".txt";
 		std::ofstream f;
 		f.open(ss.str().c_str());
 		f << std::fixed;
@@ -370,7 +398,25 @@ namespace EdgeSLAM {
 			}
 		}
 		f.close();
-		
+		if (user->mbDeviceTracking) {
+			std::stringstream ss;
+			ss << ssPath.str() << "/" << user->userName << "_" << user->mnSkip << "_DEVICE_" << newtime.tm_year + 1900 << "_" << newtime.tm_mon + 1 << "_" << newtime.tm_mday << "_" << newtime.tm_hour << "_" << newtime.tm_min << "_" << newtime.tm_sec << ".txt";
+			std::ofstream f;
+			f.open(ss.str().c_str());
+			f << std::fixed;
+
+			auto vecTrajectories = user->mvDeviceTrajectories.get();
+			auto vecTimestamps = user->mvDeviceTimeStamps.get();
+			for (int i = 0; i < vecTrajectories.size(); i++) {
+				cv::Mat R = vecTrajectories[i].rowRange(0, 3).colRange(0, 3);
+				cv::Mat t = vecTrajectories[i].rowRange(0, 3).col(3);
+				R = R.t(); //inverse
+				t = -R*t;  //camera center
+				std::vector<float> q = Converter::toQuaternion(R);
+				f << std::setprecision(6) << vecTimestamps[i] << std::setprecision(7) << " " << t.at<float>(0) << " " << t.at<float>(1) << " " << t.at<float>(2)
+					<< " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
+			}
+		}
 	}
 	void SLAM::AddMap(std::string name, Map* pMap) {
 		Maps.Update(name, pMap);

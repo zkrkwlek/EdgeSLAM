@@ -53,7 +53,7 @@ namespace EdgeSLAM {
 	/////Multi user and multi map
 	public:
 		void CreateMap(std::string name);
-		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, bool _b, bool _bTracking = false, bool _b2 = false);
+		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, bool _b, bool _bTracking = false, bool _b2 = false, bool _bsave = false);
 		bool CheckMap(std::string str);
 		bool CheckUser(std::string str);
 		void AddUser(std::string id, User* user);
@@ -61,7 +61,7 @@ namespace EdgeSLAM {
 		User* GetUser(std::string id);
 		std::vector<User*> GetAllUsersInMap(std::string map);
 		void UpdateDeviceGyroSensor(std::string user, int id);
-		void UpdateDevicePosition(std::string user, int id);
+		void UpdateDevicePosition(std::string user, int id, double ts);
 		void AddMap(std::string name, Map* pMap);
 		Map* GetMap(std::string name);
 		void RemoveMap(std::string name);
@@ -88,6 +88,7 @@ namespace EdgeSLAM {
 	//////Save Data
 	public:
 		ConcurrentMap<int, std::map<std::string, ProcessTime*>> ProcessingTime;
+		ConcurrentMap<std::string, std::map<int, Ratio*>> SuccessRatio;
 		//std::map<int, std::vector<ProcessTime*>> ProcessTime;
 		/*
 		int nTotalTrack, nTotalReloc, nTotalMapping, nTotalSeg, nTotalDepth;

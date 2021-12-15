@@ -95,22 +95,29 @@ namespace EdgeSLAM {
 		}
 		return label.at<ushort>(l);*/
 	}
-	void Segmentator::ProcessDevicePosition(SLAM* system, User* user, int id) {
+	void Segmentator::ProcessDevicePosition(SLAM* system, User* user, int id, double ts) {
 		std::stringstream ss;
 		ss << "/Load?keyword=DevicePosition" << "&id=" << id << "&src=" << user->userName;
 		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 		auto res = mpAPI->Send(ss.str(), "");
 		int n2 = res.size();
 
+		std::cout << "as;dlfjlasdfjasdf" << std::endl;
+
 		cv::Mat fdata = cv::Mat::zeros(4, 3, CV_32FC1);
 		std::memcpy(fdata.data, res.data(), res.size());
+		user->mvDeviceTrajectories.push_back(fdata.clone());
+		user->mvDeviceTimeStamps.push_back(ts);
+		fdata.release();
 
-		cv::Mat R = fdata.rowRange(0, 3).colRange(0, 3).clone();
+		
+
+		/*cv::Mat R = fdata.rowRange(0, 3).colRange(0, 3).clone();
 		cv::Mat t = fdata.row(3).t();
 
 		cv::Mat Rinv = R.t();
 		cv::Mat pos = -Rinv*t;
-		user->AddDevicePosition(pos);
+		user->AddDevicePosition(pos);*/
 	}
 
 	cv::Point2f CalcLinePoint2(float val, cv::Mat mLine, bool opt) {
@@ -611,7 +618,10 @@ namespace EdgeSLAM {
 				F = pUser->mapFrames.Get(id);
 			continue;
 		}*/
-
+		cv::Mat P;
+		cv::Mat T;
+		
+		
 		//cv::Mat dst = F->imgColor.clone();
 		//std::memcpy(data.data, res.data(), res.size());
 

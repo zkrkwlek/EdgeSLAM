@@ -68,10 +68,9 @@ namespace EdgeSLAM {
 		float t_prev = 1000.0;
 		float t_init = 1000.0;
 		float t_frame = 1000.0;
-
 		LocalMap* pLocalMap = new LocalCovisibilityMap();
 
-		std::cout << "Frame = " << user->userName <<" "<<id<< "=start!!" << std::endl;
+		//std::cout << "Frame = " << user->userName <<" "<<id<< "=start!!" << std::endl;
 		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
 		////receive image
@@ -85,7 +84,6 @@ namespace EdgeSLAM {
 		cv::Mat img = cv::imdecode(temp, cv::IMREAD_COLOR);
 		std::chrono::high_resolution_clock::time_point received = std::chrono::high_resolution_clock::now();
 		////receive image
-		
 		/////save image
 		/*std::stringstream sss;
 		sss << "../bin/img/" << user->userName << "/" << id << "_color.jpg";
@@ -124,7 +122,7 @@ namespace EdgeSLAM {
 				map->mvpKeyFrameOrigins.push_back(kf1);
 				/*user->mapKeyFrames[kf1->mnId] = kf1;
 				user->mapKeyFrames[kf2->mnId] = kf2;*/
-				user->mnReferenceKeyFrameID = kf2->mnId;
+				user->mpRefKF = kf2;
 				user->mnLastKeyFrameID = frame->mnFrameID;
 				pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf1);
 				pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf2);
@@ -157,7 +155,8 @@ namespace EdgeSLAM {
 				auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 				float t_test1 = du_test1 / 1000.0;
 				
-				//system->UpdateRelocTime(t_test1);
+				int N = system->GetConnectedDevice();
+				system->ProcessingTime.Get(N)["reloc"]->add(t_test1);
 			}
 			else {
 				if (userState == UserState::Success) {
@@ -243,9 +242,8 @@ namespace EdgeSLAM {
 			cv::Mat T = frame->GetPose();
 			user->UpdatePose(T, ts);
 			//check keyframe
-			if (user->mbMapping) {
-				auto ref = map->GetKeyFrame(user->mnReferenceKeyFrameID);
-				if (Tracker::NeedNewKeyFrame(map, system->mpLocalMapper, frame, ref, nInliers, user->mnLastKeyFrameID.load(), user->mnLastRelocFrameId.load())) {
+			if (user->mbMapping && user->mpRefKF) {
+				if (Tracker::NeedNewKeyFrame(map, system->mpLocalMapper, frame, user->mpRefKF, nInliers, user->mnLastKeyFrameID.load(), user->mnLastRelocFrameId.load())) {
 					Tracker::CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, user);
 					Segmentator::RequestSegmentation(user->userName, frame->mnFrameID);
 				}
@@ -287,7 +285,7 @@ namespace EdgeSLAM {
 		
 		//int tempID = user->mnPrevFrameID;
 		user->mnPrevFrameID = frame->mnFrameID;
-		if (mapState == MapState::Initialized&&user->prevFrame)
+		if (mapState == MapState::Initialized && user->prevFrame)
 			delete user->prevFrame;
 		user->prevFrame = frame;
 		user->mbProgress = false; 
@@ -305,7 +303,10 @@ namespace EdgeSLAM {
 		int N = system->GetConnectedDevice();
 		system->ProcessingTime.Get(N)["download"]->add(t_test1);
 		system->ProcessingTime.Get(N)["tracking"]->add(t_test2);
-
+		if (mapState == MapState::Initialized && !user->mbMapping) {
+			int ntemp = userState == UserState::Success ? 1 : 0;
+			system->SuccessRatio.Get("skipframe")[user->mnSkip]->increase(ntemp);
+		}
 		std::cout << "Frame = " << user->userName << " : " << id << ", Matches = " << nInliers << ", time =" << t_test1 <<", "<< t_test2<<"="<< t_local <<" "<<t_prev<<" "<< t_init <<" "<<t_frame<< std::endl;
 		
 		//system->UpdateTrackingTime(t_test1);
@@ -688,7 +689,7 @@ namespace EdgeSLAM {
 		if (!map->SetNotStop(true))
 			return;
 		KeyFrame* pKF = new KeyFrame(cur, map);
-		user->mnReferenceKeyFrameID = pKF->mnId;
+		user->mpRefKF = pKF;
 		user->mnLastKeyFrameID = cur->mnFrameID;
 		pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, pKF);
 		map->SetNotStop(false);

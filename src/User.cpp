@@ -6,12 +6,12 @@
 #include <MotionModel.h>
 
 namespace EdgeSLAM {
-	User::User():mbMotionModel(false), mnVisID(0){
+	User::User():mbMotionModel(false), mpRefKF(nullptr), mnVisID(0){
 
 	}
-	User::User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, bool _b, bool _bTracking, bool _bimu) : userName(_user), mapName(_map), mbMapping(_b), mState(UserState::NotEstimated),
-		Rgyro(cv::Mat::eye(3, 3, CV_32FC1)), tacc(cv::Mat::zeros(3, 1, CV_32FC1)), mbIMU(_bimu), mbDeviceTracking(_bTracking), mnQuality(q),
-		mbProgress(false), mnReferenceKeyFrameID(-1), mnLastKeyFrameID(-1), mnPrevFrameID(-1), mnCurrFrameID(-1), mnLastRelocFrameId(-1), mbMotionModel(false), mnVisID(0)
+	User::User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, int nskip, bool _b, bool _bTracking, bool _bimu, bool _bsave) : userName(_user), mapName(_map), mbMapping(_b), mState(UserState::NotEstimated),
+		Rgyro(cv::Mat::eye(3, 3, CV_32FC1)), tacc(cv::Mat::zeros(3, 1, CV_32FC1)), mbIMU(_bimu), mbDeviceTracking(_bTracking), mbSaveTrajectory(_bsave), mnQuality(q), mnSkip(nskip),
+		mbProgress(false), mpRefKF(nullptr), mnLastKeyFrameID(-1), mnPrevFrameID(-1), mnCurrFrameID(-1), mnLastRelocFrameId(-1), mbMotionModel(false), mnVisID(0)
 	{
 		mpMotionModel = new MotionModel();
 		mpCamPose = new CameraPose();
@@ -39,11 +39,12 @@ namespace EdgeSLAM {
 		mapFrames.Release();
 		objFrames.Release();
 		*/
+		mvDeviceTimeStamps.Release();
+		mvDeviceTrajectories.Release();
 		for (int i = 0, iend = vecTrajectories.size(); i < iend; i++)
 			vecTrajectories[i].release();
 		std::vector<cv::Mat>().swap(vecTrajectories);
 		std::vector<double>().swap(vecTimestamps);
-		std::vector<cv::Mat>().swap(mVecDevicePositions);
 		//delete mapFrames;
 	}
 
@@ -105,13 +106,5 @@ namespace EdgeSLAM {
 	int User::GetVisID(){
 		std::unique_lock<std::mutex> lock(mMutexVisID);
 		return mnVisID;
-	}
-	void User::AddDevicePosition(cv::Mat pos) {
-		std::unique_lock<std::mutex> lock(mMutexDevicePositions);
-		mVecDevicePositions.push_back(pos);
-	}
-	std::vector<cv::Mat> User::GetDevicePositions(){
-		std::unique_lock<std::mutex> lock(mMutexDevicePositions);
-		return mVecDevicePositions;
 	}
 }

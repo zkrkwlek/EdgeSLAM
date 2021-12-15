@@ -6,6 +6,7 @@
 #include <opencv2/core.hpp>
 #include <atomic>
 #include <ConcurrentMap.h>
+#include <ConcurrentVector.h>
 
 namespace EdgeSLAM {
 
@@ -23,7 +24,7 @@ namespace EdgeSLAM {
 	class User {
 	public:
 		User();
-		User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, bool _b, bool bDeviceTracking = false, bool bimu = false);
+		User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, int nskip, bool _b, bool bDeviceTracking = false, bool bimu = false, bool bsave = false);
 		virtual ~User();
 	public:
 		bool mbMotionModel;
@@ -39,14 +40,19 @@ namespace EdgeSLAM {
 
 		cv::Mat GetCameraMatrix();
 		cv::Mat GetCameraInverseMatrix();
+
+		ConcurrentVector<cv::Mat> mvDeviceTrajectories;
+		ConcurrentVector<double> mvDeviceTimeStamps;
+
 	public:
 		std::string userName;
 		std::string mapName;
 		int mnQuality;
+		int mnSkip;
 		Map* mpMap;
 		Camera* mpCamera;
 		CameraPose* mpCamPose;
-		bool mbMapping, mbIMU, mbDeviceTracking;
+		bool mbMapping, mbIMU, mbDeviceTracking, mbSaveTrajectory;
 
 		Frame* prevFrame;
 		std::vector<cv::Mat> vecTrajectories;
@@ -56,11 +62,10 @@ namespace EdgeSLAM {
 		ConcurrentMap<int, ObjectFrame*> objFrames;*/
 		
 		////frame id와 키프레임 id의 대응이 필요함.
-
-
 		//std::map<int, KeyFrame*> mapKeyFrames;
+		KeyFrame* mpRefKF;
 		std::atomic<bool> mbProgress;
-		std::atomic<int> mnReferenceKeyFrameID, mnLastKeyFrameID, mnPrevFrameID, mnCurrFrameID, mnLastRelocFrameId;
+		std::atomic<int> mnLastKeyFrameID, mnPrevFrameID, mnCurrFrameID, mnLastRelocFrameId;
 	
 	public:
 		UserState GetState();
@@ -73,14 +78,9 @@ namespace EdgeSLAM {
 	public:
 		void SetVisID(int id);
 		int GetVisID();
-		void AddDevicePosition(cv::Mat pos);
-		std::vector<cv::Mat> GetDevicePositions();
 	private:
 		int mnVisID;
 		std::mutex mMutexVisID;
-
-		std::mutex mMutexDevicePositions;
-		std::vector<cv::Mat> mVecDevicePositions;
 
 		std::mutex mMutexGyro, mMutexAcc;
 		cv::Mat Rgyro, tacc;
