@@ -348,12 +348,15 @@ namespace EdgeSLAM {
 			return;
 		
 		std::stringstream ssPath;
-		std::cout << "????" << std::endl;
-		std::cout << user->mnQuality << std::endl;
-		std::cout << user->mapName << std::endl;
-		ssPath << "../bin/trajectory/" << user->mapName << "_" << user->mnQuality;
+		ssPath << "../bin/trajectory/" << user->mapName;
 		
 		int resPath = _access(ssPath.str().c_str(), 0);
+		if (resPath == -1)
+			_mkdir(ssPath.str().c_str());
+
+		ssPath << "/" << user->mapName << "_" << user->mnQuality;
+
+		resPath = _access(ssPath.str().c_str(), 0);
 		if (resPath == -1)
 			_mkdir(ssPath.str().c_str());
 
@@ -386,8 +389,7 @@ namespace EdgeSLAM {
 			
 		}
 		else{
-			
-			for (int i = 0; i < user->vecTrajectories.size(); i++) {
+			for (int i = 0; i < user->vecTrajectories.size(); i += 2) {
 				cv::Mat R = user->vecTrajectories[i].rowRange(0, 3).colRange(0, 3);
 				cv::Mat t = user->vecTrajectories[i].rowRange(0, 3).col(3);
 				R = R.t(); //inverse
@@ -407,15 +409,18 @@ namespace EdgeSLAM {
 
 			auto vecTrajectories = user->mvDeviceTrajectories.get();
 			auto vecTimestamps = user->mvDeviceTimeStamps.get();
-			for (int i = 0; i < vecTrajectories.size(); i++) {
-				cv::Mat R = vecTrajectories[i].rowRange(0, 3).colRange(0, 3);
-				cv::Mat t = vecTrajectories[i].rowRange(0, 3).col(3);
+			
+			for (int i = 0; i < vecTrajectories.size(); i+=10) {
+				
+				cv::Mat R = vecTrajectories[i].rowRange(0, 3);
+				cv::Mat t = vecTrajectories[i].row(3).t();
 				R = R.t(); //inverse
 				t = -R*t;  //camera center
 				std::vector<float> q = Converter::toQuaternion(R);
 				f << std::setprecision(6) << vecTimestamps[i] << std::setprecision(7) << " " << t.at<float>(0) << " " << t.at<float>(1) << " " << t.at<float>(2)
 					<< " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
 			}
+			f.close();
 		}
 	}
 	void SLAM::AddMap(std::string name, Map* pMap) {
