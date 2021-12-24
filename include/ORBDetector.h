@@ -13,6 +13,7 @@ namespace EdgeSLAM {
 	public:
 		ORBDetector(int nFeatures = 1000, float fScaleFactor = 1.2, int nLevels = 8, float fInitThFast = 20, float fMinThFast = 7);
 		virtual ~ORBDetector();
+		void Compute(cv::InputArray image, cv::InputArray mask, std::vector<cv::KeyPoint>& keypoints, cv::OutputArray descriptors);
 		void detectAndCompute(cv::InputArray image, cv::InputArray mask, std::vector<cv::KeyPoint>& keypoints, cv::OutputArray descriptors);
 		void init_sigma_level();
 	private:

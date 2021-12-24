@@ -27,6 +27,7 @@ namespace EdgeSLAM {
 		static bool TrackWithKeyFrame(KeyFrame* ref, Frame* cur);
 		static int  Relocalization(Map* map, User* user, Frame* cur, float thMinDesc);
 
+		static void DownloadKeyPoints(SLAM* system, User* user, int id);
 		static void UpdateDeviceGyro(SLAM* system, User* user, int id);
 		static void SendTrackingResults(SLAM* system, User* user, int nFrameID, int n, cv::Mat R, cv::Mat t);
 		static void SendDeviceTrackingData(SLAM* system, User* user, LocalMap* pLocalMap, Frame* frame, int nInlier, int id);

@@ -15,6 +15,7 @@ namespace EdgeSLAM {
 		virtual ~FeatureDetector();
 	public:
 		virtual void init_sigma_level() {}
+		virtual void Compute(cv::InputArray image, cv::InputArray mask, std::vector<cv::KeyPoint>& keypoints, cv::OutputArray descriptors) {}
 		virtual void detectAndCompute(cv::InputArray image, cv::InputArray mask, std::vector<cv::KeyPoint>& keypoints, cv::OutputArray descriptors){}
 	public:
 		enum cv::NormTypes norm_type;

@@ -128,6 +128,12 @@ namespace EdgeSLAM {
 		}
 		return false;*/
 	}
+	void SLAM::DownloadKeyPoints(std::string user, int id) {
+		if (!CheckUser(user))
+			return;
+		auto pUser = GetUser(user);
+		pool->EnqueueJob(Tracker::DownloadKeyPoints, this, pUser, id);
+	}
 	void SLAM::UpdateDeviceGyroSensor(std::string user, int id) {
 		if (!CheckUser(user))
 			return;
@@ -252,7 +258,28 @@ namespace EdgeSLAM {
 	*/
 	void SLAM::InitProcessingTime() {
 		//ProcessingTime
+
+		std::map<int, ProcessTime*> vec1;
+		std::map<int, ProcessTime*> vec2;
+		std::map<int, ProcessTime*> vec3;
+		std::map<int, ProcessTime*> vec4;
+		std::map<int, ProcessTime*> vec5;
+
 		for (int i = 1; i < 9; i++) {
+			vec1.insert(std::make_pair(i, new ProcessTime("tracking", i)));
+			vec2.insert(std::make_pair(i, new ProcessTime("mapping",i)));
+			vec3.insert(std::make_pair(i, new ProcessTime("reloc", i)));
+			vec4.insert(std::make_pair(i, new ProcessTime("download",i)));
+			vec5.insert(std::make_pair(i, new ProcessTime("upload", i)));
+		}
+
+		ProcessingTime.Update("tracking", vec1);
+		ProcessingTime.Update("mapping", vec2);
+		ProcessingTime.Update("reloc", vec3);
+		ProcessingTime.Update("download", vec4);
+		ProcessingTime.Update("upload", vec5);
+
+		/*for (int i = 1; i < 9; i++) {
 			std::map<std::string, ProcessTime*> vec;
 			std::stringstream ss;
 			ss << "../bin/time/tracking_" << i << ".txt";
@@ -271,7 +298,8 @@ namespace EdgeSLAM {
 			vec.insert(std::make_pair("upload", new ProcessTime(ss.str())));
 			ss.str("");
 			ProcessingTime.Update(i, vec);
-		}
+		}*/
+
 		std::map<int, Ratio*> vec;
 		for (int i = 1; i < 15; i++) {
 			std::stringstream ss;
@@ -282,28 +310,88 @@ namespace EdgeSLAM {
 	}
 	void SLAM::SaveProcessingTime() {
 		
-		auto AllData = ProcessingTime.Get();
-		for (auto iter = AllData.begin(), iend = AllData.end(); iter != iend; iter++) {
-			auto vec = iter->second;
-			for (auto jter = vec.begin(), jend = vec.end(); jter != jend; jter++) {
-				auto temp = jter->second;
-				temp->update();
-				temp->save(temp->getname());
+		{
+			std::ofstream file;
+			std::stringstream ss;
+			ss << "../bin/time/processtime.txt";
+			file.open(ss.str());
+			ss.str("");
+			auto AllData = ProcessingTime.Get();
+
+			{
+				auto data = ProcessingTime.Get("tracking");
+				for (auto iter = data.begin(), iend = data.end(); iter != iend; iter++) {
+					auto temp = iter->second;
+					temp->update();
+					ss << temp->print() << std::endl;
+				}
 			}
+			{
+				auto data = ProcessingTime.Get("mapping");
+				for (auto iter = data.begin(), iend = data.end(); iter != iend; iter++) {
+					auto temp = iter->second;
+					temp->update();
+					ss << temp->print() << std::endl;
+				}
+			}
+			{
+				auto data = ProcessingTime.Get("reloc");
+				for (auto iter = data.begin(), iend = data.end(); iter != iend; iter++) {
+					auto temp = iter->second;
+					temp->update();
+					ss << temp->print() << std::endl;
+				}
+			}
+			{
+				auto data = ProcessingTime.Get("download");
+				for (auto iter = data.begin(), iend = data.end(); iter != iend; iter++) {
+					auto temp = iter->second;
+					temp->update();
+					ss << temp->print() << std::endl;
+				}
+			}
+			{
+				auto data = ProcessingTime.Get("upload");
+				for (auto iter = data.begin(), iend = data.end(); iter != iend; iter++) {
+					auto temp = iter->second;
+					temp->update();
+					ss << temp->print() << std::endl;
+				}
+			}
+
+			/*for (auto iter = AllData.begin(), iend = AllData.end(); iter != iend; iter++) {
+				auto vec = iter->second;
+				for (auto jter = vec.begin(), jend = vec.end(); jter != jend; jter++) {
+					auto temp = jter->second;
+					temp->update();
+					ss << temp->print() << std::endl;
+				}
+			}*/
+			file.write(ss.str().c_str(), ss.str().size());
+			file.close();
 		}
-		auto RatioData = SuccessRatio.Get();
-		for (auto iter = RatioData.begin(), iend = RatioData.end(); iter != iend; iter++) {
-			auto vec = iter->second;
-			for (auto jter = vec.begin(), jend = vec.end(); jter != jend; jter++) {
-				auto temp = jter->second;
-				temp->update();
-				temp->save(temp->getname());
+		{
+			std::ofstream file;
+			std::stringstream ss;
+			ss << "../bin/time/skipframe.txt";
+			file.open(ss.str());
+			ss.str("");
+			auto RatioData = SuccessRatio.Get();
+			for (auto iter = RatioData.begin(), iend = RatioData.end(); iter != iend; iter++) {
+				auto vec = iter->second;
+				for (auto jter = vec.begin(), jend = vec.end(); jter != jend; jter++) {
+					auto temp = jter->second;
+					temp->update();
+					ss << temp->print() << std::endl;
+				}
 			}
+			file.write(ss.str().c_str(), ss.str().size());
+			file.close();
 		}
 	}
 	void SLAM::LoadProcessingTime(){
 		
-		for (int i = 1; i < 9; i++) {
+		/*for (int i = 1; i < 9; i++) {
 			std::map<std::string,ProcessTime*> vec;
 			std::stringstream ss;
 			ss << "../bin/time/tracking_" << i << ".txt";
@@ -331,17 +419,86 @@ namespace EdgeSLAM {
 			vec.insert(std::make_pair("download", p4));
 			vec.insert(std::make_pair("upload", p5));
 			ProcessingTime.Update(i, vec);
-		}
-
-		std::map<int, Ratio*> vec;
-		for (int i = 1; i < 15; i++) {
+		}*/
+		{
+			std::ifstream file;
 			std::stringstream ss;
-			ss << "../bin/time/skipframe_" << i << ".txt";
-			auto ratio = new Ratio(ss.str());
-			ratio->load(ss.str());
-			vec.insert(std::make_pair(i, ratio));
+			ss << "../bin/time/processtime.txt";
+			file.open(ss.str());
+			ss.str("");
+			std::string s;
+
+			std::map<int, ProcessTime*> vec1;
+			for (int i = 1; i < 9; i++)
+			{
+				auto p = new ProcessTime();
+				getline(file, s);
+				p->load(s);
+				vec1.insert(std::make_pair(i, p));
+			}
+			ProcessingTime.Update("tracking", vec1);
+
+			std::map<int, ProcessTime*> vec2;
+			for (int i = 1; i < 9; i++)
+			{
+				auto p = new ProcessTime();
+				getline(file, s);
+				p->load(s);
+				vec2.insert(std::make_pair(i, p));
+			}
+			ProcessingTime.Update("mapping", vec2);
+
+			std::map<int, ProcessTime*> vec3;
+			for (int i = 1; i < 9; i++)
+			{
+				auto p = new ProcessTime();
+				getline(file, s);
+				p->load(s);
+				vec3.insert(std::make_pair(i, p));
+			}
+			ProcessingTime.Update("reloc", vec3);
+
+			std::map<int, ProcessTime*> vec4;
+			for (int i = 1; i < 9; i++)
+			{
+				auto p = new ProcessTime();
+				getline(file, s);
+				p->load(s);
+				vec4.insert(std::make_pair(i, p));
+			}
+			ProcessingTime.Update("download", vec4);
+
+			std::map<int, ProcessTime*> vec5;
+			for (int i = 1; i < 9; i++)
+			{
+				auto p = new ProcessTime();
+				getline(file, s);
+				p->load(s);
+				vec5.insert(std::make_pair(i, p));
+			}
+			ProcessingTime.Update("upload", vec5);
 		}
-		SuccessRatio.Update("skipframe", vec);
+		{
+			std::ifstream file;
+			std::stringstream ss;
+			ss << "../bin/time/skipframe.txt";
+			file.open(ss.str());
+			ss.str("");
+			std::string s;
+
+			std::map<int, Ratio*> vec;
+			for (int i = 1; i < 15; i++) {
+				//std::stringstream ss;
+				/*ss << "../bin/time/skipframe_" << i << ".txt";*/
+				auto ratio = new Ratio(ss.str());
+				getline(file, s);
+				//ss << s;
+				ratio->load(s);
+				vec.insert(std::make_pair(i, ratio));
+			}
+			SuccessRatio.Update("skipframe", vec);
+		}
+		
 	}
 	void SLAM::SaveTrajectory(User* user) {
 		if (!user->mbSaveTrajectory)

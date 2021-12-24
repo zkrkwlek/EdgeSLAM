@@ -20,6 +20,55 @@ namespace EdgeSLAM {
 	{
 		
 	}
+
+	Frame::Frame(cv::Mat img, cv::Mat data, Camera* pCam, int id, double time_stamp) :mnFrameID(id), mdTimeStamp(time_stamp), mpCamera(pCam),
+		K(pCam->K), D(pCam->D), InvK(pCam->Kinv), fx(pCam->fx), fy(pCam->fy), cx(pCam->cx), cy(pCam->cy), invfx(pCam->invfx), invfy(pCam->invfy), mnMinX(pCam->u_min), mnMaxX(pCam->u_max), mnMinY(pCam->v_min), mnMaxY(pCam->v_max), mfGridElementWidthInv(pCam->mfGridElementWidthInv), mfGridElementHeightInv(pCam->mfGridElementHeightInv), FRAME_GRID_COLS(pCam->mnGridCols), FRAME_GRID_ROWS(pCam->mnGridRows), mbDistorted(pCam->bDistorted),
+		mnScaleLevels(Detector->mnScaleLevels), mfScaleFactor(Detector->mfScaleFactor), mfLogScaleFactor(Detector->mfLogScaleFactor), mvScaleFactors(Detector->mvScaleFactors), mvInvScaleFactors(Detector->mvInvScaleFactors), mvLevelSigma2(Detector->mvLevelSigma2), mvInvLevelSigma2(Detector->mvInvLevelSigma2)
+	{
+		
+		mpCamPose = new CameraPose();
+		cv::Mat gray;
+		cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);//COLOR_BGR2GRAY
+		N = data.rows;
+		//mvKeys.resize(N);
+		for (int i = 0; i < N; i++)
+		{
+			cv::KeyPoint kp;
+			kp.pt.x = data.at<float>(i, 0);
+			kp.pt.y = data.at<float>(i, 1);
+			kp.octave = 0;
+			mvKeys.push_back(kp);
+		}
+		Detector->Compute(gray, cv::Mat(), mvKeys, mDescriptors);
+
+		if (mbDistorted) {
+			cv::Mat mat = data.reshape(2);
+			cv::undistortPoints(mat, mat, K, D, cv::Mat(), K);
+			mat = mat.reshape(1);
+
+			// Fill undistorted keypoint vector
+			mvKeysUn.resize(N);
+			for (int i = 0; i<N; i++)
+			{
+				cv::KeyPoint kp;
+				kp.pt.x = mat.at<float>(i, 0);
+				kp.pt.y = mat.at<float>(i, 1);
+				kp.octave = 0;
+				mvKeysUn[i] = kp;
+			}
+		}
+		else {
+			mvKeysUn = mvKeys;
+		}
+
+		mGrid = new std::vector<size_t>*[FRAME_GRID_COLS];
+		for (int i = 0; i < FRAME_GRID_COLS; i++)
+			mGrid[i] = new std::vector<size_t>[FRAME_GRID_ROWS];
+
+		AssignFeaturesToGrid();
+
+	}
+
 	Frame::Frame(cv::Mat img, Camera* pCam, int id, double time_stamp):mnFrameID(id), mdTimeStamp(time_stamp), mpCamera(pCam),
 		K(pCam->K), D(pCam->D), InvK(pCam->Kinv), fx(pCam->fx),fy(pCam->fy), cx(pCam->cx), cy(pCam->cy), invfx(pCam->invfx), invfy(pCam->invfy), mnMinX(pCam->u_min), mnMaxX(pCam->u_max), mnMinY(pCam->v_min), mnMaxY(pCam->v_max), mfGridElementWidthInv(pCam->mfGridElementWidthInv), mfGridElementHeightInv(pCam->mfGridElementHeightInv), FRAME_GRID_COLS(pCam->mnGridCols), FRAME_GRID_ROWS(pCam->mnGridRows), mbDistorted(pCam->bDistorted),
 		mnScaleLevels(Detector->mnScaleLevels), mfScaleFactor(Detector->mfScaleFactor), mfLogScaleFactor(Detector->mfLogScaleFactor), mvScaleFactors(Detector->mvScaleFactors), mvInvScaleFactors(Detector->mvInvScaleFactors), mvLevelSigma2(Detector->mvLevelSigma2), mvInvLevelSigma2(Detector->mvInvLevelSigma2)

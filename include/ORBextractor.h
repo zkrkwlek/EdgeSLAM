@@ -60,6 +60,7 @@ namespace EdgeSLAM
 		void operator()(cv::InputArray image, cv::InputArray mask,
 			std::vector<cv::KeyPoint>& keypoints,
 			cv::OutputArray descriptors);
+		void Compute(cv::InputArray _image, cv::InputArray _mask, std::vector<cv::KeyPoint>& _keypoints, cv::OutputArray _descriptors);
 
 		int inline GetLevels() {
 			return nlevels;

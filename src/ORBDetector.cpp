@@ -7,9 +7,14 @@ namespace EdgeSLAM {
 		init_sigma_level();
 	}
 	ORBDetector::~ORBDetector() {}
+	
 	void ORBDetector::detectAndCompute(cv::InputArray image, cv::InputArray mask, std::vector<cv::KeyPoint>& keypoints, cv::OutputArray descriptors) {
 		(*detector)(image, mask, keypoints, descriptors);
 	}
+	void ORBDetector::Compute(cv::InputArray image, cv::InputArray mask, std::vector<cv::KeyPoint>& keypoints, cv::OutputArray descriptors) {
+		(*detector).Compute(image, mask, keypoints, descriptors);
+	}
+
 	void ORBDetector::init_sigma_level() {
 		mnScaleLevels = detector->GetLevels();
 		mfScaleFactor = detector->GetScaleFactor();

@@ -28,6 +28,7 @@ namespace EdgeSLAM {
 	public:
 		Frame();
 		Frame(const Frame &src);
+		Frame(cv::Mat img, cv::Mat data, Camera* pCam, int id, double time_stamp = 0.0);
 		Frame(cv::Mat img, Camera* pCam, int id, double time_stamp = 0.0);
 		virtual ~Frame();
 	public:

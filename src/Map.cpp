@@ -99,6 +99,7 @@ namespace EdgeSLAM {
 				}
 			}
 			{
+				////이 안에서 에러 있음.
 				std::unique_lock<std::mutex> lock(mMutexKFs);
 				for (auto iter = mmpKeyFrames.begin(), iend = mmpKeyFrames.end(); iter != iend; iter++)
 				{

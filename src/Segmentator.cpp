@@ -102,8 +102,6 @@ namespace EdgeSLAM {
 		auto res = mpAPI->Send(ss.str(), "");
 		int n2 = res.size();
 
-		std::cout << "as;dlfjlasdfjasdf" << std::endl;
-
 		cv::Mat fdata = cv::Mat::zeros(4, 3, CV_32FC1);
 		std::memcpy(fdata.data, res.data(), res.size());
 		user->mvDeviceTrajectories.push_back(fdata.clone());

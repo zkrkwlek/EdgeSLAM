@@ -57,6 +57,8 @@ namespace EdgeSLAM {
 		Frame* prevFrame;
 		std::vector<cv::Mat> vecTrajectories;
 		std::vector<double> vecTimestamps;
+
+		ConcurrentMap<int, cv::Mat> mapKeyPoints;
 		//std::map<int, Frame*> mapFrames;
 		/*ConcurrentMap<int, Frame*> mapFrames;
 		ConcurrentMap<int, ObjectFrame*> objFrames;*/

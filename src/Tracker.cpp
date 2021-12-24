@@ -42,6 +42,21 @@ namespace EdgeSLAM {
 
 		return cv::Point2f(x, y);
 	}
+
+	void Tracker::DownloadKeyPoints(SLAM* system, User* user, int id) {
+		std::stringstream ss;
+		ss << "/Load?keyword=Keypoints" << "&id=" << id << "&src=" << user->userName;
+		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
+		auto res = mpAPI->Send(ss.str(), "");
+		int n2 = res.size();
+
+		cv::Mat fdata = cv::Mat::zeros(n2/8, 2, CV_32FC1);
+		std::memcpy(fdata.data, res.data(), res.size());
+		user->mapKeyPoints.Update(id, fdata.clone());
+
+		delete mpAPI;
+	}
+
 	void Tracker::UpdateDeviceGyro(SLAM* system, User* user, int id) {
 		std::stringstream ss;
 		ss << "/Load?keyword=Gyro" << "&id=" << id << "&src=" << user->userName;
@@ -90,8 +105,23 @@ namespace EdgeSLAM {
 		cv::imwrite(sss.str(), img);*/
 		/////save image
 		
+		/////KP 여기도 플래그 추가하기
+		Frame* frame = nullptr;
 		std::chrono::high_resolution_clock::time_point t_frame_s = std::chrono::high_resolution_clock::now();
-		Frame* frame = new Frame(img, cam, id, ts);
+		//if (user->mbMapping) {
+		//	while (user->mapKeyPoints.Count(id) == 0)
+		//	{
+		//		continue;
+		//	}
+		//	//KP
+		//	cv::Mat data = user->mapKeyPoints.Get(id);
+		//	user->mapKeyPoints.Erase(id);
+		//	frame = new Frame(img, data, cam, id, ts);
+		//}
+		//else {
+		//	frame = new Frame(img, cam, id, ts);
+		//}
+		frame = new Frame(img, cam, id, ts);
 		std::chrono::high_resolution_clock::time_point t_frame_e = std::chrono::high_resolution_clock::now();
 		auto du_frame = std::chrono::duration_cast<std::chrono::milliseconds>(t_frame_e - t_frame_s).count();
 		t_frame = du_frame / 1000.0;
@@ -156,7 +186,7 @@ namespace EdgeSLAM {
 				float t_test1 = du_test1 / 1000.0;
 				
 				int N = system->GetConnectedDevice();
-				system->ProcessingTime.Get(N)["reloc"]->add(t_test1);
+				system->ProcessingTime.Get("reloc")[N]->add(t_test1);
 			}
 			else {
 				if (userState == UserState::Success) {
@@ -301,8 +331,8 @@ namespace EdgeSLAM {
 		delete mpAPI;
 
 		int N = system->GetConnectedDevice();
-		system->ProcessingTime.Get(N)["download"]->add(t_test1);
-		system->ProcessingTime.Get(N)["tracking"]->add(t_test2);
+		system->ProcessingTime.Get("download")[N]->add(t_test1);
+		system->ProcessingTime.Get("tracking")[N]->add(t_test2);
 		if (mapState == MapState::Initialized && !user->mbMapping) {
 			int ntemp = userState == UserState::Success ? 1 : 0;
 			system->SuccessRatio.Get("skipframe")[user->mnSkip]->increase(ntemp);
@@ -780,8 +810,15 @@ namespace EdgeSLAM {
 			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 			std::stringstream ss;
 			ss << "/Store?keyword=ReferenceFrame&id=" << id << "&src=" << user->userName << "&type2=" << user->userName;
+			std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
 			auto res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
+			std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
 			delete mpAPI;
+			
+			auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(e - s).count();
+			float t_test1 = du_test1 / 1000.0;
+			int N = system->GetConnectedDevice();
+			system->ProcessingTime.Get("upload")[N]->add(t_test1);
 		}
 	
 		////data

@@ -326,14 +326,16 @@ namespace EdgeSLAM {
 					else {
 						cv::circle(tempVis, pt1, 4, userColors[i], -1);
 					}
-					
-					/*auto dPoses = user->GetDevicePositions();
-					for (int j = 0, jend = dPoses.size(); j < jend; j++) {
-						auto pos = dPoses[j];
-						cv::Point2f pt1 = cv::Point2f(pos.at<float>(mnAxis1)* mnVisScale, pos.at<float>(mnAxis2)* mnVisScale);
-						pt1 += mVisMidPt;
-						cv::circle(tempVis, pt1, 2, userColors[i], -1);
-					}*/
+					//auto vecTrajectories = user->mvDeviceTrajectories.get();
+					//for (int j = 0; j < vecTrajectories.size(); j += 1) {
+
+					//	cv::Mat R = vecTrajectories[j].rowRange(0, 3);
+					//	cv::Mat t = vecTrajectories[j].row(3).t();
+					//	t = -R.t()*t;  //camera center
+					//	cv::Point2f pt1 = cv::Point2f(t.at<float>(mnAxis1)* mnVisScale, t.at<float>(mnAxis2)* mnVisScale);
+					//	pt1 += mVisMidPt;
+					//	cv::circle(tempVis, pt1, 1, userColors[i], -1);
+					//}
 				}
 				std::vector<User*>().swap(vpUsers);
 			}

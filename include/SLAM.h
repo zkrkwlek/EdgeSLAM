@@ -60,6 +60,7 @@ namespace EdgeSLAM {
 		void RemoveUser(std::string id);
 		User* GetUser(std::string id);
 		std::vector<User*> GetAllUsersInMap(std::string map);
+		void DownloadKeyPoints(std::string user, int id);
 		void UpdateDeviceGyroSensor(std::string user, int id);
 		void UpdateDevicePosition(std::string user, int id, double ts);
 		void AddMap(std::string name, Map* pMap);
@@ -87,7 +88,7 @@ namespace EdgeSLAM {
 
 	//////Save Data
 	public:
-		ConcurrentMap<int, std::map<std::string, ProcessTime*>> ProcessingTime;
+		ConcurrentMap<std::string, std::map<int, ProcessTime*>> ProcessingTime;
 		ConcurrentMap<std::string, std::map<int, Ratio*>> SuccessRatio;
 		//std::map<int, std::vector<ProcessTime*>> ProcessTime;
 		/*

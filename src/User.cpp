@@ -45,6 +45,8 @@ namespace EdgeSLAM {
 			vecTrajectories[i].release();
 		std::vector<cv::Mat>().swap(vecTrajectories);
 		std::vector<double>().swap(vecTimestamps);
+
+		mapKeyPoints.Release();
 		//delete mapFrames;
 	}
 

@@ -918,6 +918,77 @@ namespace EdgeSLAM
 		}
 	}
 
+	void ORBextractor::Compute(cv::InputArray _image, cv::InputArray _mask, std::vector<cv::KeyPoint>& _keypoints, cv::OutputArray _descriptors)
+	{
+		vector < vector<KeyPoint> > allKeypoints(nlevels);
+		for (size_t i = 0, iend = _keypoints.size(); i < iend; i++)
+		{
+			auto kp = _keypoints[i];
+			int level = kp.octave;
+			float scale = mvScaleFactor[level];
+			kp.pt /= scale;
+			allKeypoints[level].push_back(kp);
+		}
+
+		Mat image = _image.getMat();
+		assert(image.type() == CV_8UC1);
+
+		std::vector<cv::Mat> vImagePyramid(nlevels);
+		// Pre-compute the scale pyramid
+		ComputePyramid(image, vImagePyramid);
+
+		// compute orientations
+		for (int level = 0; level < nlevels; ++level)
+			computeOrientation(vImagePyramid[level], allKeypoints[level], umax);
+
+		Mat descriptors;
+
+		int nkeypoints = 0;
+		for (int level = 0; level < nlevels; ++level)
+			nkeypoints += (int)allKeypoints[level].size();
+		if (nkeypoints == 0)
+			_descriptors.release();
+		else
+		{
+			_descriptors.create(nkeypoints, 32, CV_8U);
+			descriptors = _descriptors.getMat();
+		}
+
+		_keypoints.clear();
+		_keypoints.reserve(nkeypoints);
+
+		int offset = 0;
+		for (int level = 0; level < nlevels; ++level)
+		{
+			vector<KeyPoint>& keypoints = allKeypoints[level];
+			int nkeypointsLevel = (int)keypoints.size();
+
+			if (nkeypointsLevel == 0)
+				continue;
+
+			// preprocess the resized image
+			Mat workingMat = vImagePyramid[level].clone();
+			GaussianBlur(workingMat, workingMat, Size(7, 7), 2, 2, BORDER_REFLECT_101);
+
+			// Compute the descriptors
+			Mat desc = descriptors.rowRange(offset, offset + nkeypointsLevel);
+			computeDescriptors(workingMat, keypoints, desc, pattern);
+
+			offset += nkeypointsLevel;
+
+			// Scale keypoint coordinates
+			if (level != 0)
+			{
+				float scale = mvScaleFactor[level]; //getScale(level, firstLevel, scaleFactor);
+				for (vector<KeyPoint>::iterator keypoint = keypoints.begin(),
+					keypointEnd = keypoints.end(); keypoint != keypointEnd; ++keypoint)
+					keypoint->pt *= scale;
+			}
+			// And add the keypoints to the output
+			_keypoints.insert(_keypoints.end(), keypoints.begin(), keypoints.end());
+		}
+	}
+
 	void ORBextractor::ComputePyramid(cv::Mat image, std::vector<cv::Mat>& vImagePyramid)
 	{
 		for (int level = 0; level < nlevels; ++level)
