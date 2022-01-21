@@ -9,7 +9,7 @@ namespace EdgeSLAM {
 	Visualizer::Visualizer() {
 
 	}
-	Visualizer::Visualizer(SLAM* pSystem):mpSystem(pSystem), mpMap(nullptr), mnVisScale(20), mnDisplayX(100), mnDisplayY(100), mbDoingProcess(false){
+	Visualizer::Visualizer(SLAM* pSystem):mpSystem(pSystem), mpMap(nullptr), mnVisScale(20), mnDisplayX(0), mnDisplayY(0), mbDoingProcess(false){
 
 	}
 	Visualizer::~Visualizer(){}

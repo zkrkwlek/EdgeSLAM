@@ -103,12 +103,13 @@ namespace EdgeSLAM {
 		pool->EnqueueJob(Segmentator::ProcessDepthEstimation, pool, this, user, id);
 	}
 	//////////////////Multi User and Map
-	void SLAM::CreateMap(std::string name) {
+	void SLAM::CreateMap(std::string name, int nq) {
 		auto pNewMap = new Map(mpDBoWVoc);
 		AddMap(name, pNewMap);
+		MapQuality.Update(name, nq);
 	}
-	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, bool _b, bool _bTracking, bool _bimu, bool _bsave){
-		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _d5, quality, nskip, _b, _bTracking, _bimu, _bsave);
+	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, bool _b, bool _bTracking, bool _bimu, bool _bsave, bool _basync){
+		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _d5, quality, nskip, _b, _bTracking, _bimu, _bsave, _basync);
 		pNewUser->mpMap = GetMap(_map);
 		AddUser(_user, pNewUser);
 	}
@@ -304,7 +305,7 @@ namespace EdgeSLAM {
 		for (int i = 1; i < 15; i++) {
 			std::stringstream ss;
 			ss << "../bin/time/skipframe_" << i << ".txt";
-			vec.insert(std::make_pair(i, new Ratio(ss.str())));
+			//vec.insert(std::make_pair(i, new Ratio(ss.str())));
 		}
 		SuccessRatio.Update("skipframe", vec);
 	}
@@ -373,10 +374,27 @@ namespace EdgeSLAM {
 		{
 			std::ofstream file;
 			std::stringstream ss;
-			ss << "../bin/time/skipframe.txt";
+			ss << "../bin/time/ratio.txt";
 			file.open(ss.str());
 			ss.str("");
-			auto RatioData = SuccessRatio.Get();
+			{
+				auto data = SuccessRatio.Get("async");
+				for (auto iter = data.begin(), iend = data.end(); iter != iend; iter++) {
+					auto temp = iter->second;
+					temp->update();
+					ss << temp->print() << std::endl;
+				}
+			}
+			{
+				auto data = SuccessRatio.Get("skipframe");
+				for (auto iter = data.begin(), iend = data.end(); iter != iend; iter++) {
+					auto temp = iter->second;
+					temp->update();
+					ss << temp->print() << std::endl;
+				}
+			}
+			
+			/*auto RatioData = SuccessRatio.Get();
 			for (auto iter = RatioData.begin(), iend = RatioData.end(); iter != iend; iter++) {
 				auto vec = iter->second;
 				for (auto jter = vec.begin(), jend = vec.end(); jter != jend; jter++) {
@@ -384,7 +402,7 @@ namespace EdgeSLAM {
 					temp->update();
 					ss << temp->print() << std::endl;
 				}
-			}
+			}*/
 			file.write(ss.str().c_str(), ss.str().size());
 			file.close();
 		}
@@ -481,21 +499,33 @@ namespace EdgeSLAM {
 		{
 			std::ifstream file;
 			std::stringstream ss;
-			ss << "../bin/time/skipframe.txt";
+			ss << "../bin/time/ratio.txt";
 			file.open(ss.str());
 			ss.str("");
 			std::string s;
+
+			std::map<int, Ratio*> vec1;
+			for (int i = 10; i < 70; i+=10) {
+				auto ratio = new Ratio();
+				getline(file, s);
+				//ss << s;
+				ratio->load(s);
+				vec1.insert(std::make_pair(i, ratio));
+			}
+			//for(int i = 10; i < )
+			SuccessRatio.Update("async", vec1);
 
 			std::map<int, Ratio*> vec;
 			for (int i = 1; i < 15; i++) {
 				//std::stringstream ss;
 				/*ss << "../bin/time/skipframe_" << i << ".txt";*/
-				auto ratio = new Ratio(ss.str());
+				auto ratio = new Ratio();
 				getline(file, s);
 				//ss << s;
 				ratio->load(s);
 				vec.insert(std::make_pair(i, ratio));
 			}
+			//for(int i = 10; i < )
 			SuccessRatio.Update("skipframe", vec);
 		}
 		
@@ -511,8 +541,24 @@ namespace EdgeSLAM {
 		if (resPath == -1)
 			_mkdir(ssPath.str().c_str());
 
-		ssPath << "/" << user->mapName << "_" << user->mnQuality;
+		
 
+		int nMapQuality = MapQuality.Get(user->mapName);
+		int nUserQuality = user->mnQuality;
+
+		if (user->mbAsyncTest) {
+			ssPath << "/" << user->mapName << "_TrackingTest_" << user->mnQuality;
+		}
+		else {
+			ssPath << "/" << user->mapName << "_" << user->mnQuality;
+		}
+		/*if (nMapQuality != nUserQuality && user->mbDeviceTracking) {
+			ssPath << "/" << user->mapName << "_TrackingTest_" << user->mnQuality;
+		}
+		else {
+			ssPath << "/" << user->mapName << "_" << user->mnQuality;
+		}*/
+		
 		resPath = _access(ssPath.str().c_str(), 0);
 		if (resPath == -1)
 			_mkdir(ssPath.str().c_str());
@@ -530,7 +576,7 @@ namespace EdgeSLAM {
 		std::ofstream f;
 		f.open(ss.str().c_str());
 		f << std::fixed;
-
+		
 		if (user->mbMapping) {
 			for (int i = 0; i < vpKFs.size(); i++) {
 				auto pKF = vpKFs[i];
@@ -543,7 +589,6 @@ namespace EdgeSLAM {
 				f << std::setprecision(6) << pKF->mdTimeStamp << std::setprecision(7) << " " << t.at<float>(0) << " " << t.at<float>(1) << " " << t.at<float>(2)
 					<< " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
 			}
-			
 		}
 		else{
 			for (int i = 0; i < user->vecTrajectories.size(); i += 2) {
@@ -557,6 +602,7 @@ namespace EdgeSLAM {
 			}
 		}
 		f.close();
+
 		if (user->mbDeviceTracking) {
 			std::stringstream ss;
 			ss << ssPath.str() << "/" << user->userName << "_" << user->mnSkip << "_DEVICE_" << newtime.tm_year + 1900 << "_" << newtime.tm_mon + 1 << "_" << newtime.tm_mday << "_" << newtime.tm_hour << "_" << newtime.tm_min << "_" << newtime.tm_sec << ".txt";

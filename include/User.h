@@ -24,7 +24,7 @@ namespace EdgeSLAM {
 	class User {
 	public:
 		User();
-		User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, int nskip, bool _b, bool bDeviceTracking = false, bool bimu = false, bool bsave = false);
+		User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, int nskip, bool _b, bool bDeviceTracking = false, bool bimu = false, bool bsave = false, bool bAsync = false);
 		virtual ~User();
 	public:
 		bool mbMotionModel;
@@ -43,6 +43,7 @@ namespace EdgeSLAM {
 
 		ConcurrentVector<cv::Mat> mvDeviceTrajectories;
 		ConcurrentVector<double> mvDeviceTimeStamps;
+		ConcurrentMap<int, KeyFrame*> KeyFrames; //Frame과 키프레임 연결
 
 	public:
 		std::string userName;
@@ -52,17 +53,13 @@ namespace EdgeSLAM {
 		Map* mpMap;
 		Camera* mpCamera;
 		CameraPose* mpCamPose;
-		bool mbMapping, mbIMU, mbDeviceTracking, mbSaveTrajectory;
+		bool mbMapping, mbIMU, mbDeviceTracking, mbSaveTrajectory, mbAsyncTest;
 
 		Frame* prevFrame;
 		std::vector<cv::Mat> vecTrajectories;
 		std::vector<double> vecTimestamps;
-
 		ConcurrentMap<int, cv::Mat> mapKeyPoints;
-		//std::map<int, Frame*> mapFrames;
-		/*ConcurrentMap<int, Frame*> mapFrames;
-		ConcurrentMap<int, ObjectFrame*> objFrames;*/
-		
+				
 		////frame id와 키프레임 id의 대응이 필요함.
 		//std::map<int, KeyFrame*> mapKeyFrames;
 		KeyFrame* mpRefKF;

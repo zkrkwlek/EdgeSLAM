@@ -252,7 +252,6 @@ namespace EdgeSLAM {
 		const auto vpMapPointsKF = pKF->GetMapPointMatches();
 		
 		vpMapPointMatches = std::vector<MapPoint*>(F->N, static_cast<MapPoint*>(nullptr));
-		std::cout << "???" << vpMapPointMatches.size() << " " << F->N << std::endl;
 		const DBoW3::FeatureVector &vFeatVecKF = pKF->mFeatVec;
 		int nmatches = 0;
 
