@@ -158,6 +158,8 @@ namespace EdgeSLAM {
 		Rinv.copyTo(Tinv.colRange(0, 3).rowRange(0, 3));
 		tinv.copyTo(Tinv.col(3).rowRange(0,3));
 		
+
+
 		////click check
 		/*float m1, m2;
 		cv::Mat line1, line2;
@@ -271,39 +273,39 @@ namespace EdgeSLAM {
 		 floorPlane = new Plane();
 		 wallPlane1 = new Plane();
 		 wallPlane2 = new Plane();
-		 map->ClearPlanarMPs();
+		 //map->ClearPlanarMPs();
 		 {
 			 std::vector<MapPoint*> vpMPs(mspAllFloorPoints.begin(), mspAllFloorPoints.end());
 			 std::vector<MapPoint*> vpOutlierMPs;
 			 floorPlane->mbInit = PlaneProcessor::PlaneInitialization(floorPlane, vpMPs, vpOutlierMPs);
 
-			 if (floorPlane->mbInit) {
+			 /*if (floorPlane->mbInit) {
 				 for (int i = 0, iend = floorPlane->mvpMPs.size(); i < iend; i++) {
 					 auto pMP = floorPlane->mvpMPs[i];
 					 if (!pMP || pMP->isBad())
 						 continue;
 					 map->AddPlanarMP(pMP->GetWorldPos(), 0);
 				 }
-			 }
+			 }*/
 		 }
 		 std::vector<MapPoint*> vpOutlierWallMPs, vpOutlierWallMPs2;
 		 {
 			 std::vector<MapPoint*> vpMPs(mspAllWallPoints.begin(), mspAllWallPoints.end());
 			 
 			 wallPlane1->mbInit = PlaneProcessor::PlaneInitialization(wallPlane1, vpMPs, vpOutlierWallMPs, 1500, 0.01);
-			 if (wallPlane1->mbInit) {
+			 /*if (wallPlane1->mbInit) {
 				 for (int i = 0, iend = wallPlane1->mvpMPs.size(); i < iend; i++) {
 					 auto pMP = wallPlane1->mvpMPs[i];
 					 if (!pMP || pMP->isBad())
 						 continue;
 					 map->AddPlanarMP(pMP->GetWorldPos(), 1);
 				 }
-			 }
+			 }*/
 		 }
 		 if (wallPlane1->mbInit) {
 			 wallPlane2->mbInit = PlaneProcessor::PlaneInitialization(wallPlane2, vpOutlierWallMPs, vpOutlierWallMPs2, 1500, 0.01);
 			 //std::cout << vpOutlierWallMPs.size() << " " << vpOutlierWallMPs2.size() << std::endl;
-			 if (wallPlane2->mbInit) {
+			 /*if (wallPlane2->mbInit) {
 				 
 				 for (int i = 0, iend = wallPlane2->mvpMPs.size(); i < iend; i++) {
 					 auto pMP = wallPlane2->mvpMPs[i];
@@ -311,7 +313,7 @@ namespace EdgeSLAM {
 						 continue;
 					 map->AddPlanarMP(pMP->GetWorldPos(), 2);
 				 }
-			 }
+			 }*/
 		 }
 		 if (floorPlane->mbInit && wallPlane1->mbInit) {
 			 Lw1 = CalcFlukerLine(floorPlane->GetParam(), wallPlane1->GetParam());

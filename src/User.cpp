@@ -4,6 +4,7 @@
 #include <Camera.h>
 #include <CameraPose.h>
 #include <MotionModel.h>
+#include <MapPoint.h>
 
 namespace EdgeSLAM {
 	User::User():mbMotionModel(false), mpRefKF(nullptr), mnVisID(0){
@@ -39,6 +40,15 @@ namespace EdgeSLAM {
 		mapFrames.Release();
 		objFrames.Release();
 		*/
+		
+		auto setMPs = mSetMapPoints.Get();
+		for (auto iter = setMPs.begin(), iend = setMPs.end(); iter != iend; iter++) {
+			auto pMP = *iter;
+			if(pMP->mSetConnected.Count(this))
+				pMP->mSetConnected.Erase(this);
+		}
+		mSetMapPoints.Release();
+
 		mvDeviceTimeStamps.Release();
 		mvDeviceTrajectories.Release();
 		for (int i = 0, iend = vecTrajectories.size(); i < iend; i++)

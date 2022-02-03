@@ -2,7 +2,9 @@
 #include <Map.h>
 #include <Frame.h>
 #include <KeyFrame.h>
+#include <User.h>
 #include <FeatureTracker.h>
+
 namespace EdgeSLAM {
 	std::mutex MapPoint::mGlobalMutex;
 	TrackPoint::TrackPoint():mbTrackInView(false){}
@@ -94,7 +96,7 @@ namespace EdgeSLAM {
 
 	int MapPoint::Observations()
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
+		std::unique_lock<std::mutex> lock(mMutexFeatures);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
 		return nObs;
 	}
 
@@ -114,6 +116,15 @@ namespace EdgeSLAM {
 			pKF->EraseMapPointMatch(mit->second);
 		}
 
+		////short-term 包府
+		auto setUsers = mSetConnected.Get();
+		for (auto iter = setUsers.begin(), iend = setUsers.end(); iter != iend; iter++) {
+			auto pUser = *iter;
+			mSetConnected.Erase(pUser);
+		}
+		////short-term 包府
+
+		mSetConnected.Release();
 		mpMap->RemoveMapPoint(this);
 	}
 

@@ -5,12 +5,14 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <mutex>
+#include <ConcurrentSet.h>
 
 namespace EdgeSLAM {
 	class KeyFrame;
 	class Frame;
 	class Map;
 	class FeatureTracker;
+	class User;
 	class TrackPoint {
 	public:
 		TrackPoint();
@@ -73,6 +75,8 @@ namespace EdgeSLAM {
 		float GetMaxDistanceInvariance();
 		int PredictScale(const float &currentDist, KeyFrame* pKF);
 		int PredictScale(const float &currentDist, Frame* pF);
+
+		ConcurrentSet<User*> mSetConnected;
 
 	public:
 		int mnId;

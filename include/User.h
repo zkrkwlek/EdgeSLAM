@@ -7,6 +7,7 @@
 #include <atomic>
 #include <ConcurrentMap.h>
 #include <ConcurrentVector.h>
+#include <ConcurrentSet.h>
 
 namespace EdgeSLAM {
 
@@ -20,7 +21,8 @@ namespace EdgeSLAM {
 	class Camera;
 	class CameraPose;
 	class Map;
-	
+	class MapPoint;
+
 	class User {
 	public:
 		User();
@@ -59,6 +61,7 @@ namespace EdgeSLAM {
 		std::vector<cv::Mat> vecTrajectories;
 		std::vector<double> vecTimestamps;
 		ConcurrentMap<int, cv::Mat> mapKeyPoints;
+		ConcurrentSet<MapPoint*> mSetMapPoints;
 				
 		////frame id와 키프레임 id의 대응이 필요함.
 		//std::map<int, KeyFrame*> mapKeyFrames;

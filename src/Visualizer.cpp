@@ -42,16 +42,16 @@ namespace EdgeSLAM {
 	cv::Point2f rectPt;
 	void Visualizer::CallBackFunc(int event, int x, int y, int flags, void* userdata)
 	{
-		int* tempData = (int*)userdata;
-
+		float* tempData = (float*)userdata;
+		
 		if (event == cv::EVENT_LBUTTONDOWN)
 		{
 			//std::cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << std::endl;
-			tempData[2] = x - tempData[0];
-			tempData[3] = y;
+			tempData[2] = (float)x - tempData[0];
+			tempData[3] = (float)y;
 
 			////button interface
-			if (tempData[2] < 50 && y < 50) {
+			if (tempData[2] < 50.0 && y < 50) {
 				bSaveMap = !bSaveMap;
 			}
 			else if (tempData[2] < 50 && (y >= 50 && y < 100)) {
@@ -63,8 +63,8 @@ namespace EdgeSLAM {
 		else if (event == cv::EVENT_LBUTTONUP)
 		{
 			//std::cout << "Left button of the mouse is released - position (" << x << ", " << y << ")" << std::endl;
-			tempData[4] = x - tempData[0];
-			tempData[5] = y;
+			tempData[4] = (float)x - tempData[0];
+			tempData[5] = (float)y;
 			tempData[6] = tempData[4] - tempData[2];
 			tempData[7] = tempData[5] - tempData[3];
 		}
@@ -89,18 +89,30 @@ namespace EdgeSLAM {
 
 		}
 		else if (event == cv::EVENT_MOUSEWHEEL) {
-			//std::cout << "Wheel event detection" << std::endl;
-			if (flags > 0) {
-				//scroll up
-				tempData[1] += 20;
-			}
-			else {
-				//scroll down
-				tempData[1] -= 20;
-				if (tempData[1] <= 0) {
-					tempData[1] = 20;
+
+			if (flags & cv::EVENT_FLAG_CTRLKEY) {
+				if (flags > 0) {
+					//scroll up
+					tempData[8] += 0.2;
+				}
+				else {
+					tempData[8] -= 0.2;
 				}
 			}
+			else {
+				if (flags > 0) {
+					//scroll up
+					tempData[1] += 2.0;
+				}
+				else {
+					//scroll down
+					tempData[1] -= 2.0;
+					if (tempData[1] <= 0.0) {
+						tempData[1] = 2.0;
+					}
+				}
+			}
+
 		}
 	}
 
@@ -163,10 +175,38 @@ namespace EdgeSLAM {
 		int nDisRows = mnHeight * 2;
 		int nDisCols = leftImg1.cols + mapImage.cols;// +kfWindowImg.cols;
 		mOutputImage = cv::Mat::zeros(nDisRows, nDisCols, CV_8UC3);
+
+		
 	}
 
 	
 	void Visualizer::Run(){
+
+		//floor plan
+		cv::Mat wean = cv::imread("../bin/data/weanhall2.png", cv::IMREAD_COLOR);
+		//cv::resize(wean, wean, cv::Size(wean.cols * 1.2, wean.rows * 1.2));
+		{
+			/*cv::Mat img_gray;
+			cv::cvtColor(wean, img_gray, cv::COLOR_BGR2GRAY);
+			cv::imshow("ca", img_gray); cv::waitKey(1);
+			std::cout <<wean.type()<<" "<<CV_8UC3<<" "<<wean.channels()<<" "<< img_gray.type()<<" "<<CV_8UC1<< "?????" << std::endl;
+			cv::Mat img_canny;
+			cv::Canny(img_gray, img_canny, 150, 255);
+
+			std::vector<cv::Vec4i> linesP;
+			cv::HoughLinesP(img_canny, linesP, 1, (CV_PI / 180), 50, 50, 10);
+
+			cv::Mat img_lane;
+			threshold(img_canny, img_lane, 150, 255, cv::THRESH_MASK);
+
+			for (size_t i = 0; i < linesP.size(); i++)
+			{
+				cv::Vec4i l = linesP[i];
+				cv::line(img_lane, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar::all(255), 1, 8);
+			}
+			cv::imshow("img_lane", img_lane); cv::waitKey(1);*/
+		}
+
 		SetAxisMode();
 		int nMapImageID = 0;
 		
@@ -174,7 +214,8 @@ namespace EdgeSLAM {
 		//원인 찾는 중
 		cv::imshow("Output::Display", mOutputImage);
 		cv::moveWindow("Output::Display", mnDisplayX, mnDisplayY);
-		int mapControlData[8] = { 0, };
+		float mapControlData[9] = { 0.0, };
+		mapControlData[8] = -90.0;
 		mapControlData[0] = mnWidth;
 		mapControlData[1] = mnVisScale;
 		cv::setMouseCallback("Output::Display", EdgeSLAM::Visualizer::CallBackFunc, (void*)mapControlData);
@@ -206,34 +247,110 @@ namespace EdgeSLAM {
 			mapControlData[6] = 0;
 			mapControlData[7] = 0;
 			mnVisScale = mapControlData[1];
+			float radian = mapControlData[8]* CV_PI/180.0;
+			cv::Mat T = cv::Mat::eye(2, 2, CV_32FC1);
+			float c = std::cosf(radian);
+			float s = std::sinf(radian);
+			T.at<float>(0, 0) = c;
+			T.at<float>(0, 1) = -s;
+			T.at<float>(1, 0) = s;
+			T.at<float>(1, 1) = c;
 
 			cv::Mat tempVis = mVisPoseGraph.clone();
+			//wean.copyTo(tempVis(cv::Rect(300, 500, wean.cols, wean.rows))); //floor plan
+
 			auto pMap = GetMap();
 			if (pMap) {
-				
-				auto mmpMap = pMap->GetAllMapPoints();
-				for (auto iter = mmpMap.begin(); iter != mmpMap.end(); iter++) {
-					auto pMPi = *iter;// ->first;
-					if (!pMPi || pMPi->isBad())
-						continue;
+				{
+					////맵포인트 시각화
+					auto mmpMap = pMap->GetAllMapPoints();
+					for (auto iter = mmpMap.begin(); iter != mmpMap.end(); iter++) {
+						auto pMPi = *iter;// ->first;
+						if (!pMPi || pMPi->isBad())
+							continue;
 
-					cv::Scalar color = cv::Scalar(0, 0, 0);
-					/*if (Segmentator::ObjectPoints.Count(pMPi->mnId)) {
-						auto obj = Segmentator::ObjectPoints.Get(pMPi->mnId);
-						if (obj) {
-							int label = obj->GetLabel()+1;
-							color = Segmentator::mvObjectLabelColors[label];
+						cv::Scalar color = cv::Scalar(0, 0, 0);
+						/*if (Segmentator::ObjectPoints.Count(pMPi->mnId)) {
+							auto obj = Segmentator::ObjectPoints.Get(pMPi->mnId);
+							if (obj) {
+								int label = obj->GetLabel()+1;
+								color = Segmentator::mvObjectLabelColors[label];
+							}
+						}*/
+						cv::Mat x3D = pMPi->GetWorldPos();
+						cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+						cv::Mat tempPt(tpt);
+						cv::Mat aaa = T*tempPt;
+						tpt.x = aaa.at<float>(0);
+						tpt.y = aaa.at<float>(1);
+						tpt += mVisMidPt;
+						cv::circle(tempVis, tpt, 1, color, -1);
+
+						if (pMPi->mSetConnected.Size() > 0) {
+							cv::circle(tempVis, tpt, 3, cv::Scalar(255,255,0), 1);
+						}
+
+					}
+					std::vector<MapPoint*>().swap(mmpMap);
+				}
+				{
+					std::map<int, cv::Mat> labelDatas;
+					if (mpSystem->TemporalDatas2.Count("label"))
+						labelDatas = mpSystem->TemporalDatas2.Get("label");
+					std::map<int, cv::Mat> mapDatas;
+					if (mpSystem->TemporalDatas2.Count("map"))
+						mapDatas = mpSystem->TemporalDatas2.Get("map");
+					for (auto jter = mapDatas.begin(), jend = mapDatas.end(); jter != jend; jter++) {
+						int id = jter->first;
+						if (labelDatas.count(id) == 0 || mapDatas.count(id) == 0)
+							continue;
+						auto x3D = mapDatas[id];
+						auto label = labelDatas[id].at<uchar>(0);
+						
+						cv::Scalar color = Segmentator::mvObjectLabelColors[label];
+						cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+						cv::Mat tempPt(tpt);
+						cv::Mat aaa = T*tempPt;
+						tpt.x = aaa.at<float>(0);
+						tpt.y = aaa.at<float>(1);
+						tpt += mVisMidPt;
+						cv::circle(tempVis, tpt, 1, color, -1);
+					}
+				}
+				{
+					////벽데이터 시각화
+
+					/*if (mpSystem->TemporalDatas.Count("floor")) {
+						auto vecDatas = mpSystem->TemporalDatas.Get("floor");
+						for (int j = 0; j < vecDatas.size(); j++) {
+							cv::Mat x3D = vecDatas[j];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T*tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+
+							cv::circle(tempVis, tpt, 1, planeColors[0], -1);
+						}
+					}
+
+					if (mpSystem->TemporalDatas.Count("wall")) {
+						auto vecDatas = mpSystem->TemporalDatas.Get("wall"); 
+						for (int j = 0; j < vecDatas.size(); j++) {
+							cv::Mat x3D = vecDatas[j];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T*tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+
+							cv::circle(tempVis, tpt, 1, planeColors[1], -1);
 						}
 					}*/
-					cv::Mat x3D = pMPi->GetWorldPos();
-					cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
-					tpt += mVisMidPt;
-					
-					cv::circle(tempVis, tpt, 2, color, -1);
-				}
-				std::vector<MapPoint*>().swap(mmpMap);
 
-				{
+					////벽데이터 시각화
 					//for (int i = 0, iend = 3; i < iend; i++) {
 					//	//auto vMPs = pMap->GetPlanarMPs(i);
 					//	auto vMPs = pMap->GetDepthMPs();
@@ -244,7 +361,8 @@ namespace EdgeSLAM {
 					//		cv::circle(tempVis, tpt, 4, planeColors[i], -1);
 					//	}
 					//}
-					cv::Mat objMap = pMap->mObjectTest.Get().clone();
+
+					/*cv::Mat objMap = pMap->mObjectTest.Get().clone();
 					for (int i = 0; i < objMap.rows; i++) {
 						cv::Mat x3D = objMap.row(i).colRange(0,3);
 						int label = (int)objMap.at<float>(i, 3);
@@ -253,7 +371,7 @@ namespace EdgeSLAM {
 						tpt += mVisMidPt;
 						cv::circle(tempVis, tpt, 4, color, -1);
 					}
-					objMap.release();
+					objMap.release();*/
 				}
 			}
 
@@ -320,6 +438,11 @@ namespace EdgeSLAM {
 					
 					auto pos = user->GetPosition();
 					cv::Point2f pt1 = cv::Point2f(pos.at<float>(mnAxis1)* mnVisScale, pos.at<float>(mnAxis2)* mnVisScale);
+					cv::Mat tempPt(pt1);
+					cv::Mat aaa = T*tempPt;
+					pt1.x = aaa.at<float>(0);
+					pt1.y = aaa.at<float>(1);
+					
 					pt1 += mVisMidPt;
 					if(user->mbMapping)
 						cv::circle(tempVis, pt1, 4, cv::Scalar(0, 0, 255), -1);

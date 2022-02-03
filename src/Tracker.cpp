@@ -452,6 +452,21 @@ namespace EdgeSLAM {
 
 		int a = SearchPoints::SearchMapByProjection(cur, pLocalMap->mvpLocalMPs, pLocalMap->mvpLocalTPs, thMaxDesc, thMinDesc, thRadius);
 		Optimizer::PoseOptimization(cur);
+
+		////user update
+		for (int i = 0; i<cur->N; i++)
+		{
+			auto pMPi = cur->mvpMapPoints[i];
+			if(pMPi && !pMPi->isBad() && !cur->mvbOutliers[i]){
+				if (!pMPi->mSetConnected.Count(user))
+					pMPi->mSetConnected.Update(user);
+				if (!user->mSetMapPoints.Count(pMPi)) {
+					user->mSetMapPoints.Update(pMPi);
+				}
+			}
+		}
+		////user update
+
 		return Tracker::UpdateFoundPoints(cur);
 	}
 

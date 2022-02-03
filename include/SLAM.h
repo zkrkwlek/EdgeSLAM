@@ -72,6 +72,8 @@ namespace EdgeSLAM {
 		ConcurrentMap<std::string, User*> Users;
 		ConcurrentMap<std::string, Map*> Maps;
 		ConcurrentMap<std::string, int> MapQuality;
+		ConcurrentMap<std::string, std::vector<cv::Mat>> TemporalDatas;
+		ConcurrentMap<std::string, std::map<int, cv::Mat>> TemporalDatas2;
 
 	private:
 		/*std::mutex mMutexUserList, mMutexMapList;

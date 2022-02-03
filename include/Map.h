@@ -10,6 +10,7 @@
 #include <atomic>
 #include <LoopClosingTypes.h>
 #include <ConcurrentVariable.h>
+#include <ConcurrentMap.h>
 
 namespace EdgeSLAM {
 	
@@ -112,26 +113,7 @@ namespace EdgeSLAM {
 		std::map<int, KeyFrame*> mmpKeyFrames;
 		LocalMap* mpLocalMap;
 		////local map??
-		////Plane Test
-	public:
-		std::vector<cv::Mat> GetPlanarMPs(int id);
-		void ClearPlanarMPs();
-		void AddPlanarMP(cv::Mat m, int id);
-	private:
-		std::mutex mMutexPlanarMP;
-		std::vector<std::vector<cv::Mat>> mvvPlanarMPs;
-		////Plane Test
-		////Depth Test
-	public:
-		//테스트용 코드 변경할껏.
-		ConcurrentVariable<cv::Mat> mObjectTest;
-		std::vector<cv::Mat> GetDepthMPs();
-		void ClearDepthMPs();
-		void AddDepthMP(cv::Mat m);
-	private:
-		std::mutex mMutexDepthTest;
-		std::vector<cv::Mat> mvTempMPs;
-	////Depth Test
+	
 	public:
 		MapState GetState();
 		void SetState(MapState stat);

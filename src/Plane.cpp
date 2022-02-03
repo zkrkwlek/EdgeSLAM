@@ -421,7 +421,7 @@ namespace EdgeSLAM {
 				continue;*/
 				if (ratioDist*ratioFactor<ratioOctave || ratioDist>ratioOctave*ratioFactor)
 					continue;
-				map->AddPlanarMP(x3D, 1);
+				//map->AddPlanarMP(x3D, 1);
 				//// Triangulation is succesfull
 				MapPoint* pMP = new MapPoint(x3D, targetKF, map);
 
@@ -528,7 +528,7 @@ namespace EdgeSLAM {
 		}
 		std::cout << "pe = " << spFloorMPs.size() << " " << spWallMPs.size() << std::endl;
 
-		map->ClearPlanarMPs();
+		//map->ClearPlanarMPs();
 		{
 			cv::Mat param;
 			cv::Mat inliers = cv::Mat::zeros(0, 3, CV_32FC1);
@@ -548,9 +548,7 @@ namespace EdgeSLAM {
 				hist.at<int>(idx)++;
 				//std::cout<<"PE = "<<param.t()<<std::endl;
 				pModel->mpFloor->SetParam(param);
-				for (int i = 0, iend = inliers.rows; i <iend; i++) {
-					map->AddPlanarMP(inliers.row(i), 0);
-				}
+				
 				
 				{
 					////이부분은 올해안에 완성시키기
