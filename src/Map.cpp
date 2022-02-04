@@ -94,8 +94,8 @@ namespace EdgeSLAM {
 		{
 			{
 				std::unique_lock<std::mutex> lock(mMutexMPs);
-				for (auto iter = mmpKeyFrames.begin(), iend = mmpKeyFrames.end(); iter != iend; iter++) {
-					delete iter->second;
+				for (auto iter = mspMapPoints.begin(), iend = mspMapPoints.end(); iter != iend; iter++) {
+					delete *iter;
 				}
 			}
 			{
