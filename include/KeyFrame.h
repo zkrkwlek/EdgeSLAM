@@ -9,6 +9,7 @@
 //#include "DBoW2/FeatureVector.h"
 //#include <ORBVocabulary.h>
 #include <ConcurrentVector.h>
+#include <ConcurrentSet.h>
 #include <atomic>
 #include <mutex>
 
@@ -101,6 +102,8 @@ namespace EdgeSLAM {
 		int mnId;
 		const int mnFrameId;
 		const double mdTimeStamp;
+
+		std::atomic<int> mnConnectedDevices;
 
 		// Grid (to speed up feature matching)
 		const int mnGridCols;

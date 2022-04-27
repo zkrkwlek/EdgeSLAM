@@ -234,6 +234,7 @@ namespace EdgeSLAM {
 		std::vector<MapPoint*>().swap(mvpLocalMPs);
 		std::vector<KeyFrame*>().swap(mvpLocalKFs);
 		std::vector<TrackPoint*>().swap(mvpLocalTPs);
+		std::set<KeyFrame*>().swap(mspLocalKFs);
 	}
 	LocalCovisibilityMap::LocalCovisibilityMap() :LocalMap()
 	{}
@@ -265,7 +266,6 @@ namespace EdgeSLAM {
 
 		int max = 0;
 		KeyFrame* pKFmax = static_cast<KeyFrame*>(nullptr);
-		std::set<KeyFrame*> spKFs;
 
 		// All keyframes that observe a map point are included in the local map. Also check which keyframe shares most points
 		for (std::map<KeyFrame*, int>::const_iterator it = keyframeCounter.begin(), itEnd = keyframeCounter.end(); it != itEnd; it++)
@@ -282,7 +282,7 @@ namespace EdgeSLAM {
 			}
 
 			vpLocalKFs.push_back(it->first);
-			spKFs.insert(pKF);
+			mspLocalKFs.insert(pKF);
 		}
 
 		// Include also some not-already-included keyframes that are neighbors to already-included keyframes
@@ -300,9 +300,9 @@ namespace EdgeSLAM {
 			for (std::vector<KeyFrame*>::const_iterator itNeighKF = vNeighs.begin(), itEndNeighKF = vNeighs.end(); itNeighKF != itEndNeighKF; itNeighKF++)
 			{
 				KeyFrame* pNeighKF = *itNeighKF;
-				if (pNeighKF && !pNeighKF->isBad() && !spKFs.count(pNeighKF))
+				if (pNeighKF && !pNeighKF->isBad() && !mspLocalKFs.count(pNeighKF))
 				{
-					spKFs.insert(pNeighKF);
+					mspLocalKFs.insert(pNeighKF);
 					break;
 				}
 			}
@@ -311,17 +311,17 @@ namespace EdgeSLAM {
 			for (std::set<KeyFrame*>::const_iterator sit = spChilds.begin(), send = spChilds.end(); sit != send; sit++)
 			{
 				KeyFrame* pChildKF = *sit;
-				if (pChildKF && !pChildKF->isBad() && !spKFs.count(pChildKF))
+				if (pChildKF && !pChildKF->isBad() && !mspLocalKFs.count(pChildKF))
 				{
-					spKFs.insert(pChildKF);
+					mspLocalKFs.insert(pChildKF);
 					break;
 				}
 			}
 
 			KeyFrame* pParent = pKF->GetParent();
-			if (pParent && !pParent->isBad() && !spKFs.count(pParent))
+			if (pParent && !pParent->isBad() && !mspLocalKFs.count(pParent))
 			{
-				spKFs.insert(pParent);
+				mspLocalKFs.insert(pParent);
 				break;
 			}
 
@@ -373,7 +373,6 @@ namespace EdgeSLAM {
 
 		int max = 0;
 		KeyFrame* pKFmax = static_cast<KeyFrame*>(nullptr);
-		std::set<KeyFrame*> spKFs;
 
 		// All keyframes that observe a map point are included in the local map. Also check which keyframe shares most points
 		for (std::map<KeyFrame*, int>::const_iterator it = keyframeCounter.begin(), itEnd = keyframeCounter.end(); it != itEnd; it++)
@@ -390,7 +389,7 @@ namespace EdgeSLAM {
 			}
 
 			vpLocalKFs.push_back(it->first);
-			spKFs.insert(pKF);
+			mspLocalKFs.insert(pKF);
 		}
 
 		// Include also some not-already-included keyframes that are neighbors to already-included keyframes
@@ -408,9 +407,9 @@ namespace EdgeSLAM {
 			for (std::vector<KeyFrame*>::const_iterator itNeighKF = vNeighs.begin(), itEndNeighKF = vNeighs.end(); itNeighKF != itEndNeighKF; itNeighKF++)
 			{
 				KeyFrame* pNeighKF = *itNeighKF;
-				if (pNeighKF && !pNeighKF->isBad() && !spKFs.count(pNeighKF))
+				if (pNeighKF && !pNeighKF->isBad() && !mspLocalKFs.count(pNeighKF))
 				{
-					spKFs.insert(pNeighKF);
+					mspLocalKFs.insert(pNeighKF);
 					break;
 					/*if (pNeighKF->mnTrackReferenceForFrame != nFrameID)
 					{
@@ -425,9 +424,9 @@ namespace EdgeSLAM {
 			for (std::set<KeyFrame*>::const_iterator sit = spChilds.begin(), send = spChilds.end(); sit != send; sit++)
 			{
 				KeyFrame* pChildKF = *sit;
-				if (pChildKF && !pChildKF->isBad() && !spKFs.count(pChildKF))
+				if (pChildKF && !pChildKF->isBad() && !mspLocalKFs.count(pChildKF))
 				{
-					spKFs.insert(pChildKF);
+					mspLocalKFs.insert(pChildKF);
 					break;
 					/*if (pChildKF->mnTrackReferenceForFrame != nFrameID)
 					{
@@ -439,9 +438,9 @@ namespace EdgeSLAM {
 			}
 
 			KeyFrame* pParent = pKF->GetParent();
-			if (pParent && !pParent->isBad() && !spKFs.count(pParent))
+			if (pParent && !pParent->isBad() && !mspLocalKFs.count(pParent))
 			{
-				spKFs.insert(pParent);
+				mspLocalKFs.insert(pParent);
 				break;
 				/*if (pParent->mnTrackReferenceForFrame != nFrameID)
 				{

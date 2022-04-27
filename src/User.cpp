@@ -5,14 +5,15 @@
 #include <CameraPose.h>
 #include <MotionModel.h>
 #include <MapPoint.h>
+#include <KeyFrame.h>
 
 namespace EdgeSLAM {
-	User::User():mbMotionModel(false), mpRefKF(nullptr), mnVisID(0){
+	User::User():mbMotionModel(false), mpRefKF(nullptr), mnVisID(0), mnUsed(0){
 
 	}
 	User::User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, int nskip, bool _b, bool _bTracking, bool _bimu, bool _bsave, bool _bAsync) : userName(_user), mapName(_map), mbMapping(_b), mState(UserState::NotEstimated),
 		Rgyro(cv::Mat::eye(3, 3, CV_32FC1)), tacc(cv::Mat::zeros(3, 1, CV_32FC1)), mbIMU(_bimu), mbDeviceTracking(_bTracking), mbSaveTrajectory(_bsave), mnQuality(q), mnSkip(nskip), mbAsyncTest(_bAsync),
-		mbProgress(false), mpRefKF(nullptr), mnLastKeyFrameID(-1), mnPrevFrameID(-1), mnCurrFrameID(-1), mnLastRelocFrameId(-1), mbMotionModel(false), mnVisID(0)
+		mbProgress(false), mbRemoved(false), mpRefKF(nullptr), mnUsed(0), mnLastKeyFrameID(-1), mnPrevFrameID(-1), mnCurrFrameID(-1), mnLastRelocFrameId(-1), mbMotionModel(false), mnVisID(0)
 	{
 		mpMotionModel = new MotionModel();
 		mpCamPose = new CameraPose();
@@ -41,14 +42,23 @@ namespace EdgeSLAM {
 		objFrames.Release();
 		*/
 		
-		auto setMPs = mSetMapPoints.Get();
-		for (auto iter = setMPs.begin(), iend = setMPs.end(); iter != iend; iter++) {
-			auto pMP = *iter;
-			if(pMP->mSetConnected.Count(this))
-				pMP->mSetConnected.Erase(this);
+		auto setKFs = mSetLocalKeyFrames.Get();
+		for (auto iter = setKFs.begin(), iend = setKFs.end(); iter != iend; iter++) {
+			auto pKF = *iter;
+			pKF->mnConnectedDevices--;
 		}
-		mSetMapPoints.Release();
+		mSetLocalKeyFrames.Release();
 
+		{
+			////local mps
+			/*auto setMPs = mSetMapPoints.Get();
+			for (auto iter = setMPs.begin(), iend = setMPs.end(); iter != iend; iter++) {
+				auto pMP = *iter;
+				if(pMP->mSetConnected.Count(this))
+					pMP->mSetConnected.Erase(this);
+			}
+			mSetMapPoints.Release();*/
+		}
 		mvDeviceTimeStamps.Release();
 		mvDeviceTrajectories.Release();
 		for (int i = 0, iend = vecTrajectories.size(); i < iend; i++)
@@ -58,6 +68,7 @@ namespace EdgeSLAM {
 
 		mapKeyPoints.Release();
 		KeyFrames.Release();
+		ImageDatas.Release();
 		//delete mapFrames;
 	}
 

@@ -42,40 +42,52 @@ namespace EdgeSLAM {
 
 		return cv::Point2f(x, y);
 	}
-
-	void Tracker::DownloadKeyPoints(SLAM* system, User* user, int id) {
+	void Tracker::ProcessDevicePosition(SLAM* system, std::string user, int id, double ts) {
+		auto pUser = system->GetUser(user);
+		if (!pUser)
+			return;
+		pUser->mnUsed++;
+		
 		std::stringstream ss;
-		ss << "/Load?keyword=Keypoints" << "&id=" << id << "&src=" << user->userName;
+		ss << "/Load?keyword=DevicePosition" << "&id=" << id << "&src=" << user;
 		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 		auto res = mpAPI->Send(ss.str(), "");
 		int n2 = res.size();
 
-		cv::Mat fdata = cv::Mat::zeros(n2/8, 2, CV_32FC1);
+		cv::Mat fdata = cv::Mat::zeros(4, 3, CV_32FC1);
 		std::memcpy(fdata.data, res.data(), res.size());
-		user->mapKeyPoints.Update(id, fdata.clone());
-
-		delete mpAPI;
+		pUser->mvDeviceTrajectories.push_back(fdata.clone());
+		pUser->mvDeviceTimeStamps.push_back(ts);
+		fdata.release();
+		pUser->mnUsed--;
 	}
-
-	void Tracker::UpdateDeviceGyro(SLAM* system, User* user, int id) {
+	void Tracker::UpdateDeviceGyro(SLAM* system, std::string user, int id) {
+		auto pUser = system->GetUser(user);
+		if (!pUser)
+			return;
+		pUser->mnUsed++;
 		std::stringstream ss;
-		ss << "/Load?keyword=Gyro" << "&id=" << id << "&src=" << user->userName;
+		ss << "/Load?keyword=Gyro" << "&id=" << id << "&src=" << user;
 		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 		auto res = mpAPI->Send(ss.str(), "");
 		int n2 = res.size();
 
 		cv::Mat fdata = cv::Mat::zeros(3, 3, CV_32FC1);
 		std::memcpy(fdata.data, res.data(), res.size());
-		user->UpdateGyro(fdata);
-
+		pUser->UpdateGyro(fdata);
+		pUser->mnUsed--;
 		delete mpAPI;
 	}
-	void Tracker::Track(ThreadPool::ThreadPool* pool, SLAM* system, int id, User* user, double ts) {
-		if (user->mbProgress)
+	void Tracker::Track(ThreadPool::ThreadPool* pool, SLAM* system, int id, std::string user, double ts) {
+		auto pUser = system->GetUser(user);
+		if (!pUser)
 			return;
-		user->mbProgress = true;
-		auto cam = user->mpCamera;
-		auto map = user->mpMap;
+		if (pUser->mbProgress)
+			return;
+		pUser->mnUsed++;
+		pUser->mbProgress = true;
+		auto cam = pUser->mpCamera;
+		auto map = pUser->mpMap;
 
 		//time analysis
 		float t_local = 1000.0;
@@ -91,7 +103,7 @@ namespace EdgeSLAM {
 		////receive image
 		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 		std::stringstream ss;
-		ss << "/Load?keyword=Image" << "&id=" << id << "&src=" << user->userName;
+		ss << "/Load?keyword=Image" << "&id=" << id << "&src=" << user;
 		auto res = mpAPI->Send(ss.str(), "");
 		int n2 = res.size();
 		cv::Mat temp = cv::Mat::zeros(n2, 1, CV_8UC1);
@@ -102,10 +114,13 @@ namespace EdgeSLAM {
 		{
 			std::cout << "Decoding image = " << id << "=" << img.size() << " " << img.type() << " " << n2 << " = " << (int)temp.at<uchar>(n2 - 1) << " " << (int)temp.at<uchar>(n2 - 2) << std::endl;
 			std::cout << "Error = Decoding image = " << id << std::endl;
-			user->mbProgress = false;
+			pUser->mbProgress = false;
+			pUser->mnUsed--;
 			return;
 		}
 		
+		pUser->ImageDatas.Update(id, temp);
+
 		std::chrono::high_resolution_clock::time_point received = std::chrono::high_resolution_clock::now();
 		////receive image
 		/////save image
@@ -141,7 +156,7 @@ namespace EdgeSLAM {
 		//std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
 
 		auto mapState = map->GetState();
-		auto userState = user->GetState();
+		auto userState = pUser->GetState();
 		auto trackState = UserState::NotEstimated;
 		int nInliers = 0;
 		if (mapState == MapState::NoImages) {
@@ -161,8 +176,8 @@ namespace EdgeSLAM {
 				map->mvpKeyFrameOrigins.push_back(kf1);
 				/*user->mapKeyFrames[kf1->mnId] = kf1;
 				user->mapKeyFrames[kf2->mnId] = kf2;*/
-				user->mpRefKF = kf2;
-				user->mnLastKeyFrameID = frame->mnFrameID;
+				pUser->mpRefKF = kf2;
+				pUser->mnLastKeyFrameID = frame->mnFrameID;
 				pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf1);
 				pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf2);
 
@@ -183,11 +198,11 @@ namespace EdgeSLAM {
 				//global localization
 				//set reference keyframe and last keyframe
 				frame->reset_map_points();
-				nInliers = Tracker::Relocalization(map, user, frame, system->mpFeatureTracker->min_descriptor_distance);
+				nInliers = Tracker::Relocalization(map, pUser, frame, system->mpFeatureTracker->min_descriptor_distance);
 				if (nInliers >= 50)
 				{
 					bTrack = true;
-					user->mnLastRelocFrameId = frame->mnFrameID;
+					pUser->mnLastRelocFrameId = frame->mnFrameID;
 					//trackState = UserState::Success;
 				}
 				std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
@@ -202,18 +217,18 @@ namespace EdgeSLAM {
 					
 					//std::cout << "Tracker::Start" << std::endl;
 					//auto f_ref = user->mapFrames[user->mnPrevFrameID];
-					auto prevFrame = user->prevFrame;
+					auto prevFrame = pUser->prevFrame;
 					prevFrame->check_replaced_map_points();
 
 					cv::Mat Tpredict;
-					if (user->mbIMU) {
-						auto Rgyro = user->GetGyro();
+					if (pUser->mbIMU) {
+						auto Rgyro = pUser->GetGyro();
 						cv::Mat Tgyro = cv::Mat::eye(4, 4, CV_32FC1);
 						Rgyro.copyTo(Tgyro.rowRange(0, 3).colRange(0, 3));
-						Tpredict = Tgyro * user->GetPose();
+						Tpredict = Tgyro * pUser->GetPose();
 					}
 					else {
-						Tpredict = user->PredictPose();
+						Tpredict = pUser->PredictPose();
 					}
 					frame->SetPose(Tpredict);
 					std::chrono::high_resolution_clock::time_point t_prev_start = std::chrono::high_resolution_clock::now();
@@ -244,11 +259,11 @@ namespace EdgeSLAM {
 			
 			if (bTrack) {
 				std::chrono::high_resolution_clock::time_point t_local_start = std::chrono::high_resolution_clock::now();
-				nInliers = Tracker::TrackWithLocalMap(pLocalMap, user, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+				nInliers = Tracker::TrackWithLocalMap(pLocalMap, pUser, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
 				std::chrono::high_resolution_clock::time_point t_local_end = std::chrono::high_resolution_clock::now();
 				auto du_local = std::chrono::duration_cast<std::chrono::milliseconds>(t_local_end - t_local_start).count();
 				t_local = du_local / 1000.0;
-				if (frame->mnFrameID < user->mnLastRelocFrameId + 30 && nInliers < 50) {
+				if (frame->mnFrameID < pUser->mnLastRelocFrameId + 30 && nInliers < 50) {
 					bTrack = false;
 				}
 				else if (nInliers < 30) {
@@ -267,11 +282,11 @@ namespace EdgeSLAM {
 			if (bTrack)
 				trackState = UserState::Success;
 			
-			pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, user, pLocalMap, frame, nInliers, id, ts);
+			pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, pUser, pLocalMap, frame, nInliers, id, ts);
 			
 		}
 		
-		user->SetState(trackState);
+		pUser->SetState(trackState);
 		if (trackState == UserState::Success) {
 			
 			////오브젝트 검출 요청
@@ -279,12 +294,13 @@ namespace EdgeSLAM {
 			
 			//pose update
 			cv::Mat T = frame->GetPose();
-			user->UpdatePose(T, ts);
+			pUser->UpdatePose(T, ts);
 			//check keyframe
-			if (user->mbMapping && user->mpRefKF) {
-				if (Tracker::NeedNewKeyFrame(map, system->mpLocalMapper, frame, user->mpRefKF, nInliers, user->mnLastKeyFrameID.load(), user->mnLastRelocFrameId.load())) {
-					Tracker::CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, user);
-					Segmentator::RequestSegmentation(user->userName, frame->mnFrameID);
+			if (pUser->mbMapping && pUser->mpRefKF) {
+				if (Tracker::NeedNewKeyFrame(map, system->mpLocalMapper, frame, pUser->mpRefKF, nInliers, pUser->mnLastKeyFrameID.load(), pUser->mnLastRelocFrameId.load())) {
+					Tracker::CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, pUser);
+					Segmentator::RequestSegmentation(pUser->userName, frame->mnFrameID);
+					system->RequestTime.Update(id, std::chrono::high_resolution_clock::now());
 				}
 			}
 			
@@ -323,13 +339,13 @@ namespace EdgeSLAM {
 		}
 		
 		//int tempID = user->mnPrevFrameID;
-		user->mnPrevFrameID = user->mnCurrFrameID.load();
-		user->mnCurrFrameID = frame->mnFrameID;
+		pUser->mnPrevFrameID = pUser->mnCurrFrameID.load();
+		pUser->mnCurrFrameID = frame->mnFrameID;
 
-		if (mapState == MapState::Initialized && user->prevFrame)
-			delete user->prevFrame;
-		user->prevFrame = frame;
-		user->mbProgress = false; 
+		if (mapState == MapState::Initialized && pUser->prevFrame)
+			delete pUser->prevFrame;
+		pUser->prevFrame = frame;
+		pUser->mbProgress = false;
 		
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(received - start).count();
@@ -344,23 +360,23 @@ namespace EdgeSLAM {
 		int N = system->GetConnectedDevice();
 		system->ProcessingTime.Get("download")[N]->add(t_test1);
 		system->ProcessingTime.Get("tracking")[N]->add(t_test2);
-		if (mapState == MapState::Initialized && !user->mbMapping) {
+		if (mapState == MapState::Initialized && !pUser->mbMapping) {
 			int ntemp = userState == UserState::Success ? 1 : 0;
-			system->SuccessRatio.Get("skipframe")[user->mnSkip]->increase(ntemp);
+			system->SuccessRatio.Get("skipframe")[pUser->mnSkip]->increase(ntemp);
 
-			if (user->mbAsyncTest) {
-				system->SuccessRatio.Get("async")[user->mnQuality]->increase(ntemp);
+			if (pUser->mbAsyncTest) {
+				system->SuccessRatio.Get("async")[pUser->mnQuality]->increase(ntemp);
 			}
 
 		}
-		std::cout << "Frame = " << user->userName << " : " << id << ", Matches = " << nInliers << ", time =" << t_test1 <<", "<< t_test2<<"="<< t_local <<" "<<t_prev<<" "<< t_init <<" "<<t_frame<< std::endl;
+		std::cout << "Frame = " << pUser->userName << " : " << id << ", Matches = " << nInliers << ", time =" << t_test1 <<", "<< t_test2<<"="<< t_local <<" "<<t_prev<<" "<< t_init <<" "<<t_frame<< std::endl;
 		
 		//system->UpdateTrackingTime(t_test1);
 
 		////visualization
-		if (mapState == MapState::Initialized  && user->GetVisID() <= 3 && userState != UserState::NotEstimated) {
+		if (mapState == MapState::Initialized  && pUser->GetVisID() <= 3 && userState != UserState::NotEstimated) {
 
-			cv::Scalar color = Segmentator::mvObjectLabelColors[user->GetVisID()+1];
+			cv::Scalar color = Segmentator::mvObjectLabelColors[pUser->GetVisID()+1];
 
 			for (int i = 0; i < frame->mvKeys.size(); i++) {
 				auto pMP = frame->mvpMapPoints[i];
@@ -404,8 +420,8 @@ namespace EdgeSLAM {
 			}*/
 			
 
-			system->mpVisualizer->ResizeImage(img, img);
-			system->mpVisualizer->SetOutputImage(img, user->GetVisID());
+			//system->mpVisualizer->ResizeImage(img, img);
+			//system->mpVisualizer->SetOutputImage(img, pUser->GetVisID());
 
 			/////save image
 			/*std::stringstream sss;
@@ -413,6 +429,7 @@ namespace EdgeSLAM {
 			cv::imwrite(sss.str(), img);*/
 			/////save image
 		}
+		pUser->mnUsed--;
 		////visualization
 	}
 	
@@ -440,7 +457,6 @@ namespace EdgeSLAM {
 	int Tracker::TrackWithLocalMap(LocalMap* pLocalMap, User* user, Frame* cur, float thMaxDesc, float thMinDesc){
 		
 		pLocalMap->UpdateLocalMap(user, cur);
-		
 		//update visible
 		int nMatch = Tracker::UpdateVisiblePoints(cur, pLocalMap->mvpLocalMPs, pLocalMap->mvpLocalTPs);
 		if (nMatch == 0)
@@ -454,7 +470,18 @@ namespace EdgeSLAM {
 		Optimizer::PoseOptimization(cur);
 
 		////user update
-		for (int i = 0; i<cur->N; i++)
+		auto setPrevKFs = user->mSetLocalKeyFrames.Get();
+		user->mSetLocalKeyFrames.Set(pLocalMap->mspLocalKFs);
+		
+		for (auto iter = setPrevKFs.begin(), iend = setPrevKFs.end(); iter != iend; iter++) {
+			auto pKF = *iter;
+			pKF->mnConnectedDevices--;
+		}
+		for (auto iter = pLocalMap->mspLocalKFs.begin(), iend = pLocalMap->mspLocalKFs.end(); iter != iend; iter++) {
+			auto pKF = *iter;
+			pKF->mnConnectedDevices++;
+		}
+		/*for (int i = 0; i<cur->N; i++)
 		{
 			auto pMPi = cur->mvpMapPoints[i];
 			if(pMPi && !pMPi->isBad() && !cur->mvbOutliers[i]){
@@ -464,7 +491,7 @@ namespace EdgeSLAM {
 					user->mSetMapPoints.Update(pMPi);
 				}
 			}
-		}
+		}*/
 		////user update
 
 		return Tracker::UpdateFoundPoints(cur);
@@ -842,6 +869,7 @@ namespace EdgeSLAM {
 			std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
 			auto res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
 			std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+			
 			delete mpAPI;
 			
 			auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(e - s).count();

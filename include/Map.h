@@ -139,7 +139,7 @@ namespace EdgeSLAM {
 		virtual void UpdateLocalKeyFrames(KeyFrame* kf, std::vector<KeyFrame*>& vpLocalKFs){}
 		virtual void UpdateLocalMapPoitns(KeyFrame* kf, std::vector<KeyFrame*>& vpLocalKFs, std::vector<MapPoint*>& vpLocalMPs){}
 	public:
-
+		std::set<KeyFrame*> mspLocalKFs;
 		std::vector<MapPoint*> mvpLocalMPs;
 		std::vector<KeyFrame*> mvpLocalKFs;
 		std::vector<TrackPoint*> mvpLocalTPs;

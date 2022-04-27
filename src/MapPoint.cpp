@@ -117,14 +117,14 @@ namespace EdgeSLAM {
 		}
 
 		////short-term 包府
-		auto setUsers = mSetConnected.Get();
+		/*auto setUsers = mSetConnected.Get();
 		for (auto iter = setUsers.begin(), iend = setUsers.end(); iter != iend; iter++) {
 			auto pUser = *iter;
 			mSetConnected.Erase(pUser);
 		}
+		mSetConnected.Release();*/
 		////short-term 包府
-
-		mSetConnected.Release();
+		
 		mpMap->RemoveMapPoint(this);
 	}
 

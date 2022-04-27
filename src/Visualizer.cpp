@@ -2,6 +2,7 @@
 #include <SLAM.h>
 #include <Map.h>
 #include <MapPoint.h>
+#include <KeyFrame.h>
 #include <User.h>
 #include <Segmentator.h>
 
@@ -294,13 +295,48 @@ namespace EdgeSLAM {
 					std::vector<MapPoint*>().swap(mmpMap);
 				}
 				{
+					auto KFs = pMap->GetAllKeyFrames();
+					for (int i = 0, iend = KFs.size(); i < iend; i++) {
+						auto pKFi = KFs[i];
+						cv::Mat Ow = pKFi->GetCameraCenter();
+						cv::Scalar color = cv::Scalar(255, 0, 0);
+						if (pKFi->mnConnectedDevices > 1) {  
+							color.val[2] = 255;
+						}
+						else if (pKFi->mnConnectedDevices > 0) {
+							color.val[1] = 255;
+						}
+						cv::Point2f tpt = cv::Point2f(Ow.at<float>(mnAxis1) * mnVisScale, Ow.at<float>(mnAxis2) * mnVisScale);
+						cv::Mat tempPt(tpt);
+						cv::Mat aaa = T*tempPt;
+						tpt.x = aaa.at<float>(0);
+						tpt.y = aaa.at<float>(1);
+						tpt += mVisMidPt;
+						cv::circle(tempVis, tpt, 4, color, 1);
+					}
+				}
+				{
 					std::map<int, cv::Mat> labelDatas;
 					if (mpSystem->TemporalDatas2.Count("label"))
 						labelDatas = mpSystem->TemporalDatas2.Get("label");
 					std::map<int, cv::Mat> mapDatas;
 					if (mpSystem->TemporalDatas2.Count("map"))
 						mapDatas = mpSystem->TemporalDatas2.Get("map");
-					for (auto jter = mapDatas.begin(), jend = mapDatas.end(); jter != jend; jter++) {
+					std::map<int, cv::Mat> contentDatas;
+					if (mpSystem->TemporalDatas2.Count("content"))
+						contentDatas = mpSystem->TemporalDatas2.Get("content");
+					for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
+						int id = jter->first;
+						auto x3D = contentDatas[id];
+						cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+						cv::Mat tempPt(tpt);
+						cv::Mat aaa = T*tempPt;
+						tpt.x = aaa.at<float>(0);
+						tpt.y = aaa.at<float>(1);
+						tpt += mVisMidPt;
+						cv::circle(tempVis, tpt, 4, cv::Scalar(0,255,255), -1);
+					}
+					/*for (auto jter = mapDatas.begin(), jend = mapDatas.end(); jter != jend; jter++) {
 						int id = jter->first;
 						if (labelDatas.count(id) == 0 || mapDatas.count(id) == 0)
 							continue;
@@ -315,12 +351,12 @@ namespace EdgeSLAM {
 						tpt.y = aaa.at<float>(1);
 						tpt += mVisMidPt;
 						cv::circle(tempVis, tpt, 1, color, -1);
-					}
+					}*/
 				}
 				{
 					////벽데이터 시각화
 
-					/*if (mpSystem->TemporalDatas.Count("floor")) {
+					if (mpSystem->TemporalDatas.Count("floor")) {
 						auto vecDatas = mpSystem->TemporalDatas.Get("floor");
 						for (int j = 0; j < vecDatas.size(); j++) {
 							cv::Mat x3D = vecDatas[j];
@@ -331,7 +367,7 @@ namespace EdgeSLAM {
 							tpt.y = aaa.at<float>(1);
 							tpt += mVisMidPt;
 
-							cv::circle(tempVis, tpt, 1, planeColors[0], -1);
+							cv::circle(tempVis, tpt, 3, planeColors[0], -1);
 						}
 					}
 
@@ -346,9 +382,9 @@ namespace EdgeSLAM {
 							tpt.y = aaa.at<float>(1);
 							tpt += mVisMidPt;
 
-							cv::circle(tempVis, tpt, 1, planeColors[1], -1);
+							cv::circle(tempVis, tpt, 3, planeColors[1], -1);
 						}
-					}*/
+					}
 
 					////벽데이터 시각화
 					//for (int i = 0, iend = 3; i < iend; i++) {
@@ -383,6 +419,7 @@ namespace EdgeSLAM {
 					auto user = vpUsers[i];
 					if (!user)
 						continue;
+					user->mnUsed++;
 					//if (i == 0) {
 					//	////gyro testa
 					//	auto Ra = user->GetGyro();
@@ -459,6 +496,7 @@ namespace EdgeSLAM {
 					//	pt1 += mVisMidPt;
 					//	cv::circle(tempVis, pt1, 1, userColors[i], -1);
 					//}
+					user->mnUsed--;
 				}
 				std::vector<User*>().swap(vpUsers);
 			}

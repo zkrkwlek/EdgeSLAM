@@ -18,7 +18,7 @@ namespace EdgeSLAM {
 		mDescriptors(F->mDescriptors.clone()), mnScaleLevels(F->mnScaleLevels), mfScaleFactor(F->mfScaleFactor),
 		mfLogScaleFactor(F->mfLogScaleFactor), mvScaleFactors(F->mvScaleFactors), mvLevelSigma2(F->mvLevelSigma2),
 		mvInvLevelSigma2(F->mvInvLevelSigma2), mnMinX(F->mnMinX), mnMinY(F->mnMinY), mnMaxX(F->mnMaxX),
-		mnMaxY(F->mnMaxY), K(F->K), 
+		mnMaxY(F->mnMaxY), K(F->K), mnConnectedDevices(0),
 		mbFirstConnection(true), mpParent(nullptr), mbNotErase(false),
 		mbToBeErased(false), mbBad(false), mpMap(pMap), mpCamera(F->mpCamera)
 	{

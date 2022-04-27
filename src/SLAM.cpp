@@ -67,11 +67,8 @@ namespace EdgeSLAM {
 		/*mpDBoWVoc = new ORBVocabulary();
 		mpDBoWVoc->loadFromBinaryFile("../../bin/data/ORBvoc.bin");*/
 	}
-	void SLAM::Track(cv::Mat im, int id, User* user, double ts) {
-		
-	}
-
-	void SLAM::Track(int id, User* user, double ts) {
+	
+	void SLAM::Track(int id, std::string user, double ts) {
 		pool->EnqueueJob(Tracker::Track, pool, this, id, user, ts);
 	}
 	bool bVis = false;
@@ -129,24 +126,16 @@ namespace EdgeSLAM {
 		}
 		return false;*/
 	}
-	void SLAM::DownloadKeyPoints(std::string user, int id) {
-		if (!CheckUser(user))
-			return;
-		auto pUser = GetUser(user);
-		pool->EnqueueJob(Tracker::DownloadKeyPoints, this, pUser, id);
-	}
+	
 	void SLAM::UpdateDeviceGyroSensor(std::string user, int id) {
 		if (!CheckUser(user))
 			return;
-		auto pUser = GetUser(user);
-		pool->EnqueueJob(Tracker::UpdateDeviceGyro, this, pUser, id);
-		
+		pool->EnqueueJob(Tracker::UpdateDeviceGyro, this, user, id);
 	}
 	void SLAM::UpdateDevicePosition(std::string user, int id, double ts) {
 		if (!CheckUser(user))
 			return;
-		auto pUser = GetUser(user);
-		pool->EnqueueJob(Segmentator::ProcessDevicePosition, this, pUser, id, ts);
+		pool->EnqueueJob(Tracker::ProcessDevicePosition, this, user, id, ts);
 	}
 	void SLAM::AddUser(std::string id, User* user) {
 		SetUserVisID(user);
@@ -156,8 +145,11 @@ namespace EdgeSLAM {
 		mmpConnectedUserList[id] = user;*/
 	}
 	User* SLAM::GetUser(std::string id) {
-		if(Users.Count(id))
-			return Users.Get(id);
+		if(Users.Count(id)){
+			auto pUser = Users.Get(id);
+			if(!pUser->mbRemoved)
+				return pUser;
+		}
 		return nullptr;
 		/*std::unique_lock<std::mutex> lock(mMutexUserList);
 		if (mmpConnectedUserList.count(id)) {
@@ -178,7 +170,7 @@ namespace EdgeSLAM {
 		}*/
 		for (auto iter = mapUserLists.begin(), iend = mapUserLists.end(); iter != iend; iter++) {
 			auto user = iter->second;
-			if (user->mapName != map)
+			if (user->mapName != map || user->mbRemoved)
 				continue;
 			res.push_back(user);
 		}
@@ -189,9 +181,18 @@ namespace EdgeSLAM {
 		{
 			if (Users.Count(id)) {
 				auto user = Users.Get(id);
+				if (user->mbRemoved) {
+					std::cout << "Doing removing process = " <<id<< std::endl;
+					return;
+				}
+				user->mbRemoved = true;
+				
+				while (user->mnUsed > 0)
+					continue;
 				Users.Erase(id);
 				delete user;
 				bDelete = true;
+				std::cout << "Remove user = " << id << std::endl;
 			}
 			/*std::unique_lock<std::mutex> lock(mMutexUserList);
 			if (mmpConnectedUserList.count(id)) {
@@ -530,12 +531,16 @@ namespace EdgeSLAM {
 		}
 		
 	}
-	void SLAM::SaveTrajectory(User* user) {
-		if (!user->mbSaveTrajectory)
+	void SLAM::SaveTrajectory(std::string user) {
+		auto pUser = this->GetUser(user);
+		if (!pUser)
 			return;
-		
+		if (!pUser->mbSaveTrajectory)
+			return;
+		pUser->mnUsed++;
+
 		std::stringstream ssPath;
-		ssPath << "../bin/trajectory/" << user->mapName;
+		ssPath << "../bin/trajectory/" << pUser->mapName;
 		
 		int resPath = _access(ssPath.str().c_str(), 0);
 		if (resPath == -1)
@@ -543,14 +548,14 @@ namespace EdgeSLAM {
 
 		
 
-		int nMapQuality = MapQuality.Get(user->mapName);
-		int nUserQuality = user->mnQuality;
+		int nMapQuality = MapQuality.Get(pUser->mapName);
+		int nUserQuality = pUser->mnQuality;
 
-		if (user->mbAsyncTest) {
-			ssPath << "/" << user->mapName << "_TrackingTest_" << user->mnQuality;
+		if (pUser->mbAsyncTest) {
+			ssPath << "/" << pUser->mapName << "_TrackingTest_" << pUser->mnQuality;
 		}
 		else {
-			ssPath << "/" << user->mapName << "_" << user->mnQuality;
+			ssPath << "/" << pUser->mapName << "_" << pUser->mnQuality;
 		}
 		/*if (nMapQuality != nUserQuality && user->mbDeviceTracking) {
 			ssPath << "/" << user->mapName << "_TrackingTest_" << user->mnQuality;
@@ -568,16 +573,16 @@ namespace EdgeSLAM {
 		struct tm newtime;
 		_localtime64_s(&newtime, &long_time);
 
-		auto pMap = GetMap(user->mapName);
+		auto pMap = GetMap(pUser->mapName);
 		auto vpKFs =  pMap->GetAllKeyFrames();
 
 		std::stringstream ss;
-		ss <<ssPath.str()<< "/" << user->userName<<"_"<<user->mnSkip<<(user->mbMapping?("_MAPPING_"):("_TRACKING_"))<< newtime.tm_year + 1900 <<"_"<< newtime.tm_mon+1<<"_"<< newtime.tm_mday<<"_"<< newtime.tm_hour<<"_"<< newtime.tm_min<<"_"<<newtime.tm_sec<< ".txt";
+		ss <<ssPath.str()<< "/" << pUser->userName<<"_"<< pUser->mnSkip<<(pUser->mbMapping?("_MAPPING_"):("_TRACKING_"))<< newtime.tm_year + 1900 <<"_"<< newtime.tm_mon+1<<"_"<< newtime.tm_mday<<"_"<< newtime.tm_hour<<"_"<< newtime.tm_min<<"_"<<newtime.tm_sec<< ".txt";
 		std::ofstream f;
 		f.open(ss.str().c_str());
 		f << std::fixed;
 		
-		if (user->mbMapping) {
+		if (pUser->mbMapping) {
 			for (int i = 0; i < vpKFs.size(); i++) {
 				auto pKF = vpKFs[i];
 
@@ -591,27 +596,27 @@ namespace EdgeSLAM {
 			}
 		}
 		else{
-			for (int i = 0; i < user->vecTrajectories.size(); i += 2) {
-				cv::Mat R = user->vecTrajectories[i].rowRange(0, 3).colRange(0, 3);
-				cv::Mat t = user->vecTrajectories[i].rowRange(0, 3).col(3);
+			for (int i = 0; i < pUser->vecTrajectories.size(); i += 2) {
+				cv::Mat R = pUser->vecTrajectories[i].rowRange(0, 3).colRange(0, 3);
+				cv::Mat t = pUser->vecTrajectories[i].rowRange(0, 3).col(3);
 				R = R.t(); //inverse
 				t = -R*t;  //camera center
 				std::vector<float> q = Converter::toQuaternion(R);
-				f << std::setprecision(6) << user->vecTimestamps[i] << std::setprecision(7) << " " << t.at<float>(0) << " " << t.at<float>(1) << " " << t.at<float>(2)
+				f << std::setprecision(6) << pUser->vecTimestamps[i] << std::setprecision(7) << " " << t.at<float>(0) << " " << t.at<float>(1) << " " << t.at<float>(2)
 					<< " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
 			}
 		}
 		f.close();
 
-		if (user->mbDeviceTracking) {
+		if (pUser->mbDeviceTracking) {
 			std::stringstream ss;
-			ss << ssPath.str() << "/" << user->userName << "_" << user->mnSkip << "_DEVICE_" << newtime.tm_year + 1900 << "_" << newtime.tm_mon + 1 << "_" << newtime.tm_mday << "_" << newtime.tm_hour << "_" << newtime.tm_min << "_" << newtime.tm_sec << ".txt";
+			ss << ssPath.str() << "/" << pUser->userName << "_" << pUser->mnSkip << "_DEVICE_" << newtime.tm_year + 1900 << "_" << newtime.tm_mon + 1 << "_" << newtime.tm_mday << "_" << newtime.tm_hour << "_" << newtime.tm_min << "_" << newtime.tm_sec << ".txt";
 			std::ofstream f;
 			f.open(ss.str().c_str());
 			f << std::fixed;
 
-			auto vecTrajectories = user->mvDeviceTrajectories.get();
-			auto vecTimestamps = user->mvDeviceTimeStamps.get();
+			auto vecTrajectories = pUser->mvDeviceTrajectories.get();
+			auto vecTimestamps = pUser->mvDeviceTimeStamps.get();
 			
 			for (int i = 0; i < vecTrajectories.size(); i+=10) {
 				
@@ -625,6 +630,7 @@ namespace EdgeSLAM {
 			}
 			f.close();
 		}
+		pUser->mnUsed--;
 	}
 	void SLAM::AddMap(std::string name, Map* pMap) {
 		Maps.Update(name, pMap);

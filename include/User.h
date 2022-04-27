@@ -62,12 +62,13 @@ namespace EdgeSLAM {
 		std::vector<double> vecTimestamps;
 		ConcurrentMap<int, cv::Mat> mapKeyPoints;
 		ConcurrentSet<MapPoint*> mSetMapPoints;
-				
+		ConcurrentSet<KeyFrame*> mSetLocalKeyFrames;
+		ConcurrentMap<int, cv::Mat> ImageDatas;
 		////frame id와 키프레임 id의 대응이 필요함.
 		//std::map<int, KeyFrame*> mapKeyFrames;
 		KeyFrame* mpRefKF;
-		std::atomic<bool> mbProgress;
-		std::atomic<int> mnLastKeyFrameID, mnPrevFrameID, mnCurrFrameID, mnLastRelocFrameId;
+		std::atomic<bool> mbProgress, mbRemoved;
+		std::atomic<int> mnUsed, mnLastKeyFrameID, mnPrevFrameID, mnCurrFrameID, mnLastRelocFrameId;
 	
 	public:
 		UserState GetState();

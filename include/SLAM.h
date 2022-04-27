@@ -28,8 +28,7 @@ namespace EdgeSLAM {
 		virtual ~SLAM();
 	public:
 		void Init();
-		void Track(cv::Mat im, int id,User* user, double ts = 0.0);
-		void Track(int id, User* user, double ts = 0.0);
+		void Track(int id, std::string user, double ts = 0.0);
 		void LoadVocabulary();
 		void InitVisualizer(std::string user,std::string name, int w, int h);
 		void ProcessContentGeneration(std::string user, int id);
@@ -60,7 +59,6 @@ namespace EdgeSLAM {
 		void RemoveUser(std::string id);
 		User* GetUser(std::string id);
 		std::vector<User*> GetAllUsersInMap(std::string map);
-		void DownloadKeyPoints(std::string user, int id);
 		void UpdateDeviceGyroSensor(std::string user, int id);
 		void UpdateDevicePosition(std::string user, int id, double ts);
 		void AddMap(std::string name, Map* pMap);
@@ -106,7 +104,9 @@ namespace EdgeSLAM {
 		void InitProcessingTime();
 		void SaveProcessingTime();
 		void LoadProcessingTime();
-		void SaveTrajectory(User* user);
+		void SaveTrajectory(std::string user);
+	public:
+		ConcurrentMap<int, std::chrono::high_resolution_clock::time_point> RequestTime;
 	private:
 		std::mutex mMutexTrackingTime, mMutexRelocTime, mMutexMappingTime;
 	};

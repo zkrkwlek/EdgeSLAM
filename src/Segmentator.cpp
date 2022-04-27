@@ -145,7 +145,9 @@ namespace EdgeSLAM {
 		auto res = mpAPI->Send(ss.str(), "");
 		int n2 = res.size();
 
-		cv::Mat fdata = cv::Mat::zeros(5, 3, CV_32FC1);
+		cv::Mat fdata = cv::Mat::zeros(1000, 1, CV_32FC1);
+		std::memcpy(fdata.data, res.data(), res.size());
+		/*cv::Mat fdata = cv::Mat::zeros(5, 3, CV_32FC1);
 		std::memcpy(fdata.data, res.data(), res.size());
 		
 		cv::Mat R = fdata.rowRange(1, 4).colRange(0, 3).clone();
@@ -156,9 +158,34 @@ namespace EdgeSLAM {
 		cv::Mat tinv = -Rinv*t;
 		cv::Mat Tinv = cv::Mat::eye(4, 4, CV_32FC1);
 		Rinv.copyTo(Tinv.colRange(0, 3).rowRange(0, 3));
-		tinv.copyTo(Tinv.col(3).rowRange(0,3));
-		
+		tinv.copyTo(Tinv.col(3).rowRange(0,3));*/
 
+
+		std::map<int, cv::Mat> mapDatas;
+		if (system->TemporalDatas2.Count("content"))
+			mapDatas = system->TemporalDatas2.Get("content");
+		cv::Mat X = cv::Mat::zeros(3, 1, CV_32FC1);
+		X.at<float>(0) = fdata.at<float>(2);
+		X.at<float>(1) = fdata.at<float>(3);
+		X.at<float>(2) = fdata.at<float>(4);
+		mapDatas[id] = X;
+		system->TemporalDatas2.Update("content", mapDatas);
+
+		{
+			std::cout << "temp content" <<fdata.at<float>(0)<<" "<<fdata.at<float>(1)<< " " << fdata.at<float>(5) << " " << fdata.at<float>(7)<<" || " <<fdata.at<float>(6) << " " << fdata.at<float>(8) << std::endl;
+			std::cout << "temp content POS = " << fdata.at<float>(2) << " " << fdata.at<float>(3) << " " << fdata.at<float>(4) << std::endl;
+			cv::Mat data = cv::Mat::ones(400, 1, CV_32FC1);
+			data.at<float>(0) = 500;
+			data.at<float>(1) = 500;
+			data.at<float>(2) = 500;
+
+			////Store Content
+			ss.str("");
+			ss << "/Store?keyword=Content&id=" << ++mnContentID << "&src=SLAMServer&type2=" << user->userName<< "&ts=" << id;
+			res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
+			return;
+		}
+		
 
 		////click check
 		/*float m1, m2;
@@ -205,26 +232,26 @@ namespace EdgeSLAM {
 		////click check
 
 		////юс╫ц╥н
-		if (!floorPlane)
-			return;
+		//if (!floorPlane)
+		//	return;
 
-		cv::Mat Kinv = user->GetCameraInverseMatrix();
-		cv::Mat Pinv = PlaneProcessor::CalcInverPlaneParam(floorPlane->GetParam(), Tinv);
-		
-		cv::Mat Xnorm = Kinv*Ximg;
-		float depth = PlaneProcessor::CalculateDepth(Xnorm, Pinv);
-		cv::Mat Xw = PlaneProcessor::CreateWorldPoint(Xnorm, Tinv, depth);
-		std::cout << Xw.t() << std::endl;
+		//cv::Mat Kinv = user->GetCameraInverseMatrix();
+		//cv::Mat Pinv = PlaneProcessor::CalcInverPlaneParam(floorPlane->GetParam(), Tinv);
+		//
+		//cv::Mat Xnorm = Kinv*Ximg;
+		//float depth = PlaneProcessor::CalculateDepth(Xnorm, Pinv);
+		//cv::Mat Xw = PlaneProcessor::CreateWorldPoint(Xnorm, Tinv, depth);
+		//std::cout << Xw.t() << std::endl;
 
-		cv::Mat data = cv::Mat::ones(400, 1, CV_32FC1);
-		data.at<float>(0) = Xw.at<float>(0);
-		data.at<float>(1) = Xw.at<float>(1);
-		data.at<float>(2) = Xw.at<float>(2);
+		//cv::Mat data = cv::Mat::ones(400, 1, CV_32FC1);
+		//data.at<float>(0) = Xw.at<float>(0);
+		//data.at<float>(1) = Xw.at<float>(1);
+		//data.at<float>(2) = Xw.at<float>(2);
 
-		////Store Content
-		ss.str("");
-		ss << "/Store?keyword=Content&id=" << ++mnContentID << "&src=ContentServer&type2=" << user->userName;//<< "&id2=" << id;
-		res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
+		//////Store Content
+		//ss.str("");
+		//ss << "/Store?keyword=Content&id=" << ++mnContentID << "&src=ContentServer&type2=" << user->userName;//<< "&id2=" << id;
+		//res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
 		
 	}
 
@@ -994,12 +1021,23 @@ namespace EdgeSLAM {
 	{
 		
 		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
-		std::stringstream ss;
-		ss << "/Store?keyword=RequestDepth&id=" << id << "&src=" << user;
-		auto res = mpAPI->Send(ss.str(), "");
-		ss.str("");
-		ss << "/Store?keyword=RequestSegmentation&id=" << id <<"&src="<<user;
-		res = mpAPI->Send(ss.str(), "");
+		{
+			std::stringstream ss;
+			ss << "/Store?keyword=RequestDepth&id=" << id << "&src=" << user;
+			auto res = mpAPI->Send(ss.str(), "");
+		}
+		{
+			std::stringstream ss;
+			ss << "/Store?keyword=RequestSegmentation&id=" << id << "&src=" << user;
+			auto res = mpAPI->Send(ss.str(), "");
+		}
+		/*{
+			std::stringstream ss;
+			ss << "/Store?keyword=RPlaneEstimation&id=" << id << "&src=" << user;
+			auto res = mpAPI->Send(ss.str(), "");
+		}*/
+		//ss.str("");
+		//ss.str("");
 		delete mpAPI;
 	}
 	void Segmentator::Init() {
