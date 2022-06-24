@@ -282,7 +282,7 @@ namespace EdgeSLAM {
 			if (bTrack)
 				trackState = UserState::Success;
 			
-			pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, pUser, pLocalMap, frame, nInliers, id, ts);
+			pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, pUser->userName, pLocalMap, frame, nInliers, id, ts);
 			
 		}
 		
@@ -806,13 +806,12 @@ namespace EdgeSLAM {
 		delete mpAPI;
 	}
 
-	void Tracker::SendDeviceTrackingData(SLAM* system, User* user, LocalMap* pLocalMap, Frame* frame, int nInlier, int id, double ts) {
+	void Tracker::SendDeviceTrackingData(SLAM* system, std::string userName, LocalMap* pLocalMap, Frame* frame, int nInlier, int id, double ts) {
 		
 		////data
 		cv::Mat T = frame->GetPose();
 		cv::Mat data = cv::Mat::zeros(13, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
-		
-		
+				
 		int nDataIdx = 1;
 		data.at<float>(nDataIdx++) = T.at<float>(0, 0);
 		data.at<float>(nDataIdx++) = T.at<float>(0, 1);
@@ -865,7 +864,7 @@ namespace EdgeSLAM {
 		{
 			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 			std::stringstream ss;
-			ss << "/Store?keyword=ReferenceFrame&id=" << id << "&src=" << user->userName <<"&ts="<<std::fixed<< std::setprecision(6) <<ts<< "&type2=" << user->userName;
+			ss << "/Store?keyword=ReferenceFrame&id=" << id << "&src=" << userName <<"&ts="<<std::fixed<< std::setprecision(6) <<ts<< "&type2=" << userName;
 			std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
 			auto res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
 			std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
