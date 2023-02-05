@@ -10,7 +10,7 @@ namespace EdgeSLAM {
 	Visualizer::Visualizer() {
 
 	}
-	Visualizer::Visualizer(SLAM* pSystem):mpSystem(pSystem), mpMap(nullptr), mnVisScale(20), mnDisplayX(0), mnDisplayY(0), mbDoingProcess(false){
+	Visualizer::Visualizer(SLAM* pSystem):mpSystem(pSystem), mpMap(nullptr), mnVisScale(20), mnDisplayX(0), mnDisplayY(0), mbDoingProcess(false), mnVisMode(0){
 
 	}
 	Visualizer::~Visualizer(){}
@@ -117,6 +117,7 @@ namespace EdgeSLAM {
 		}
 	}
 
+	int nOutputImages = 0;
 	void Visualizer::Init(int w, int h){
 		mnWidth = w;
 		mnHeight = h;
@@ -133,6 +134,13 @@ namespace EdgeSLAM {
 		cv::Mat leftImg2 = cv::Mat::zeros(mnHeight / 2, mnWidth / 2, CV_8UC3);
 		cv::Mat leftImg3 = cv::Mat::zeros(mnHeight / 2, mnWidth / 2, CV_8UC3);
 		cv::Mat leftImg4 = cv::Mat::zeros(mnHeight / 2, mnWidth / 2, CV_8UC3);
+
+		//right image
+		cv::Mat rightImg1 = cv::Mat::zeros(mnHeight / 2, mnWidth / 2, CV_8UC3);
+		cv::Mat rightImg2 = cv::Mat::zeros(mnHeight / 2, mnWidth / 2, CV_8UC3);
+		cv::Mat rightImg3 = cv::Mat::zeros(mnHeight / 2, mnWidth / 2, CV_8UC3);
+		cv::Mat rightImg4 = cv::Mat::zeros(mnHeight / 2, mnWidth / 2, CV_8UC3);
+
 		mSizeOutputImg = leftImg1.size();
 		//¸Ê
 		cv::Mat mapImage = cv::Mat::zeros(mnHeight * 2, mnWidth * 2, CV_8UC3);
@@ -159,7 +167,23 @@ namespace EdgeSLAM {
 		cv::Rect r4(0, leftImg1.rows * 3, leftImg1.cols, leftImg1.rows);
 		mvRects.push_back(r4);
 
+		//right image
+		int colRight = leftImg1.cols + mapImage.cols;
+		mvOutputImgs.push_back((rightImg1));
+		cv::Rect r5(colRight, 0, leftImg1.cols, leftImg1.rows);
+		mvRects.push_back(r5);
+		mvOutputImgs.push_back((rightImg2));
+		cv::Rect r6(colRight, leftImg1.rows, leftImg1.cols, leftImg1.rows);
+		mvRects.push_back(r6);
+		mvOutputImgs.push_back((rightImg3));
+		cv::Rect r7(colRight, leftImg1.rows * 2, leftImg1.cols, leftImg1.rows);
+		mvRects.push_back(r7);
+		mvOutputImgs.push_back((rightImg4));
+		cv::Rect r8(colRight, leftImg1.rows * 3, leftImg1.cols, leftImg1.rows);
+		mvRects.push_back(r8);
+
 		//4
+		nOutputImages = mvOutputImgs.size();
 		mvOutputImgs.push_back((mapImage));
 		cv::Rect rMap(leftImg1.cols, 0, mapImage.cols, mapImage.rows);
 		mvRects.push_back(rMap);
@@ -174,7 +198,7 @@ namespace EdgeSLAM {
 
 		rectPt = cv::Point2f(r3.x, r3.y);
 		int nDisRows = mnHeight * 2;
-		int nDisCols = leftImg1.cols + mapImage.cols;// +kfWindowImg.cols;
+		int nDisCols = leftImg1.cols + mapImage.cols + rightImg1.cols;// +kfWindowImg.cols;
 		mOutputImage = cv::Mat::zeros(nDisRows, nDisCols, CV_8UC3);
 
 		
@@ -336,6 +360,24 @@ namespace EdgeSLAM {
 						tpt += mVisMidPt;
 						cv::circle(tempVis, tpt, 4, cv::Scalar(0,255,255), -1);
 					}
+					std::map<int, cv::Mat> ARFoundationMPs;
+					if (mpSystem->TemporalDatas2.Count("ARFoundationMPs"))
+						ARFoundationMPs = mpSystem->TemporalDatas2.Get("ARFoundationMPs");
+					for (auto jter = ARFoundationMPs.begin(), jend = ARFoundationMPs.end(); jter != jend; jter++) {
+						int id = jter->first;
+						auto x3Ds = ARFoundationMPs[id];
+						for (int j = 0; j < x3Ds.cols; j++) {
+							cv::Mat x3D = x3Ds.col(j);
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T*tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+							cv::circle(tempVis, tpt, 4, cv::Scalar(0, 255, 255), -1);
+						}
+					}
+
 					/*for (auto jter = mapDatas.begin(), jend = mapDatas.end(); jter != jend; jter++) {
 						int id = jter->first;
 						if (labelDatas.count(id) == 0 || mapDatas.count(id) == 0)
@@ -449,14 +491,49 @@ namespace EdgeSLAM {
 
 					//}
 
+					{
+						////device testa
+						cv::Mat T2 = user->GetPose();
+						cv::Mat R = T2.rowRange(0, 3).colRange(0, 3);
+						cv::Mat t = T2.col(3).rowRange(0, 3);
+						auto pos = user->GetPosition();
+						cv::Point2f pt1 = cv::Point2f(pos.at<float>(mnAxis1)* mnVisScale, pos.at<float>(mnAxis2)* mnVisScale);
+						cv::Mat tempPt(pt1);
+						cv::Mat aaa = T*tempPt;
+						pt1.x = aaa.at<float>(0);
+						pt1.y = aaa.at<float>(1);
+						pt1 += mVisMidPt;
+						cv::circle(tempVis, pt1, 3, cv::Scalar(0, 0, 255), -1);
+
+						cv::Mat directionZ = R.row(2);
+						cv::Point2f dirPtZ = cv::Point2f(directionZ.at<float>(mnAxis1)* mnVisScale / 10.0, directionZ.at<float>(mnAxis2)* mnVisScale / 10.0) + pt1;
+						cv::line(tempVis, pt1, dirPtZ, cv::Scalar(255, 0, 0), 2);
+
+						cv::Mat directionY = R.row(1);
+						cv::Point2f dirPtY = cv::Point2f(directionY.at<float>(mnAxis1)* mnVisScale / 10.0, directionY.at<float>(mnAxis2)* mnVisScale / 10.0) + pt1;
+						cv::line(tempVis, pt1, dirPtY, cv::Scalar(0, 255, 0), 2);
+
+						cv::Mat directionX = R.row(0);
+						cv::Point2f dirPtX1 = pt1 + cv::Point2f(directionX.at<float>(mnAxis1)* mnVisScale / 10.0, directionX.at<float>(mnAxis2)* mnVisScale / 10.0);
+						//cv::Point2f dirPtX2 = pt1 - cv::Point2f(directionX.at<float>(mnAxis1)* mnVisScale / 10.0, directionX.at<float>(mnAxis2)* mnVisScale / 10.0);
+						cv::line(tempVis, pt1, dirPtX1, cv::Scalar(0, 0, 255), 2);
+
+					}
+
 					//{
-					//	////gyro testa
-					//	cv::Mat T = user->GetPose();
-					//	cv::Mat R = T.rowRange(0, 3).colRange(0, 3);
-					//	auto pos = user->GetPosition();
+					//	////arfoudation test
+					//	cv::Mat T2 = user->GetDevicePose();
+					//	cv::Mat R = T2.rowRange(0, 3).colRange(0, 3);
+					//	cv::Mat t = T2.col(3).rowRange(0, 3);
+					//	cv::Mat pos = -R.t()*t;
+					//	//auto pos = user->GetPosition();
 					//	cv::Point2f pt1 = cv::Point2f(pos.at<float>(mnAxis1)* mnVisScale, pos.at<float>(mnAxis2)* mnVisScale);
+					//	cv::Mat tempPt(pt1);
+					//	cv::Mat aaa = T*tempPt;
+					//	pt1.x = aaa.at<float>(0);
+					//	pt1.y = aaa.at<float>(1);
 					//	pt1 += mVisMidPt;
-					//	cv::circle(tempVis, pt1, 3, cv::Scalar(0, 0, 255), -1);
+					//	cv::circle(tempVis, pt1, 5, cv::Scalar(0, 0, 0), -1);
 
 					//	cv::Mat directionZ = R.row(2);
 					//	cv::Point2f dirPtZ = cv::Point2f(directionZ.at<float>(mnAxis1)* mnVisScale / 10.0, directionZ.at<float>(mnAxis2)* mnVisScale / 10.0) + pt1;
@@ -468,9 +545,8 @@ namespace EdgeSLAM {
 
 					//	cv::Mat directionX = R.row(0);
 					//	cv::Point2f dirPtX1 = pt1 + cv::Point2f(directionX.at<float>(mnAxis1)* mnVisScale / 10.0, directionX.at<float>(mnAxis2)* mnVisScale / 10.0);
-					//	cv::Point2f dirPtX2 = pt1 - cv::Point2f(directionX.at<float>(mnAxis1)* mnVisScale / 10.0, directionX.at<float>(mnAxis2)* mnVisScale / 10.0);
-					//	cv::line(tempVis, dirPtX1, dirPtX2, cv::Scalar(0, 0, 255), 2);
-
+					//	//cv::Point2f dirPtX2 = pt1 - cv::Point2f(directionX.at<float>(mnAxis1)* mnVisScale / 10.0, directionX.at<float>(mnAxis2)* mnVisScale / 10.0);
+					//	cv::line(tempVis, dirPtX1, pt1, cv::Scalar(255, 0, 255), 2);
 					//}
 					
 					auto pos = user->GetPosition();
@@ -501,9 +577,16 @@ namespace EdgeSLAM {
 				std::vector<User*>().swap(vpUsers);
 			}
 
-			SetOutputImage(tempVis, 4);
+			SetOutputImage(tempVis, nOutputImages);
 			////////Update Map Visualizer
-			if (isOutputTypeChanged(0)) {
+			int N = mvOutputImgs.size();
+			for (int i = 0; i < N; i++) {
+				if (isOutputTypeChanged(i)) {
+					cv::Mat mTrackImg = GetOutputImage(i);
+					mTrackImg.copyTo(mOutputImage(mvRects[i]));
+				}
+			}
+			/*if (isOutputTypeChanged(0)) {
 				cv::Mat mTrackImg = GetOutputImage(0);
 				mTrackImg.copyTo(mOutputImage(mvRects[0]));
 			}
@@ -526,7 +609,7 @@ namespace EdgeSLAM {
 			if (isOutputTypeChanged(5)) {
 				cv::Mat mMappingImg = GetOutputImage(5);
 				mMappingImg.copyTo(mOutputImage(mvRects[5]));
-			}
+			}*/
 			
 			///////save image
 			//nMapImageID++;
@@ -538,7 +621,13 @@ namespace EdgeSLAM {
 			///////save image
 
 			imshow("Output::Display", mOutputImage);
-			cv::waitKey(1);
+			auto key = cv::waitKey(10);
+			if (key == '1') {
+				std::cout << "1" << std::endl;
+			}
+			if (key == '2') {
+				std::cout << "2" << std::endl;
+			}
 		}
 	}
 	void Visualizer::SetBoolDoingProcess(bool b){

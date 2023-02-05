@@ -8,7 +8,7 @@
 
 namespace EdgeSLAM {
 	Map::Map(DBoW3::Vocabulary* voc, bool bFixScale):mnMaxKFid(0), mnBigChangeIdx(0), mnNumMappingFrames(0), mnNumLoopClosingFrames(0), mnNumPlaneEstimation(0), mnNextKeyFrameID(0), mnNextMapPointID(0), mState(MapState::NoImages), mpVoc(voc),
-		mbResetRequested(false), mbFinishRequested(false), mbFinished(true),
+		mbResetRequested(false), mbFinishRequested(false), mbFinished(false),
 		mbAbortBA(false), mbStopped(false), mbStopRequested(false), mbNotStop(false),
 		mpMatchedKF(nullptr), mnLastLoopKFid(0), mbRunningGBA(false), mbFinishedGBA(true),
 		mbStopGBA(false), mpThreadGBA(nullptr), mbFixScale(bFixScale), mnFullBAIdx(0)

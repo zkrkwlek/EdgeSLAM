@@ -6,6 +6,7 @@
 #include <FeatureTracker.h>
 #include <CameraPose.h>
 #include <Converter.h>
+#include <User.h>
 
 namespace EdgeSLAM {
 	KeyFrame::KeyFrame(Frame *F, Map* pMap):
@@ -32,7 +33,9 @@ namespace EdgeSLAM {
 				mGrid[i][j] = F->mGrid[i][j];
 		}
 	}
-	KeyFrame:: ~KeyFrame(){}
+	KeyFrame:: ~KeyFrame(){
+		
+	}
 
 
 	bool KeyFrame::is_in_image(float x, float y, float z){

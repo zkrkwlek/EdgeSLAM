@@ -20,6 +20,7 @@ namespace EdgeSLAM {
 		virtual ~LocalMapper();
 	public:
 		static void ProcessMapping(ThreadPool::ThreadPool* pool, SLAM* system, Map* map, KeyFrame* targetKF);
+		static void SendKeyFrameInformation(SLAM* system, std::string name, Map* map, KeyFrame* targetKF);
 		void ProcessNewKeyFrame(Map* map, KeyFrame* targetKF);
 		void MapPointCulling(Map* map, KeyFrame* targetKF);
 		void CreateNewMapPoints(Map* map, KeyFrame* targetKF);

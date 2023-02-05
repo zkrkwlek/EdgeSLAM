@@ -37,6 +37,7 @@ namespace EdgeSLAM {
 		int mnWindowImgCols, mnWindowImgRows;
 		SLAM* mpSystem;
 		Map* mpMap;
+		int mnVisMode;
 		int mnVisScale;
 		int mnDisplayX, mnDisplayY;
 		int mnWidth, mnHeight;

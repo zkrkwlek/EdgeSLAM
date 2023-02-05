@@ -30,6 +30,7 @@ namespace EdgeSLAM {
 		static void UpdateDeviceGyro(SLAM* system, std::string user, int id);
 		static void ProcessDevicePosition(SLAM* system, std::string user, int id, double ts);
 		static void SendTrackingResults(SLAM* system, User* user, int nFrameID, int n, cv::Mat R, cv::Mat t);
+		static void SendFrameInformationForRecon(SLAM* system, int id, std::string userName, Frame* f, LocalMap* pLocalMap);
 		static void SendDeviceTrackingData(SLAM* system, std::string userName, LocalMap* pLocalMap, Frame* frame, int nInlier, int id, double ts);
 
 	private:

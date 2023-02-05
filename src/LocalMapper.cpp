@@ -10,7 +10,10 @@
 #include <Optimizer.h>
 #include <Plane.h>
 #include <Utils.h>
+#include <WebAPI.h>
 #include <chrono>
+#include <User.h>
+
 
 
 namespace EdgeSLAM {
@@ -47,6 +50,7 @@ namespace EdgeSLAM {
 		}
 		
 		pool->EnqueueJob(LoopCloser::ProcessLoopClosing, system, map, targetKF);
+		//pool->EnqueueJob(SendKeyFrameInformation, system, "SLAMServer", map, targetKF);
 		map->mnNumMappingFrames--;
 
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
@@ -56,6 +60,61 @@ namespace EdgeSLAM {
 		if(N > 0)
 			system->ProcessingTime.Get("mapping")[N]->add(t_test1);
 	}
+
+	void LocalMapper::SendKeyFrameInformation(EdgeSLAM::SLAM* system, std::string name, Map* map, KeyFrame* targetKF) {
+		
+		auto pUser = system->GetUser(targetKF->sourceName);
+		if (!pUser)
+			return;
+		pUser->mnUsed++;
+		//이미지, 포즈, fx, fy 전송
+		////MP와 인접 MP 정보 전송
+		WebAPI API("143.248.6.143", 35005);
+		std::stringstream ss;
+		
+		cv::Mat T = targetKF->GetPose();
+		cv::Mat data = cv::Mat::zeros(24, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
+		//12+4+7+1(연결 KF 수)
+		int nDataIdx = 0;
+		data.at<float>(nDataIdx++) = T.at<float>(0, 0);
+		data.at<float>(nDataIdx++) = T.at<float>(0, 1);
+		data.at<float>(nDataIdx++) = T.at<float>(0, 2);
+		data.at<float>(nDataIdx++) = T.at<float>(1, 0);
+		data.at<float>(nDataIdx++) = T.at<float>(1, 1);
+		data.at<float>(nDataIdx++) = T.at<float>(1, 2);
+		data.at<float>(nDataIdx++) = T.at<float>(2, 0);
+		data.at<float>(nDataIdx++) = T.at<float>(2, 1);
+		data.at<float>(nDataIdx++) = T.at<float>(2, 2);
+		data.at<float>(nDataIdx++) = T.at<float>(0, 3);
+		data.at<float>(nDataIdx++) = T.at<float>(1, 3);
+		data.at<float>(nDataIdx++) = T.at<float>(2, 3);
+		data.at<float>(nDataIdx++) = targetKF->fx;
+		data.at<float>(nDataIdx++) = targetKF->fy;
+		data.at<float>(nDataIdx++) = targetKF->cx;
+		data.at<float>(nDataIdx++) = targetKF->cy;
+
+		auto kfs = targetKF->GetBestCovisibilityKeyFrames(7);
+		data.at<float>(nDataIdx++) = (float)kfs.size();
+		for (int i = 0; i < kfs.size(); i++) {
+			auto pKF = kfs[i];
+			data.at<float>(nDataIdx++) = (float)pKF->mnId;
+		}
+		
+		cv::Mat encoded = pUser->ImageDatas.Get(targetKF->mnFrameId);
+		
+		size_t len = sizeof(float)*(data.rows) + sizeof(char)*encoded.rows;
+		unsigned char* vdata = (unsigned char*)malloc(len);
+		memcpy(vdata, data.data, sizeof(float)*(data.rows));
+		memcpy(vdata+96, encoded.data, sizeof(char)*encoded.rows);
+		//encoded.convertTo(encoded, CV_32FC1);
+		//cv::vconcat(data, encoded, data);
+		
+		pUser->mnUsed--;
+		ss << "/Store?keyword=NewKeyFrame&id=" << targetKF->mnId << "&src=" << name;// << "&type2=" << user->userName;
+		auto res = API.Send(ss.str(), vdata, len);
+		free(vdata);
+	}
+
 	void LocalMapper::ProcessNewKeyFrame(Map* map, KeyFrame* targetKF) {
 		
 		targetKF->ComputeBoW();

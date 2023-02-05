@@ -17,6 +17,7 @@ namespace EdgeSLAM {
 	class MapPoint;
 	class Map;
 	class Frame;
+	class User;
 	class Camera;
 	class CameraPose;
 	class FeatureTracker;
@@ -178,6 +179,7 @@ namespace EdgeSLAM {
 		KeyFrame* mpParent;
 		std::set<KeyFrame*> mspChildrens;
 		std::set<KeyFrame*> mspLoopEdges;
+		std::string sourceName;
 
 		// Bad flags
 		bool mbNotErase;

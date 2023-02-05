@@ -25,7 +25,7 @@ namespace EdgeSLAM {
 		cv::Mat Kfluker;
 		float u_min, u_max, v_min, v_max;
 		bool bDistorted;
-
+		cv::Mat Knew, map1, map2;
 		static int mnGridSize;
 		int mnGridRows, mnGridCols;
 		float mfGridElementWidthInv, mfGridElementHeightInv;

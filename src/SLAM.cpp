@@ -187,8 +187,9 @@ namespace EdgeSLAM {
 				}
 				user->mbRemoved = true;
 				
-				while (user->mnUsed > 0)
+				while (user->mnUsed > 0){
 					continue;
+				}
 				Users.Erase(id);
 				delete user;
 				bDelete = true;
@@ -209,9 +210,9 @@ namespace EdgeSLAM {
 	}
 	void SLAM::SetUserVisID(User* user){
 		std::unique_lock<std::mutex> lock(mMutexVisID);
-		if (user->mbMapping) {
+		/*if (user->mbMapping) {
 			return;
-		}
+		}*/
 		user->SetVisID(mnVisID);
 		mnVisID++;
 		std::cout << user->userName << "=" << user->GetVisID() << std::endl;
@@ -230,9 +231,12 @@ namespace EdgeSLAM {
 				continue;
 			user->SetVisID(mnVisID);
 			mnVisID++;
-		}
+		}  
 	}
 
+	//t일 때 트래킹 출력
+	//f일 때 나머지 출력
+	//왼쪽은 시각화, 오른쪽은 기기 위치 출력하기
 	void SLAM::VisualizeImage(cv::Mat src, int vid) {
 		mpVisualizer->ResizeImage(src, src);
 		mpVisualizer->SetOutputImage(src, vid);

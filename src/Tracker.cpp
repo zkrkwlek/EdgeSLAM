@@ -84,6 +84,8 @@ namespace EdgeSLAM {
 			return;
 		if (pUser->mbProgress)
 			return;
+		if (id < pUser->mnPrevFrameID)
+			return;
 		pUser->mnUsed++;
 		pUser->mbProgress = true;
 		auto cam = pUser->mpCamera;
@@ -173,6 +175,10 @@ namespace EdgeSLAM {
 				trackState = UserState::Success;
 				auto kf1 = system->mpInitializer->mpInitKeyFrame1;
 				auto kf2 = system->mpInitializer->mpInitKeyFrame2;
+
+				kf1->sourceName = user;
+				kf2->sourceName = user;
+
 				map->mvpKeyFrameOrigins.push_back(kf1);
 				/*user->mapKeyFrames[kf1->mnId] = kf1;
 				user->mapKeyFrames[kf2->mnId] = kf2;*/
@@ -283,7 +289,7 @@ namespace EdgeSLAM {
 				trackState = UserState::Success;
 			
 			pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, pUser->userName, pLocalMap, frame, nInliers, id, ts);
-			
+			pool->EnqueueJob(Tracker::SendFrameInformationForRecon, system, id, pUser->userName,frame, pLocalMap);
 		}
 		
 		pUser->SetState(trackState);
@@ -295,6 +301,7 @@ namespace EdgeSLAM {
 			//pose update
 			cv::Mat T = frame->GetPose();
 			pUser->UpdatePose(T, ts);
+			pUser->PoseDatas.Update(id, T);
 			//check keyframe
 			if (pUser->mbMapping && pUser->mpRefKF) {
 				if (Tracker::NeedNewKeyFrame(map, system->mpLocalMapper, frame, pUser->mpRefKF, nInliers, pUser->mnLastKeyFrameID.load(), pUser->mnLastRelocFrameId.load())) {
@@ -369,12 +376,14 @@ namespace EdgeSLAM {
 			}
 
 		}
-		std::cout << "Frame = " << pUser->userName << " : " << id << ", Matches = " << nInliers << ", time =" << t_test1 <<", "<< t_test2<<"="<< t_local <<" "<<t_prev<<" "<< t_init <<" "<<t_frame<< std::endl;
-		
 		//system->UpdateTrackingTime(t_test1);
 
 		////visualization
 		if (mapState == MapState::Initialized  && pUser->GetVisID() <= 3 && userState != UserState::NotEstimated) {
+
+			cv::Mat R = frame->GetRotation();
+			cv::Mat t = frame->GetTranslation();
+			cv::Mat K = pUser->GetCameraMatrix();
 
 			cv::Scalar color = Segmentator::mvObjectLabelColors[pUser->GetVisID()+1];
 
@@ -399,6 +408,12 @@ namespace EdgeSLAM {
 					/*color.val[1] = 255;
 					color.val[2] = 0;*/
 					cv::circle(img, frame->mvKeys[i].pt, r, color, -1);
+
+					cv::Mat x3D = pMP->GetWorldPos();	
+					cv::Mat proj= K*(R*x3D + t);
+					float d = proj.at<float>(2);
+					cv::Point2f pt(proj.at<float>(0) / d, proj.at<float>(1) / d);
+					cv::circle(img, pt, r, cv::Scalar(255,0,255), -1);
 				}
 			}
 			/*if (user->objFrames.Count(tempID)) {
@@ -419,13 +434,13 @@ namespace EdgeSLAM {
 				std::cout << std::endl << std::endl << std::endl << std::endl;
 			}*/
 			
-
+			system->VisualizeImage(img, pUser->GetVisID()+4); 
 			//system->mpVisualizer->ResizeImage(img, img);
 			//system->mpVisualizer->SetOutputImage(img, pUser->GetVisID());
 
 			/////save image
 			/*std::stringstream sss;
-			sss << "../../bin/img/" << user->userName << "/Track/" << id << ".jpg";
+			sss << "../bin/img/zkrkwleks202/Track/" << id << ".jpg";
 			cv::imwrite(sss.str(), img);*/
 			/////save image
 		}
@@ -725,14 +740,15 @@ namespace EdgeSLAM {
 			return false;
 
 		// If Local Mapping is freezed by a Loop Closure do not insert keyframes
-		if (map->isStopped() || map->stopRequested())
+		if (map->isStopped() || map->stopRequested()){
 			return false;
-
+		}
 		const int nKFs = map->GetNumKeyFrames();
 
 		// Do not insert keyframes if not enough frames have passed from last relocalisation
-		if (cur->mnFrameID<nLastRelocFrameID + nMaxFrames && nKFs>nMaxFrames)
+		if (cur->mnFrameID<nLastRelocFrameID + nMaxFrames && nKFs>nMaxFrames){
 			return false;
+		}
 
 		// Tracked MapPoints in the reference keyframe
 		int nMinObs = 3;
@@ -753,7 +769,7 @@ namespace EdgeSLAM {
 		//const bool c1c = mSensor != System::MONOCULAR && (mnMatchesInliers<nRefMatches*0.25 || bNeedToInsertClose);
 		// Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
 		const bool c2 = (nMatchesInliers<nRefMatches*thRefRatio) && nMatchesInliers>15;
-
+		
 		if ((c1a || c1b) && c2)
 		{
 			// If the mapping accepts keyframes, insert keyframe.
@@ -774,11 +790,11 @@ namespace EdgeSLAM {
 		if (!map->SetNotStop(true))
 			return;
 		KeyFrame* pKF = new KeyFrame(cur, map);
+		pKF->sourceName = user->userName;
 		user->mpRefKF = pKF;
 		user->mnLastKeyFrameID = cur->mnFrameID;
 		pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, pKF);
 		map->SetNotStop(false);
-		
 		user->KeyFrames.Update(cur->mnFrameID, pKF);
 	}
 
@@ -804,6 +820,76 @@ namespace EdgeSLAM {
 		auto res = mpAPI->Send(ss.str(), data.data, sizeof(float)*data.rows);
 
 		delete mpAPI;
+	}
+	//키프레임 아이디와 포즈, 현재 이미지의 아이디와 이미지 전송(이것을 이후 키프레임 연경)
+	void Tracker::SendFrameInformationForRecon(EdgeSLAM::SLAM* system, int id, std::string userName, Frame* f, LocalMap* pLocalMap) {
+
+		//이미지, 포즈, fx, fy 전송
+		////MP와 인접 MP 정보 전송
+		WebAPI API("143.248.6.143", 35005);
+		std::stringstream ss;
+
+		//현재 프레임의 자세 및 인트린직 정보와 인접 키프레임의 아이디와 포즈 전송.
+
+		//레퍼런스와 6개의 키프레임
+		cv::Mat T = f->GetPose();
+		cv::Mat data = cv::Mat::zeros(5000, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
+														//12+4+7+1(연결 KF 수)
+
+		//프레임의 포즈와 인트린직
+		int nDataIdx = 0;
+		data.at<float>(nDataIdx++) = T.at<float>(0, 0);
+		data.at<float>(nDataIdx++) = T.at<float>(0, 1);
+		data.at<float>(nDataIdx++) = T.at<float>(0, 2);
+		data.at<float>(nDataIdx++) = T.at<float>(1, 0);
+		data.at<float>(nDataIdx++) = T.at<float>(1, 1);
+		data.at<float>(nDataIdx++) = T.at<float>(1, 2);
+		data.at<float>(nDataIdx++) = T.at<float>(2, 0);
+		data.at<float>(nDataIdx++) = T.at<float>(2, 1);
+		data.at<float>(nDataIdx++) = T.at<float>(2, 2);
+		data.at<float>(nDataIdx++) = T.at<float>(0, 3);
+		data.at<float>(nDataIdx++) = T.at<float>(1, 3);
+		data.at<float>(nDataIdx++) = T.at<float>(2, 3);
+		data.at<float>(nDataIdx++) = f->fx;
+		data.at<float>(nDataIdx++) = f->fy;
+		data.at<float>(nDataIdx++) = f->cx;
+		data.at<float>(nDataIdx++) = f->cy;
+
+		//키프레임의 포즈까지 전송.
+		auto kfs = pLocalMap->mvpLocalKFs;
+		
+		nDataIdx = 17;
+		int nKF = 0;
+		for (int i = 0; i < kfs.size(); i++) {
+			auto pKF = kfs[i];
+			//포즈
+			if (!pKF || pKF->isBad()) {
+				continue;
+			}
+			
+			cv::Mat kfPose = pKF->GetPose();
+			data.at<float>(nDataIdx++) = (float)pKF->mnFrameId;
+			data.at<float>(nDataIdx++) = kfPose.at<float>(0, 0);
+			data.at<float>(nDataIdx++) = kfPose.at<float>(0, 1);
+			data.at<float>(nDataIdx++) = kfPose.at<float>(0, 2);
+			data.at<float>(nDataIdx++) = kfPose.at<float>(1, 0);
+			data.at<float>(nDataIdx++) = kfPose.at<float>(1, 1);
+			data.at<float>(nDataIdx++) = kfPose.at<float>(1, 2);
+			data.at<float>(nDataIdx++) = kfPose.at<float>(2, 0);
+			data.at<float>(nDataIdx++) = kfPose.at<float>(2, 1);
+			data.at<float>(nDataIdx++) = kfPose.at<float>(2, 2);
+			data.at<float>(nDataIdx++) = kfPose.at<float>(0, 3);
+			data.at<float>(nDataIdx++) = kfPose.at<float>(1, 3);
+			data.at<float>(nDataIdx++) = kfPose.at<float>(2, 3);
+
+			nKF++;
+			if (nKF == 7)
+				break;
+		}
+		data.at<float>(16) = (float)nKF;
+
+		ss << "/Store?keyword=NewFrameForRecon&id=" << id << "&src=" << userName;
+		auto res = API.Send(ss.str(), data.data, data.rows * sizeof(float));
 	}
 
 	void Tracker::SendDeviceTrackingData(SLAM* system, std::string userName, LocalMap* pLocalMap, Frame* frame, int nInlier, int id, double ts) {
@@ -873,8 +959,8 @@ namespace EdgeSLAM {
 			
 			auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(e - s).count();
 			float t_test1 = du_test1 / 1000.0;
-			int N = system->GetConnectedDevice();
-			system->ProcessingTime.Get("upload")[N]->add(t_test1);
+			//int N = system->GetConnectedDevice();
+			//system->ProcessingTime.Get("upload")[N]->add(t_test1);
 		}
 	
 		////data

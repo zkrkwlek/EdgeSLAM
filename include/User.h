@@ -8,6 +8,8 @@
 #include <ConcurrentMap.h>
 #include <ConcurrentVector.h>
 #include <ConcurrentSet.h>
+#include <ConcurrentDeque.h>
+#include <NotificationMessage.h>
 
 namespace EdgeSLAM {
 
@@ -42,11 +44,18 @@ namespace EdgeSLAM {
 
 		cv::Mat GetCameraMatrix();
 		cv::Mat GetCameraInverseMatrix();
+		cv::Mat GetDistortionMatrix();
 
 		ConcurrentVector<cv::Mat> mvDeviceTrajectories;
 		ConcurrentVector<double> mvDeviceTimeStamps;
 		ConcurrentMap<int, KeyFrame*> KeyFrames; //Frame과 키프레임 연결
 
+		cv::Mat GetDevicePose();
+		void SetDevicePose(cv::Mat T);
+		////////////////
+		////좌표계 결합용
+
+		////////////////
 	public:
 		std::string userName;
 		std::string mapName;
@@ -55,6 +64,7 @@ namespace EdgeSLAM {
 		Map* mpMap;
 		Camera* mpCamera;
 		CameraPose* mpCamPose;
+		CameraPose* mpDevicePose;
 		bool mbMapping, mbIMU, mbDeviceTracking, mbSaveTrajectory, mbAsyncTest;
 
 		Frame* prevFrame;
@@ -63,13 +73,15 @@ namespace EdgeSLAM {
 		ConcurrentMap<int, cv::Mat> mapKeyPoints;
 		ConcurrentSet<MapPoint*> mSetMapPoints;
 		ConcurrentSet<KeyFrame*> mSetLocalKeyFrames;
-		ConcurrentMap<int, cv::Mat> ImageDatas;
+		ConcurrentMap<int, cv::Mat> ImageDatas, PoseDatas; // id = frame id, 압축된 이미지와 포즈 정보를 이용하기 위해서임.
 		////frame id와 키프레임 id의 대응이 필요함.
 		//std::map<int, KeyFrame*> mapKeyFrames;
 		KeyFrame* mpRefKF;
 		std::atomic<bool> mbProgress, mbRemoved;
 		std::atomic<int> mnUsed, mnLastKeyFrameID, mnPrevFrameID, mnCurrFrameID, mnLastRelocFrameId;
 	
+		ConcurrentMap<int, std::string> QueueNotiMsg;
+
 	public:
 		UserState GetState();
 		void SetState(UserState stat);

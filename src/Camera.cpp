@@ -47,6 +47,8 @@ namespace EdgeSLAM {
 		mfGridElementWidthInv  = static_cast<float>(mnGridCols) / (u_max - u_min);
 		mfGridElementHeightInv = static_cast<float>(mnGridRows) / (v_max - v_min);
 
+		initUndistortRectifyMap(K, D, cv::Mat(), Knew, cv::Size(mnWidth, mnHeight), CV_32FC1, map1, map2);
+		//cv::getOptimalNewCameraMatrix()
 	}
 
 	bool Camera::is_in_image(float x, float y, float z) {
@@ -61,10 +63,11 @@ namespace EdgeSLAM {
 		mat.at<float>(3, 0) = u_max;		mat.at<float>(3, 1) = v_max;
 
 		// Undistort corners
+		std::cout << "K1 = " << K << std::endl;
 		mat = mat.reshape(2);
 		cv::undistortPoints(mat, mat, K, D, cv::Mat(), K);
 		mat = mat.reshape(1);
-
+		std::cout << "K2 = " << K << std::endl;
 		u_min = std::min(mat.at<float>(0, 0), mat.at<float>(2, 0));
 		u_max = std::max(mat.at<float>(1, 0), mat.at<float>(3, 0));
 		v_min = std::min(mat.at<float>(0, 1), mat.at<float>(1, 1));

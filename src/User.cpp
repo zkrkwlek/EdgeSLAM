@@ -17,6 +17,7 @@ namespace EdgeSLAM {
 	{
 		mpMotionModel = new MotionModel();
 		mpCamPose = new CameraPose();
+		mpDevicePose = new CameraPose();
 		mpCamera = new Camera(_w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _d5);
 		/*mpLastFrame = nullptr;
 		SetPose(cv::Mat::eye(3, 3, CV_32FC1), cv::Mat::zeros(3, 1, CV_32FC1));*/
@@ -25,6 +26,7 @@ namespace EdgeSLAM {
 	User::~User() {
 		//delete mpCamera;
 		delete mpCamPose;
+		delete mpDevicePose;
 		delete mpMotionModel;
 		mpMap = nullptr;
 
@@ -69,6 +71,7 @@ namespace EdgeSLAM {
 		mapKeyPoints.Release();
 		KeyFrames.Release();
 		ImageDatas.Release();
+		QueueNotiMsg.Release();
 		//delete mapFrames;
 	}
 
@@ -76,6 +79,14 @@ namespace EdgeSLAM {
 	cv::Mat User::GetPosition() {
 		return mpCamPose->GetCenter();
 	}
+
+	cv::Mat User::GetDevicePose(){
+		return mpDevicePose->GetPose();
+	}
+	void User::SetDevicePose(cv::Mat T){
+		mpDevicePose->SetPose(T);
+	}
+
 	cv::Mat User::GetPose() {
 		return mpCamPose->GetPose();
 	}
@@ -113,6 +124,9 @@ namespace EdgeSLAM {
 	}
 	cv::Mat User::GetCameraInverseMatrix(){
 		return mpCamera->Kinv;
+	}
+	cv::Mat User::GetDistortionMatrix() {
+		return mpCamera->D;
 	}
 
 	UserState User::GetState() {
