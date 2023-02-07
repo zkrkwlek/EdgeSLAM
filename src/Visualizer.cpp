@@ -359,6 +359,50 @@ namespace EdgeSLAM {
 						tpt.y = aaa.at<float>(1);
 						tpt += mVisMidPt;
 						cv::circle(tempVis, tpt, 4, cv::Scalar(0,255,255), -1);
+					} 
+					
+					{
+						std::map<int, cv::Mat> contentDatas;
+						if (mpSystem->TemporalDatas2.Count("marker"))
+							contentDatas = mpSystem->TemporalDatas2.Get("marker");
+						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
+							int id = jter->first;
+							auto x3D = contentDatas[id];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T*tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+							cv::circle(tempVis, tpt, 4, cv::Scalar(0, 255, 255), -1);
+						}
+					}
+					{
+						std::map<int, cv::Mat> contentDatas;
+						if (mpSystem->TemporalDatas2.Count("path"))
+							contentDatas = mpSystem->TemporalDatas2.Get("path");
+						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
+							int id = jter->first;
+							auto temp = contentDatas[id];
+							auto x1 = temp.rowRange(0,3);
+							auto x2 = temp.rowRange(3,6);
+							
+							cv::Point2f tpt1 = cv::Point2f(x1.at<float>(mnAxis1) * mnVisScale, x1.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt1(tpt1);
+							cv::Mat aaa = T*tempPt1;
+							tpt1.x = aaa.at<float>(0);
+							tpt1.y = aaa.at<float>(1);
+							tpt1 += mVisMidPt;
+							
+							cv::Point2f tpt2 = cv::Point2f(x2.at<float>(mnAxis1) * mnVisScale, x2.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt2(tpt2);
+							cv::Mat bbb = T*tempPt2;
+							tpt2.x = bbb.at<float>(0);
+							tpt2.y = bbb.at<float>(1);
+							tpt2 += mVisMidPt;
+							cv::line(tempVis, tpt1, tpt2, cv::Scalar(255, 255, 0), 2);
+							//cv::circle(tempVis, tpt, 4, cv::Scalar(0, 255, 255), -1);
+						}
 					}
 					std::map<int, cv::Mat> ARFoundationMPs;
 					if (mpSystem->TemporalDatas2.Count("ARFoundationMPs"))
@@ -517,7 +561,9 @@ namespace EdgeSLAM {
 						cv::Point2f dirPtX1 = pt1 + cv::Point2f(directionX.at<float>(mnAxis1)* mnVisScale / 10.0, directionX.at<float>(mnAxis2)* mnVisScale / 10.0);
 						//cv::Point2f dirPtX2 = pt1 - cv::Point2f(directionX.at<float>(mnAxis1)* mnVisScale / 10.0, directionX.at<float>(mnAxis2)* mnVisScale / 10.0);
 						cv::line(tempVis, pt1, dirPtX1, cv::Scalar(0, 0, 255), 2);
-
+						std::stringstream ss;
+						ss << user->userName;
+						cv::putText(tempVis, ss.str(), cv::Point(pt1.x, pt1.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0,0,255),2);
 					}
 
 					//{
