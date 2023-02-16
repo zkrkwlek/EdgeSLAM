@@ -32,9 +32,11 @@ namespace EdgeSLAM {
 		map->mnNumLoopClosingFrames++;
 		
 		bool bSim3 = false;
+		//새로운 키프레임이 생성되면 디비에 저장해야 하기 때문에 이거는 해야 하긴 함.
 		bool bDetect = pLoopCloser->DetectLoop(system, map, kf);
 
-		if (bDetect)
+		//GBA 도는 동안 여기가 동작안하도록 변경함. 확인 필요(23.02.11)
+		if (bDetect && !map->isStopped())
 		{
 			//std::cout << "ComputeSim3::start" << std::endl;
 			bSim3 = pLoopCloser->ComputeSim3(system, map, kf);
@@ -46,7 +48,6 @@ namespace EdgeSLAM {
 			//std::cout << "CorrectLoop::start" << std::endl;
 		}
 		map->mnNumLoopClosingFrames--;
-		
 	}
 	bool LoopCloser::DetectLoop(SLAM* system, Map* map, KeyFrame* kf) {
 		auto db = map->mpKeyFrameDB;
@@ -488,9 +489,9 @@ namespace EdgeSLAM {
 		map->mpThreadGBA = new std::thread(&LoopCloser::RunGlobalBundleAdjustment, system->mpLoopCloser, system, map, kf, kf->mnId);//
 
 		// Loop closed. Release Local Mapping.
-		map->Release();
-
-		map->mnLastLoopKFid = kf->mnId;
+		//230211 변경. 이게 쓰레드인데 여기서 해제하면 안될거 같음.
+		//map->Release();
+		//map->mnLastLoopKFid = kf->mnId;
 	}
 
 	void LoopCloser::SearchAndFuse(Map* map ,const KeyFrameAndPose &CorrectedPosesMap)
@@ -617,6 +618,7 @@ namespace EdgeSLAM {
 				map->InformNewBigChange();
 				std::cout << "gba = 5" << std::endl;
 				map->Release();
+				map->mnLastLoopKFid = kf->mnId;
 				std::cout << "gba = 6" << std::endl;
 				std::cout << "Map updated!" << std::endl;
 			}

@@ -112,16 +112,16 @@ namespace EdgeSLAM {
 		std::memcpy(temp.data, res.data(), res.size());
 		cv::Mat img = cv::imdecode(temp, cv::IMREAD_COLOR);
 		
-		if (img.empty())
+		/*if (img.empty())
 		{
 			std::cout << "Decoding image = " << id << "=" << img.size() << " " << img.type() << " " << n2 << " = " << (int)temp.at<uchar>(n2 - 1) << " " << (int)temp.at<uchar>(n2 - 2) << std::endl;
 			std::cout << "Error = Decoding image = " << id << std::endl;
 			pUser->mbProgress = false;
 			pUser->mnUsed--;
 			return;
-		}
+		}*/
 		
-		pUser->ImageDatas.Update(id, temp);
+		
 
 		std::chrono::high_resolution_clock::time_point received = std::chrono::high_resolution_clock::now();
 		////receive image
@@ -289,7 +289,8 @@ namespace EdgeSLAM {
 				trackState = UserState::Success;
 			
 			pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, pUser->userName, pLocalMap, frame, nInliers, id, ts);
-			pool->EnqueueJob(Tracker::SendFrameInformationForRecon, system, id, pUser->userName,frame, pLocalMap);
+			//로컬 맵 키프레임 전송 중 에러.
+			//pool->EnqueueJob(Tracker::SendFrameInformationForRecon, system, id, pUser->userName,frame, pLocalMap);
 		}
 		
 		pUser->SetState(trackState);
@@ -346,6 +347,7 @@ namespace EdgeSLAM {
 		}
 		
 		//int tempID = user->mnPrevFrameID;
+		pUser->ImageDatas.Update(id, temp);
 		pUser->mnPrevFrameID = pUser->mnCurrFrameID.load();
 		pUser->mnCurrFrameID = frame->mnFrameID;
 
@@ -924,12 +926,13 @@ namespace EdgeSLAM {
 						auto kp = frame->mvKeys[i];
 						auto mp = frame->mvpMapPoints[i]->GetWorldPos();
 						int octave = kp.octave;
-						cv::Mat temp = cv::Mat::zeros(8, 1, CV_32FC1);
+						cv::Mat temp = cv::Mat::zeros(9, 1, CV_32FC1);
 						temp.at<float>(nDataIdx++) = kp.pt.x;
 						temp.at<float>(nDataIdx++) = kp.pt.y;
 						temp.at<float>(nDataIdx++) = (float)kp.octave;
 						temp.at<float>(nDataIdx++) = kp.angle;
 						temp.at<float>(nDataIdx++) = (float)frame->mvpMapPoints[i]->mnId;
+						temp.at<float>(nDataIdx++) = frame->mvpMapPoints[i]->mnLabelID;
 						temp.at<float>(nDataIdx++) = mp.at<float>(0);
 						temp.at<float>(nDataIdx++) = mp.at<float>(1);
 						temp.at<float>(nDataIdx++) = mp.at<float>(2);
@@ -942,7 +945,7 @@ namespace EdgeSLAM {
 		}
 		else{
 			for (int i = 0; i < 500; i++) {
-				cv::Mat temp = cv::Mat::ones(8, 1, CV_32FC1);
+				cv::Mat temp = cv::Mat::ones(9, 1, CV_32FC1);
 				data.push_back(temp);
 			}
 			data.at<float>(0) = 0.0;

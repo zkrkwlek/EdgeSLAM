@@ -6,6 +6,7 @@
 #include <opencv2/core.hpp>
 #include <mutex>
 #include <ConcurrentSet.h>
+#include <atomic>
 
 namespace EdgeSLAM {
 	class KeyFrame;
@@ -83,6 +84,7 @@ namespace EdgeSLAM {
 		int mnFirstKFid;
 		int mnFirstFrame;
 		int nObs;
+		std::atomic<int> mnLabelID;
 
 		// Variables used by the tracking
 		/*float mTrackProjX;
