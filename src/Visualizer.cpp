@@ -294,7 +294,7 @@ namespace EdgeSLAM {
 						if (!pMPi || pMPi->isBad())
 							continue;
 
-						cv::Scalar color = cv::Scalar(0, 0, 0);
+						//cv::Scalar color = cv::Scalar(0, 0, 0);
 						/*if (Segmentator::ObjectPoints.Count(pMPi->mnId)) {
 							auto obj = Segmentator::ObjectPoints.Get(pMPi->mnId);
 							if (obj) {
@@ -302,6 +302,9 @@ namespace EdgeSLAM {
 								color = Segmentator::mvObjectLabelColors[label];
 							}
 						}*/
+						int label = pMPi->mnLabelID;
+						cv::Scalar color = Segmentator::mvObjectLabelColors[label];
+
 						cv::Mat x3D = pMPi->GetWorldPos();
 						cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
 						cv::Mat tempPt(tpt);
@@ -340,12 +343,7 @@ namespace EdgeSLAM {
 					}
 				}
 				{
-					std::map<int, cv::Mat> labelDatas;
-					if (mpSystem->TemporalDatas2.Count("label"))
-						labelDatas = mpSystem->TemporalDatas2.Get("label");
-					std::map<int, cv::Mat> mapDatas;
-					if (mpSystem->TemporalDatas2.Count("map"))
-						mapDatas = mpSystem->TemporalDatas2.Get("map");
+					
 					std::map<int, cv::Mat> contentDatas;
 					if (mpSystem->TemporalDatas2.Count("content"))
 						contentDatas = mpSystem->TemporalDatas2.Get("content");
@@ -379,6 +377,104 @@ namespace EdgeSLAM {
 					}
 					{
 						std::map<int, cv::Mat> contentDatas;
+						if (mpSystem->TemporalDatas2.Count("GBAFloor"))
+							contentDatas = mpSystem->TemporalDatas2.Get("GBAFloor");
+						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
+							int id = jter->first;
+							auto x3D = contentDatas[id];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T*tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+							cv::circle(tempVis, tpt, 4, cv::Scalar(0, 0, 255),-1);
+						}
+					}
+					{
+						std::map<int, cv::Mat> contentDatas;
+						if (mpSystem->TemporalDatas2.Count("GBAWall"))
+							contentDatas = mpSystem->TemporalDatas2.Get("GBAWall");
+						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
+							int id = jter->first;
+							auto x3D = contentDatas[id];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T*tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+							cv::circle(tempVis, tpt, 4, cv::Scalar(255, 0, 0), -1);
+						}
+					}
+					{
+						std::map<int, cv::Mat> contentDatas;
+						if (mpSystem->TemporalDatas2.Count("GBACeil"))
+							contentDatas = mpSystem->TemporalDatas2.Get("GBACeil");
+						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
+							int id = jter->first;
+							auto x3D = contentDatas[id];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T*tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+							cv::circle(tempVis, tpt, 4, cv::Scalar(0, 255, 0), -1);
+						}
+					}
+					{
+						std::map<int, cv::Mat> contentDatas;
+						if (mpSystem->TemporalDatas2.Count("GBAFloorOutlier"))
+							contentDatas = mpSystem->TemporalDatas2.Get("GBAFloorOutlier");
+						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
+							int id = jter->first;
+							auto x3D = contentDatas[id];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T*tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+							cv::circle(tempVis, tpt, 4, cv::Scalar(125, 125, 125),-1);
+						}
+					}
+					{
+						std::map<int, cv::Mat> contentDatas;
+						if (mpSystem->TemporalDatas2.Count("MovingObject"))
+							contentDatas = mpSystem->TemporalDatas2.Get("MovingObject");
+						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
+							int id = jter->first;
+							auto x3D = contentDatas[id];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T*tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+							cv::circle(tempVis, tpt, 6, cv::Scalar(0, 0, 0),-1);
+						}
+						//std::cout << "Path test = " << contentDatas.size() << std::endl;
+					}
+					{
+						std::map<int, cv::Mat> contentDatas;
+						if (mpSystem->TemporalDatas2.Count("pathpos"))
+							contentDatas = mpSystem->TemporalDatas2.Get("pathpos");
+						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
+							int id = jter->first;
+							auto x3D = contentDatas[id];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T*tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+							cv::circle(tempVis, tpt, 6, cv::Scalar(0, 255, 0));
+						}
+						//std::cout << "Path test = " << contentDatas.size() << std::endl;
+					}
+					{
+						std::map<int, cv::Mat> contentDatas;
 						if (mpSystem->TemporalDatas2.Count("path"))
 							contentDatas = mpSystem->TemporalDatas2.Get("path");
 						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
@@ -404,7 +500,7 @@ namespace EdgeSLAM {
 							//cv::circle(tempVis, tpt, 4, cv::Scalar(0, 255, 255), -1);
 						}
 					}
-					std::map<int, cv::Mat> ARFoundationMPs;
+					/*std::map<int, cv::Mat> ARFoundationMPs;
 					if (mpSystem->TemporalDatas2.Count("ARFoundationMPs"))
 						ARFoundationMPs = mpSystem->TemporalDatas2.Get("ARFoundationMPs");
 					for (auto jter = ARFoundationMPs.begin(), jend = ARFoundationMPs.end(); jter != jend; jter++) {
@@ -420,9 +516,14 @@ namespace EdgeSLAM {
 							tpt += mVisMidPt;
 							cv::circle(tempVis, tpt, 4, cv::Scalar(0, 255, 255), -1);
 						}
-					}
-
-					/*for (auto jter = mapDatas.begin(), jend = mapDatas.end(); jter != jend; jter++) {
+					}*/
+					/*std::map<int, cv::Mat> labelDatas;
+					if (mpSystem->TemporalDatas2.Count("label"))
+						labelDatas = mpSystem->TemporalDatas2.Get("label");
+					std::map<int, cv::Mat> mapDatas;
+					if (mpSystem->TemporalDatas2.Count("map"))
+						mapDatas = mpSystem->TemporalDatas2.Get("map");
+					for (auto jter = mapDatas.begin(), jend = mapDatas.end(); jter != jend; jter++) {
 						int id = jter->first;
 						if (labelDatas.count(id) == 0 || mapDatas.count(id) == 0)
 							continue;

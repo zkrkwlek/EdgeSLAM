@@ -932,7 +932,7 @@ namespace EdgeSLAM {
 						temp.at<float>(nDataIdx++) = (float)kp.octave;
 						temp.at<float>(nDataIdx++) = kp.angle;
 						temp.at<float>(nDataIdx++) = (float)frame->mvpMapPoints[i]->mnId;
-						temp.at<float>(nDataIdx++) = frame->mvpMapPoints[i]->mnLabelID;
+						temp.at<float>(nDataIdx++) = frame->mvpMapPoints[i]->mnPlaneID;// label or plane
 						temp.at<float>(nDataIdx++) = mp.at<float>(0);
 						temp.at<float>(nDataIdx++) = mp.at<float>(1);
 						temp.at<float>(nDataIdx++) = mp.at<float>(2);

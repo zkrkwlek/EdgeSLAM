@@ -85,6 +85,8 @@ namespace EdgeSLAM {
 		int mnFirstFrame;
 		int nObs;
 		std::atomic<int> mnLabelID;
+		std::atomic<int> mnPlaneID;
+		std::atomic<int> mnPlaneCount;
 
 		// Variables used by the tracking
 		/*float mTrackProjX;
@@ -106,7 +108,6 @@ namespace EdgeSLAM {
 		long unsigned int mnCorrectedReference;
 		cv::Mat mPosGBA;
 		long unsigned int mnBAGlobalForKF;
-
 
 		static std::mutex mGlobalMutex;
 		static FeatureTracker* mpDist;

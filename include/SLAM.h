@@ -52,9 +52,10 @@ namespace EdgeSLAM {
 	/////Multi user and multi map
 	public:
 		void CreateMap(std::string name, int nq);
-		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, bool _b, bool _bTracking = false, bool _b2 = false, bool _bsave = false, bool _basync = false);
+		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, bool _b, bool _bTracking = false, bool _bIMU = false, bool _bGBA = false, bool _bsave = false, bool _basync = false);
 		bool CheckMap(std::string str);
 		bool CheckUser(std::string str);
+		int  CountUser();
 		void AddUser(std::string id, User* user);
 		void RemoveUser(std::string id);
 		User* GetUser(std::string id);

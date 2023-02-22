@@ -28,7 +28,7 @@ namespace EdgeSLAM {
 	class User {
 	public:
 		User();
-		User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, int nskip, bool _b, bool bDeviceTracking = false, bool bimu = false, bool bsave = false, bool bAsync = false);
+		User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, int nskip, bool _b, bool bDeviceTracking = false, bool bimu = false, bool bGBA = false, bool bsave = false, bool bAsync = false);
 		virtual ~User();
 	public:
 		bool mbMotionModel;
@@ -65,7 +65,7 @@ namespace EdgeSLAM {
 		Camera* mpCamera;
 		CameraPose* mpCamPose;
 		CameraPose* mpDevicePose;
-		bool mbMapping, mbIMU, mbDeviceTracking, mbSaveTrajectory, mbAsyncTest;
+		bool mbMapping, mbIMU, mbDeviceTracking, mbSaveTrajectory, mbAsyncTest, mbPlaneGBA;
 
 		Frame* prevFrame;
 		std::vector<cv::Mat> vecTrajectories;

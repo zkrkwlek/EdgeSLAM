@@ -124,5 +124,31 @@ namespace EdgeSLAM {
 
 		return v;
 	}
+	cv::Mat Converter::toCvMat(const Eigen::Matrix<double, 6, 1> &m)
+	{
+		Eigen::Matrix<double, 6, 1> temp = m;
+		Eigen::Vector3d normal = m.head(3).normalized();
+		double dist = m[3] / m.head(3).squaredNorm();
+		temp.head(3) = normal;
+		temp[3] = dist;
 
+
+		cv::Mat cvMat(6, 1, CV_32F);
+		for (int i = 0; i<6; i++)
+			cvMat.at<float>(i) = temp(i);
+		//std::cout << "After = " << m.head(3).squaredNorm() << std::endl;
+		//std::cout << "After2 = " << temp.head(3).squaredNorm() << std::endl;
+		return cvMat.clone();
+	}
+	Eigen::Matrix<double, 6, 1> Converter::toVector6d(const cv::Mat &cvVector)
+	{
+		Eigen::Matrix<double, 6, 1> v;
+		v << cvVector.at<float>(0), cvVector.at<float>(1), cvVector.at<float>(2), cvVector.at<float>(3), 0, 0;
+		Eigen::Vector3d normal = v.head(3);
+		double dist = v[3] / v.head(3).squaredNorm();
+		v.head(3) = normal;
+		v[3] = dist;
+		//std::cout << "Before = " << v.head(3).squaredNorm() << std::endl;
+		return v;
+	}
 }

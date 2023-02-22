@@ -487,7 +487,7 @@ namespace EdgeSLAM {
 		map->mbFinishedGBA = false;
 		map->mbStopGBA = false;
 		map->mpThreadGBA = new std::thread(&LoopCloser::RunGlobalBundleAdjustment, system->mpLoopCloser, system, map, kf, kf->mnId);//
-
+		
 		// Loop closed. Release Local Mapping.
 		//230211 변경. 이게 쓰레드인데 여기서 해제하면 안될거 같음.
 		//map->Release();
