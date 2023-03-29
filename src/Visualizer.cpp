@@ -344,21 +344,6 @@ namespace EdgeSLAM {
 				}
 				{
 					
-					std::map<int, cv::Mat> contentDatas;
-					if (mpSystem->TemporalDatas2.Count("content"))
-						contentDatas = mpSystem->TemporalDatas2.Get("content");
-					for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
-						int id = jter->first;
-						auto x3D = contentDatas[id];
-						cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
-						cv::Mat tempPt(tpt);
-						cv::Mat aaa = T*tempPt;
-						tpt.x = aaa.at<float>(0);
-						tpt.y = aaa.at<float>(1);
-						tpt += mVisMidPt;
-						cv::circle(tempVis, tpt, 4, cv::Scalar(0,255,255), -1);
-					} 
-					
 					{
 						std::map<int, cv::Mat> contentDatas;
 						if (mpSystem->TemporalDatas2.Count("marker"))
@@ -388,7 +373,7 @@ namespace EdgeSLAM {
 							tpt.x = aaa.at<float>(0);
 							tpt.y = aaa.at<float>(1);
 							tpt += mVisMidPt;
-							cv::circle(tempVis, tpt, 4, cv::Scalar(0, 0, 255),-1);
+							cv::circle(tempVis, tpt, 3, cv::Scalar(0, 0, 255),-1);
 						}
 					}
 					{
@@ -404,7 +389,7 @@ namespace EdgeSLAM {
 							tpt.x = aaa.at<float>(0);
 							tpt.y = aaa.at<float>(1);
 							tpt += mVisMidPt;
-							cv::circle(tempVis, tpt, 4, cv::Scalar(255, 0, 0), -1);
+							cv::circle(tempVis, tpt, 3, cv::Scalar(255, 0, 0), -1);
 						}
 					}
 					{
@@ -420,7 +405,7 @@ namespace EdgeSLAM {
 							tpt.x = aaa.at<float>(0);
 							tpt.y = aaa.at<float>(1);
 							tpt += mVisMidPt;
-							cv::circle(tempVis, tpt, 4, cv::Scalar(0, 255, 0), -1);
+							cv::circle(tempVis, tpt, 3, cv::Scalar(0, 255, 0), -1);
 						}
 					}
 					{
@@ -439,40 +424,8 @@ namespace EdgeSLAM {
 							cv::circle(tempVis, tpt, 4, cv::Scalar(125, 125, 125),-1);
 						}
 					}
-					{
-						std::map<int, cv::Mat> contentDatas;
-						if (mpSystem->TemporalDatas2.Count("MovingObject"))
-							contentDatas = mpSystem->TemporalDatas2.Get("MovingObject");
-						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
-							int id = jter->first;
-							auto x3D = contentDatas[id];
-							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
-							cv::Mat tempPt(tpt);
-							cv::Mat aaa = T*tempPt;
-							tpt.x = aaa.at<float>(0);
-							tpt.y = aaa.at<float>(1);
-							tpt += mVisMidPt;
-							cv::circle(tempVis, tpt, 6, cv::Scalar(0, 0, 0),-1);
-						}
-						//std::cout << "Path test = " << contentDatas.size() << std::endl;
-					}
-					{
-						std::map<int, cv::Mat> contentDatas;
-						if (mpSystem->TemporalDatas2.Count("pathpos"))
-							contentDatas = mpSystem->TemporalDatas2.Get("pathpos");
-						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
-							int id = jter->first;
-							auto x3D = contentDatas[id];
-							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
-							cv::Mat tempPt(tpt);
-							cv::Mat aaa = T*tempPt;
-							tpt.x = aaa.at<float>(0);
-							tpt.y = aaa.at<float>(1);
-							tpt += mVisMidPt;
-							cv::circle(tempVis, tpt, 6, cv::Scalar(0, 255, 0));
-						}
-						//std::cout << "Path test = " << contentDatas.size() << std::endl;
-					}
+					
+					
 					{
 						std::map<int, cv::Mat> contentDatas;
 						if (mpSystem->TemporalDatas2.Count("path"))
@@ -500,6 +453,60 @@ namespace EdgeSLAM {
 							//cv::circle(tempVis, tpt, 4, cv::Scalar(0, 255, 255), -1);
 						}
 					}
+
+					{
+						std::map<int, cv::Mat> contentDatas;
+						if (mpSystem->TemporalDatas2.Count("pathpos"))
+							contentDatas = mpSystem->TemporalDatas2.Get("pathpos");
+						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
+							int id = jter->first;
+							auto x3D = contentDatas[id];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T*tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+							cv::circle(tempVis, tpt, 6, cv::Scalar(0, 255, 0));
+						}
+						//std::cout << "Path test = " << contentDatas.size() << std::endl;
+					}
+
+					{
+						std::map<int, cv::Mat> contentDatas;
+						if (mpSystem->TemporalDatas2.Count("content"))
+							contentDatas = mpSystem->TemporalDatas2.Get("content");
+						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
+							int id = jter->first;
+							auto x3D = contentDatas[id];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T*tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+							cv::circle(tempVis, tpt, 4, cv::Scalar(0, 255, 255), -1);
+						}
+					}
+
+					{
+						std::map<int, cv::Mat> contentDatas;
+						if (mpSystem->TemporalDatas2.Count("MovingObject"))
+							contentDatas = mpSystem->TemporalDatas2.Get("MovingObject");
+						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
+							int id = jter->first;
+							auto x3D = contentDatas[id];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T*tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+							cv::circle(tempVis, tpt, 6, cv::Scalar(0, 0, 0), -1);
+						}
+						//std::cout << "Path test = " << contentDatas.size() << std::endl;
+					}
+
 					/*std::map<int, cv::Mat> ARFoundationMPs;
 					if (mpSystem->TemporalDatas2.Count("ARFoundationMPs"))
 						ARFoundationMPs = mpSystem->TemporalDatas2.Get("ARFoundationMPs");

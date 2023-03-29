@@ -756,7 +756,7 @@ namespace EdgeSLAM {
 			pUser->mnUsed--;
 			return;
 		}
-
+		
 		std::stringstream ss;
 		ss << "/Load?keyword=Depth" << "&id=" << id << "&src=" << user;
 		WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);

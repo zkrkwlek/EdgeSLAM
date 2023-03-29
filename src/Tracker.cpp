@@ -87,6 +87,7 @@ namespace EdgeSLAM {
 		if (id < pUser->mnPrevFrameID)
 			return;
 		pUser->mnUsed++;
+		pUser->mnDebugTrack++;
 		pUser->mbProgress = true;
 		auto cam = pUser->mpCamera;
 		auto map = pUser->mpMap;
@@ -112,49 +113,17 @@ namespace EdgeSLAM {
 		std::memcpy(temp.data, res.data(), res.size());
 		cv::Mat img = cv::imdecode(temp, cv::IMREAD_COLOR);
 		
-		/*if (img.empty())
-		{
-			std::cout << "Decoding image = " << id << "=" << img.size() << " " << img.type() << " " << n2 << " = " << (int)temp.at<uchar>(n2 - 1) << " " << (int)temp.at<uchar>(n2 - 2) << std::endl;
-			std::cout << "Error = Decoding image = " << id << std::endl;
-			pUser->mbProgress = false;
-			pUser->mnUsed--;
-			return;
-		}*/
-		
-		
-
 		std::chrono::high_resolution_clock::time_point received = std::chrono::high_resolution_clock::now();
-		////receive image
-		/////save image
-		/*std::stringstream sss;
-		sss << "../bin/img/" << user->userName << "/" << id << "_color.jpg";
-		cv::imwrite(sss.str(), img);*/
-		/////save image
 		
 		/////KP 여기도 플래그 추가하기
 		Frame* frame = nullptr;
 		std::chrono::high_resolution_clock::time_point t_frame_s = std::chrono::high_resolution_clock::now();
-		//if (user->mbMapping) {
-		//	while (user->mapKeyPoints.Count(id) == 0)
-		//	{
-		//		continue;
-		//	}
-		//	//KP
-		//	cv::Mat data = user->mapKeyPoints.Get(id);
-		//	user->mapKeyPoints.Erase(id);
-		//	frame = new Frame(img, data, cam, id, ts);
-		//}
-		//else {
-		//	frame = new Frame(img, cam, id, ts);
-		//}
 		frame = new Frame(img, cam, id, ts);
 		std::chrono::high_resolution_clock::time_point t_frame_e = std::chrono::high_resolution_clock::now();
 		auto du_frame = std::chrono::duration_cast<std::chrono::milliseconds>(t_frame_e - t_frame_s).count();
 		t_frame = du_frame / 1000.0;
 		
 		//user->mapFrames.Update(frame->mnFrameID, frame);
-		
-		
 		//std::unique_lock<std::mutex> lock(map->mMutexMapUpdate);
 
 		auto mapState = map->GetState();
@@ -288,9 +257,80 @@ namespace EdgeSLAM {
 			if (bTrack)
 				trackState = UserState::Success;
 			
-			pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, pUser->userName, pLocalMap, frame, nInliers, id, ts);
+			cv::Mat T = frame->GetPose().clone();
+			{
+				////data
+				cv::Mat data = cv::Mat::zeros(13, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
+
+				int nDataIdx = 1;
+				data.at<float>(nDataIdx++) = T.at<float>(0, 0);
+				data.at<float>(nDataIdx++) = T.at<float>(0, 1);
+				data.at<float>(nDataIdx++) = T.at<float>(0, 2);
+				data.at<float>(nDataIdx++) = T.at<float>(1, 0);
+				data.at<float>(nDataIdx++) = T.at<float>(1, 1);
+				data.at<float>(nDataIdx++) = T.at<float>(1, 2);
+				data.at<float>(nDataIdx++) = T.at<float>(2, 0);
+				data.at<float>(nDataIdx++) = T.at<float>(2, 1);
+				data.at<float>(nDataIdx++) = T.at<float>(2, 2);
+				data.at<float>(nDataIdx++) = T.at<float>(0, 3);
+				data.at<float>(nDataIdx++) = T.at<float>(1, 3);
+				data.at<float>(nDataIdx++) = T.at<float>(2, 3);
+
+				if (nInliers > 0) {
+					int nres = 0;
+					for (int i = 0; i < frame->N; i++)
+					{
+						if (frame->mvpMapPoints[i])
+						{
+							if (!frame->mvbOutliers[i] && !frame->mvpMapPoints[i]->isBad())
+							{
+								int nDataIdx = 0;
+								auto kp = frame->mvKeys[i];
+								auto mp = frame->mvpMapPoints[i]->GetWorldPos();
+								int octave = kp.octave;
+								cv::Mat temp = cv::Mat::zeros(9, 1, CV_32FC1);
+								temp.at<float>(nDataIdx++) = kp.pt.x;
+								temp.at<float>(nDataIdx++) = kp.pt.y;
+								temp.at<float>(nDataIdx++) = (float)kp.octave;
+								temp.at<float>(nDataIdx++) = kp.angle;
+								temp.at<float>(nDataIdx++) = (float)frame->mvpMapPoints[i]->mnId;
+								temp.at<float>(nDataIdx++) = frame->mvpMapPoints[i]->mnPlaneID;// label or plane
+								temp.at<float>(nDataIdx++) = mp.at<float>(0);
+								temp.at<float>(nDataIdx++) = mp.at<float>(1);
+								temp.at<float>(nDataIdx++) = mp.at<float>(2);
+								data.push_back(temp);
+								nres++;
+							}
+						}
+					}
+					data.at<float>(0) = (float)nres;
+
+					////traffic 계산용
+					// input = n2
+					// output = nInlier*32
+					{
+						std::stringstream ssfile1;
+						ssfile1 << "../bin/normal/proposed_"<<pUser->mnQuality<<".txt";
+						std::ofstream f1;
+						f1.open(ssfile1.str().c_str(), std::ios_base::out | std::ios_base::app);
+						f1 << id << " " << n2 << " " << nInliers * 32 << std::endl;
+						f1.close();
+					}
+				}
+				else {
+					for (int i = 0; i < 500; i++) {
+						cv::Mat temp = cv::Mat::ones(9, 1, CV_32FC1);
+						data.push_back(temp);
+					}
+					data.at<float>(0) = 0.0;
+				}
+				pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, pUser->userName, data, id, ts);
+			}
+
+			
 			//로컬 맵 키프레임 전송 중 에러.
-			//pool->EnqueueJob(Tracker::SendFrameInformationForRecon, system, id, pUser->userName,frame, pLocalMap);
+			//키프레임의 포즈까지 전송.
+			
 		}
 		
 		pUser->SetState(trackState);
@@ -309,6 +349,16 @@ namespace EdgeSLAM {
 					Tracker::CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, pUser);
 					Segmentator::RequestSegmentation(pUser->userName, frame->mnFrameID);
 					system->RequestTime.Update(id, std::chrono::high_resolution_clock::now());
+
+					{
+						auto kfs = std::vector<KeyFrame*>(pLocalMap->mvpLocalKFs.begin(), pLocalMap->mvpLocalKFs.end());
+						float fx = frame->fx;
+						float fy = frame->fy;
+						float cx = frame->cx;
+						float cy = frame->cy;
+						pool->EnqueueJob(Tracker::SendFrameInformationForRecon, system, id, pUser->userName, T, fx, fy, cx, cy, kfs);
+					}
+
 				}
 			}
 			
@@ -366,7 +416,8 @@ namespace EdgeSLAM {
 		delete pLocalMap;
 		delete mpAPI;
 
-		int N = system->GetConnectedDevice();
+		////데이터 측정 코드
+		/*int N = system->GetConnectedDevice();
 		system->ProcessingTime.Get("download")[N]->add(t_test1);
 		system->ProcessingTime.Get("tracking")[N]->add(t_test2);
 		if (mapState == MapState::Initialized && !pUser->mbMapping) {
@@ -377,8 +428,9 @@ namespace EdgeSLAM {
 				system->SuccessRatio.Get("async")[pUser->mnQuality]->increase(ntemp);
 			}
 
-		}
+		}*/
 		//system->UpdateTrackingTime(t_test1);
+		////데이터 측정 코드
 
 		////visualization
 		if (mapState == MapState::Initialized  && pUser->GetVisID() <= 3 && userState != UserState::NotEstimated) {
@@ -446,6 +498,7 @@ namespace EdgeSLAM {
 			cv::imwrite(sss.str(), img);*/
 			/////save image
 		}
+		pUser->mnDebugTrack--;
 		pUser->mnUsed--;
 		////visualization
 	}
@@ -824,7 +877,7 @@ namespace EdgeSLAM {
 		delete mpAPI;
 	}
 	//키프레임 아이디와 포즈, 현재 이미지의 아이디와 이미지 전송(이것을 이후 키프레임 연경)
-	void Tracker::SendFrameInformationForRecon(EdgeSLAM::SLAM* system, int id, std::string userName, Frame* f, LocalMap* pLocalMap) {
+	void Tracker::SendFrameInformationForRecon(EdgeSLAM::SLAM* system, int id, std::string userName, const cv::Mat& T, float fx, float fy, float cx, float cy, const std::vector<KeyFrame*>& kfs) {
 
 		//이미지, 포즈, fx, fy 전송
 		////MP와 인접 MP 정보 전송
@@ -834,7 +887,6 @@ namespace EdgeSLAM {
 		//현재 프레임의 자세 및 인트린직 정보와 인접 키프레임의 아이디와 포즈 전송.
 
 		//레퍼런스와 6개의 키프레임
-		cv::Mat T = f->GetPose();
 		cv::Mat data = cv::Mat::zeros(5000, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
 														//12+4+7+1(연결 KF 수)
 
@@ -852,14 +904,11 @@ namespace EdgeSLAM {
 		data.at<float>(nDataIdx++) = T.at<float>(0, 3);
 		data.at<float>(nDataIdx++) = T.at<float>(1, 3);
 		data.at<float>(nDataIdx++) = T.at<float>(2, 3);
-		data.at<float>(nDataIdx++) = f->fx;
-		data.at<float>(nDataIdx++) = f->fy;
-		data.at<float>(nDataIdx++) = f->cx;
-		data.at<float>(nDataIdx++) = f->cy;
+		data.at<float>(nDataIdx++) = fx;
+		data.at<float>(nDataIdx++) = fy;
+		data.at<float>(nDataIdx++) = cx;
+		data.at<float>(nDataIdx++) = cy;
 
-		//키프레임의 포즈까지 전송.
-		auto kfs = pLocalMap->mvpLocalKFs;
-		
 		nDataIdx = 17;
 		int nKF = 0;
 		for (int i = 0; i < kfs.size(); i++) {
@@ -894,62 +943,9 @@ namespace EdgeSLAM {
 		auto res = API.Send(ss.str(), data.data, data.rows * sizeof(float));
 	}
 
-	void Tracker::SendDeviceTrackingData(SLAM* system, std::string userName, LocalMap* pLocalMap, Frame* frame, int nInlier, int id, double ts) {
+	void Tracker::SendDeviceTrackingData(SLAM* system, std::string userName, const cv::Mat& data, int id, double ts) {
 		
-		////data
-		cv::Mat T = frame->GetPose();
-		cv::Mat data = cv::Mat::zeros(13, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
-				
-		int nDataIdx = 1;
-		data.at<float>(nDataIdx++) = T.at<float>(0, 0);
-		data.at<float>(nDataIdx++) = T.at<float>(0, 1);
-		data.at<float>(nDataIdx++) = T.at<float>(0, 2);
-		data.at<float>(nDataIdx++) = T.at<float>(1, 0);
-		data.at<float>(nDataIdx++) = T.at<float>(1, 1);
-		data.at<float>(nDataIdx++) = T.at<float>(1, 2);
-		data.at<float>(nDataIdx++) = T.at<float>(2, 0);
-		data.at<float>(nDataIdx++) = T.at<float>(2, 1);
-		data.at<float>(nDataIdx++) = T.at<float>(2, 2);
-		data.at<float>(nDataIdx++) = T.at<float>(0, 3);
-		data.at<float>(nDataIdx++) = T.at<float>(1, 3);
-		data.at<float>(nDataIdx++) = T.at<float>(2, 3);
-
-		if (nInlier > 0){
-			int nres = 0;
-			for (int i = 0; i < frame->N; i++)
-			{
-				if (frame->mvpMapPoints[i])
-				{
-					if (!frame->mvbOutliers[i] && !frame->mvpMapPoints[i]->isBad())
-					{
-						int nDataIdx = 0;
-						auto kp = frame->mvKeys[i];
-						auto mp = frame->mvpMapPoints[i]->GetWorldPos();
-						int octave = kp.octave;
-						cv::Mat temp = cv::Mat::zeros(9, 1, CV_32FC1);
-						temp.at<float>(nDataIdx++) = kp.pt.x;
-						temp.at<float>(nDataIdx++) = kp.pt.y;
-						temp.at<float>(nDataIdx++) = (float)kp.octave;
-						temp.at<float>(nDataIdx++) = kp.angle;
-						temp.at<float>(nDataIdx++) = (float)frame->mvpMapPoints[i]->mnId;
-						temp.at<float>(nDataIdx++) = frame->mvpMapPoints[i]->mnPlaneID;// label or plane
-						temp.at<float>(nDataIdx++) = mp.at<float>(0);
-						temp.at<float>(nDataIdx++) = mp.at<float>(1);
-						temp.at<float>(nDataIdx++) = mp.at<float>(2);
-						data.push_back(temp);
-						nres++;
-					}
-				}
-			}
-			data.at<float>(0) = (float)nres;
-		}
-		else{
-			for (int i = 0; i < 500; i++) {
-				cv::Mat temp = cv::Mat::ones(9, 1, CV_32FC1);
-				data.push_back(temp);
-			}
-			data.at<float>(0) = 0.0;
-		}
+		
 		{
 			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 			std::stringstream ss;
