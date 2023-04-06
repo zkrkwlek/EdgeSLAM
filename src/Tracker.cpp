@@ -846,6 +846,7 @@ namespace EdgeSLAM {
 			return;
 		KeyFrame* pKF = new KeyFrame(cur, map);
 		pKF->sourceName = user->userName;
+		pKF->mbSendLocalMap = user->mbBaseLocalMap;
 		user->mpRefKF = pKF;
 		user->mnLastKeyFrameID = cur->mnFrameID;
 		pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, pKF);

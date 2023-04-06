@@ -179,7 +179,12 @@ namespace EdgeSLAM {
 		KeyFrame* mpParent;
 		std::set<KeyFrame*> mspChildrens;
 		std::set<KeyFrame*> mspLoopEdges;
+		
+		/// <summary>
+		/// 키프레임을 생성한 원본 기기와 관련된 정보
+		/// </summary>
 		std::string sourceName;
+		bool mbSendLocalMap;
 
 		// Bad flags
 		bool mbNotErase;

@@ -48,7 +48,10 @@ namespace EdgeSLAM {
 			}
 			pMapper->KeyFrameCulling(map, targetKF);
 		}
-		
+
+
+		if(targetKF->mbSendLocalMap)
+			pool->EnqueueJob(LocalMapper::SendLocalMap, targetKF);
 		pool->EnqueueJob(LoopCloser::ProcessLoopClosing, system, map, targetKF);
 		//pool->EnqueueJob(SendKeyFrameInformation, system, "SLAMServer", map, targetKF);
 		map->mnNumMappingFrames--;
@@ -59,6 +62,74 @@ namespace EdgeSLAM {
 		int N = system->GetConnectedDevice();
 		if(N > 0)
 			system->ProcessingTime.Get("mapping")[N]->add(t_test1);
+	}
+	
+	void LocalMapper::SendLocalMap(KeyFrame* targetKF) {
+		
+		const int nn = 20;
+		const std::vector<KeyFrame*> vpNeighKFs = targetKF->GetBestCovisibilityKeyFrames(nn);
+
+		std::set<EdgeSLAM::MapPoint*> spLocalMPs;
+		std::vector<EdgeSLAM::MapPoint*> vpLocalMPs;
+
+		//pts에 맵포인트 id와 3차원 위치 민 맥스 노말 추가
+		//4 + 12 + 4 + 4 + 12 = 36바이트가 필요함.(디스크립터 제외), 디스크립터는 32바이트임.
+		cv::Mat pts = cv::Mat::zeros(0, 1, CV_32FC1);
+		cv::Mat desc = cv::Mat::zeros(0, 1, CV_8UC1);
+
+		int nInput = 0;
+
+		for (std::vector<EdgeSLAM::KeyFrame*>::const_iterator itKF = vpNeighKFs.begin(), itEndKF = vpNeighKFs.end(); itKF != itEndKF; itKF++)
+		{
+			EdgeSLAM::KeyFrame* pKFi = *itKF;
+			if (!pKFi)
+				continue;
+			const std::vector<EdgeSLAM::MapPoint*> vpMPs = pKFi->GetMapPointMatches();
+
+			int nInputTemp = 0;
+			for (std::vector<EdgeSLAM::MapPoint*>::const_iterator itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
+			{
+				EdgeSLAM::MapPoint* pMPi = *itMP;
+				if (!pMPi || pMPi->isBad() || spLocalMPs.count(pMPi))
+					continue;
+				///추가 데이터
+				float id = (float)pMPi->mnId;
+				float minDist = pMPi->GetMinDistanceInvariance()/0.8;
+				float maxDist = pMPi->GetMaxDistanceInvariance()/1.2;
+				cv::Mat temp = cv::Mat::zeros(3, 1, CV_32FC1);
+				temp.at<float>(0) = id;
+				temp.at<float>(1) = minDist;
+				temp.at<float>(2) = maxDist;
+
+				vpLocalMPs.push_back(pMPi);
+				spLocalMPs.insert(pMPi);
+
+				pts.push_back(temp);
+				pts.push_back(pMPi->GetWorldPos());
+				pts.push_back(pMPi->GetNormal());
+				desc.push_back(pMPi->GetDescriptor().t());
+
+				/*if (nInput == 0) {
+					nInputTemp += 52;
+				}*/
+			}
+			/*if (nInput == 0)
+				nInput = nInputTemp;*/
+
+		}
+
+		//256 x 1비트라 8로 나누면 32 바이트로 표현이 가능함.
+		//4바이트 실수형에 강제로 복사하는 것이기 때문에 32 바이트 디스크립터는 8개의 실수로 표현이 가능함.
+		cv::Mat converted_desc = cv::Mat::zeros(vpLocalMPs.size() * 8, 1, CV_32FC1);
+		std::memcpy(converted_desc.data, desc.data, desc.rows);
+		pts.push_back(converted_desc);
+
+		WebAPI API("143.248.6.143", 35005);
+		std::stringstream ss;
+		ss << "/Store?keyword=UpdatedLocalMap&id=" << targetKF->mnFrameId << "&src=" << targetKF->sourceName;
+		//std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+		auto res = API.Send(ss.str(), pts.data, pts.rows * sizeof(float));
+
 	}
 
 	void LocalMapper::SendKeyFrameInformation(EdgeSLAM::SLAM* system, std::string name, Map* map, KeyFrame* targetKF) {
