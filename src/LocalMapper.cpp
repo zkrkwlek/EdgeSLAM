@@ -48,10 +48,7 @@ namespace EdgeSLAM {
 			}
 			pMapper->KeyFrameCulling(map, targetKF);
 		}
-
-
-		if(targetKF->mbSendLocalMap)
-			pool->EnqueueJob(LocalMapper::SendLocalMap, targetKF);
+	
 		pool->EnqueueJob(LoopCloser::ProcessLoopClosing, system, map, targetKF);
 		//pool->EnqueueJob(SendKeyFrameInformation, system, "SLAMServer", map, targetKF);
 		map->mnNumMappingFrames--;

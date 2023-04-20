@@ -308,14 +308,15 @@ namespace EdgeSLAM {
 					////traffic 계산용
 					// input = n2
 					// output = nInlier*32
-					{
+					
+					/*{
 						std::stringstream ssfile1;
 						ssfile1 << "../bin/normal/proposed_"<<pUser->mnQuality<<".txt";
 						std::ofstream f1;
 						f1.open(ssfile1.str().c_str(), std::ios_base::out | std::ios_base::app);
 						f1 << id << " " << n2 << " " << nInliers * 32 << std::endl;
 						f1.close();
-					}
+					}*/
 				}
 				else {
 					for (int i = 0; i < 500; i++) {
@@ -327,7 +328,9 @@ namespace EdgeSLAM {
 				pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, pUser->userName, data, id, ts);
 			}
 
-			
+			if (pUser->mbBaseLocalMap && pUser->mpRefKF) {
+				pool->EnqueueJob(Tracker::SendLocalMap, system, user, id);
+			}
 			//로컬 맵 키프레임 전송 중 에러.
 			//키프레임의 포즈까지 전송.
 			
@@ -350,14 +353,14 @@ namespace EdgeSLAM {
 					Segmentator::RequestSegmentation(pUser->userName, frame->mnFrameID);
 					system->RequestTime.Update(id, std::chrono::high_resolution_clock::now());
 
-					{
+					/*{
 						auto kfs = std::vector<KeyFrame*>(pLocalMap->mvpLocalKFs.begin(), pLocalMap->mvpLocalKFs.end());
 						float fx = frame->fx;
 						float fy = frame->fy;
 						float cx = frame->cx;
 						float cy = frame->cy;
 						pool->EnqueueJob(Tracker::SendFrameInformationForRecon, system, id, pUser->userName, T, fx, fy, cx, cy, kfs);
-					}
+					}*/
 
 				}
 			}
@@ -441,6 +444,12 @@ namespace EdgeSLAM {
 
 			cv::Scalar color = Segmentator::mvObjectLabelColors[pUser->GetVisID()+1];
 
+			float hline = 92.31;
+			cv::Point2f pt1(0, hline);
+			cv::Point2f pt2(640, hline);
+			cv::Point2f pt3(0, 480- hline);
+			cv::Point2f pt4(640, 480 - hline);
+
 			for (int i = 0; i < frame->mvKeys.size(); i++) {
 				auto pMP = frame->mvpMapPoints[i];
 				//cv::Scalar color = cv::Scalar(255, 0, 255);
@@ -470,6 +479,8 @@ namespace EdgeSLAM {
 					cv::circle(img, pt, r, cv::Scalar(255,0,255), -1);
 				}
 			}
+			cv::line(img, pt1, pt2, cv::Scalar(255, 0, 0), 2);
+			cv::line(img, pt3, pt4, cv::Scalar(255, 0, 0), 2);
 			/*if (user->objFrames.Count(tempID)) {
 				ObjectFrame* objFrame = user->objFrames.Get(tempID);
 				for (auto iter = objFrame->mapObjects.begin(), iend = objFrame->mapObjects.end(); iter != iend; iter++) {
@@ -514,7 +525,6 @@ namespace EdgeSLAM {
 			std::cout << "Matching prev fail!!!" << std::endl;
 			return false;
 		}
-		
 		int nopt = Optimizer::PoseOptimization(cur);
 		
 		// Discard outliers
@@ -874,7 +884,6 @@ namespace EdgeSLAM {
 		std::stringstream ss;
 		ss << "/Store?keyword=MappingResult&id=" << nFrameID << "&src=" << user->userName;// << "&type2=" << user->userName;
 		auto res = mpAPI->Send(ss.str(), data.data, sizeof(float)*data.rows);
-
 		delete mpAPI;
 	}
 	//키프레임 아이디와 포즈, 현재 이미지의 아이디와 이미지 전송(이것을 이후 키프레임 연경)
@@ -965,5 +974,68 @@ namespace EdgeSLAM {
 	
 		////data
 		
+	}
+
+	void Tracker::SendLocalMap(EdgeSLAM::SLAM* SLAM, std::string user, int id) {
+		auto pUser = SLAM->GetUser(user);
+		if (!pUser)
+			return;
+		pUser->mnUsed++;
+
+		auto spLocalKFs = pUser->mSetLocalKeyFrames.Get();
+		auto vpLocalKFs = std::vector<EdgeSLAM::KeyFrame*>(spLocalKFs.begin(), spLocalKFs.end());
+		std::set<EdgeSLAM::MapPoint*> spMPs;
+		std::vector<EdgeSLAM::MapPoint*> vpLocalMPs;
+
+		//pts에 맵포인트 id와 3차원 위치, 민, 맥스, 노말 추가
+		//4 + 12 + 4 + 4 + 12 = 36바이트가 필요함.(디스크립터 제외), 디스크립터는 32바이트임.
+		cv::Mat pts = cv::Mat::zeros(0, 1, CV_32FC1);
+		cv::Mat desc = cv::Mat::zeros(0, 1, CV_8UC1);
+
+		int nInput = 0;
+
+		for (std::vector<EdgeSLAM::KeyFrame*>::const_iterator itKF = vpLocalKFs.begin(), itEndKF = vpLocalKFs.end(); itKF != itEndKF; itKF++)
+		{
+			EdgeSLAM::KeyFrame* pKFi = *itKF;
+			if (!pKFi)
+				continue;
+			const std::vector<EdgeSLAM::MapPoint*> vpMPs = pKFi->GetMapPointMatches();
+
+			int nInputTemp = 0;
+			for (std::vector<EdgeSLAM::MapPoint*>::const_iterator itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
+			{
+				EdgeSLAM::MapPoint* pMPi = *itMP;
+				if (!pMPi || pMPi->isBad() || spMPs.count(pMPi))
+					continue;
+				vpLocalMPs.push_back(pMPi);
+				spMPs.insert(pMPi);
+
+				///추가 데이터
+				float id = (float)pMPi->mnId;
+				float minDist = pMPi->GetMinDistanceInvariance() / 0.8;
+				float maxDist = pMPi->GetMaxDistanceInvariance() / 1.2;
+				cv::Mat temp = cv::Mat::zeros(3, 1, CV_32FC1);
+				temp.at<float>(0) = id;
+				temp.at<float>(1) = minDist;
+				temp.at<float>(2) = maxDist;
+
+				pts.push_back(temp);
+				pts.push_back(pMPi->GetWorldPos());
+				pts.push_back(pMPi->GetNormal());
+				desc.push_back(pMPi->GetDescriptor().t());
+			}
+		}
+		pUser->mnUsed--;
+
+		cv::Mat converted_desc = cv::Mat::zeros(vpLocalMPs.size() * 8, 1, CV_32FC1);
+		std::memcpy(converted_desc.data, desc.data, desc.rows);
+		pts.push_back(converted_desc);
+		
+		{
+			WebAPI API("143.248.6.143", 35005);
+			std::stringstream ss;
+			ss << "/Store?keyword=UpdatedLocalMap&id=" << id << "&src=" << user;
+			auto res = API.Send(ss.str(), pts.data, pts.rows * sizeof(float));
+		}
 	}
 }
