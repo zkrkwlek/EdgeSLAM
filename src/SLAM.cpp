@@ -47,7 +47,7 @@ namespace EdgeSLAM {
 		mpFeatureTracker = new FlannFeatureTracker(1500);
 		mpLocalMapper = new LocalMapper();
 		mpLoopCloser = new LoopCloser();
-		mpVisualizer = new Visualizer(this);
+		//mpVisualizer = new Visualizer(this);
 
 		//set method
 		KeyFrame::mpVoc = mpDBoWVoc;
@@ -68,19 +68,26 @@ namespace EdgeSLAM {
 		mpDBoWVoc->loadFromBinaryFile("../../bin/data/ORBvoc.bin");*/
 	}
 	
+	void SLAM::TrackOXR(int id, std::string user, double ts) {
+		pool->EnqueueJob(Tracker::TrackWithKnownPose, pool, this, id, user, ts);
+	}
+
 	void SLAM::Track(int id, std::string user, double ts) {
 		pool->EnqueueJob(Tracker::Track, pool, this, id, user, ts);
 	}
-	bool bVis = false;
+	
 	void SLAM::InitVisualizer(std::string user, std::string name, int w, int h) {
 		/*if (bVis)
 			return;*/
-		if(!bVis){
-			mpVisualizer->Init(w, h);
-			mptVisualizer = new std::thread(&EdgeSLAM::Visualizer::Run, mpVisualizer);
-			mpVisualizer->SetMap(GetMap(name));
-			mpVisualizer->strMapName = name;
-			bVis = true;
+		auto pMap = GetMap(name);
+		if (!pMap->mbVisualized) {
+			pMap->mpVisualizer = new Visualizer(this);
+			pMap->mpVisualizer->Init(w, h);
+			//mptVisualizer = new std::thread(&EdgeSLAM::Visualizer::Run, mpVisualizer);
+			new std::thread(&EdgeSLAM::Visualizer::Run, pMap->mpVisualizer);
+			pMap->mpVisualizer->SetMap(GetMap(name));
+			pMap->mpVisualizer->strMapName = name;
+			pMap->mbVisualized = true;
 		}
 		//mpVisualizer->AddUser(GetUser(user));
 	}
@@ -256,9 +263,10 @@ namespace EdgeSLAM {
 	//t일 때 트래킹 출력
 	//f일 때 나머지 출력
 	//왼쪽은 시각화, 오른쪽은 기기 위치 출력하기
-	void SLAM::VisualizeImage(cv::Mat src, int vid) {
-		mpVisualizer->ResizeImage(src, src);
-		mpVisualizer->SetOutputImage(src, vid);
+	void SLAM::VisualizeImage(std::string mapName, cv::Mat src, int vid) {
+		auto pMap = GetMap(mapName);
+		pMap->mpVisualizer->ResizeImage(src, src);
+		pMap->mpVisualizer->SetOutputImage(src, vid);
 	}
 
 	/*

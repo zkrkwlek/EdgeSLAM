@@ -11,7 +11,7 @@ namespace EdgeSLAM {
 		mbResetRequested(false), mbFinishRequested(false), mbFinished(false),
 		mbAbortBA(false), mbStopped(false), mbStopRequested(false), mbNotStop(false),
 		mpMatchedKF(nullptr), mnLastLoopKFid(0), mbRunningGBA(false), mbFinishedGBA(true),
-		mbStopGBA(false), mpThreadGBA(nullptr), mbFixScale(bFixScale), mnFullBAIdx(0)
+		mbStopGBA(false), mpThreadGBA(nullptr), mbFixScale(bFixScale), mnFullBAIdx(0), mbVisualized(false)
 	{
 		mpKeyFrameDB = new KeyFrameDB(voc);
 		//mObjectTest.Update(cv::Mat::zeros(0, 4, CV_32FC1));

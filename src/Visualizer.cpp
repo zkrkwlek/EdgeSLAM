@@ -235,15 +235,19 @@ namespace EdgeSLAM {
 		SetAxisMode();
 		int nMapImageID = 0;
 		
+		std::stringstream ss;
+		ss << "Output::Display::" << strMapName;
+		std::string strWindowName = ss.str();
+
 		//현재 여기서 시각화가 안됨
 		//원인 찾는 중
-		cv::imshow("Output::Display", mOutputImage);
-		cv::moveWindow("Output::Display", mnDisplayX, mnDisplayY);
+		cv::imshow(strWindowName, mOutputImage);
+		cv::moveWindow(strWindowName, mnDisplayX, mnDisplayY);
 		float mapControlData[9] = { 0.0, };
 		mapControlData[8] = -90.0;
 		mapControlData[0] = mnWidth;
 		mapControlData[1] = mnVisScale;
-		cv::setMouseCallback("Output::Display", EdgeSLAM::Visualizer::CallBackFunc, (void*)mapControlData);
+		cv::setMouseCallback(strWindowName, EdgeSLAM::Visualizer::CallBackFunc, (void*)mapControlData);
 
 		std::vector<cv::Scalar> planeColors(3);
 		planeColors[0] = cv::Scalar(125, 0, 0);
@@ -343,7 +347,22 @@ namespace EdgeSLAM {
 					}
 				}
 				{
-					
+					{
+						std::map<int, cv::Mat> contentDatas;
+						if (mpSystem->TemporalDatas2.Count("OXRMAP"))
+							contentDatas = mpSystem->TemporalDatas2.Get("OXRMAP");
+						for (auto jter = contentDatas.begin(), jend = contentDatas.end(); jter != jend; jter++) {
+							int id = jter->first;
+							auto x3D = contentDatas[id];
+							cv::Point2f tpt = cv::Point2f(x3D.at<float>(mnAxis1) * mnVisScale, x3D.at<float>(mnAxis2) * mnVisScale);
+							cv::Mat tempPt(tpt);
+							cv::Mat aaa = T * tempPt;
+							tpt.x = aaa.at<float>(0);
+							tpt.y = aaa.at<float>(1);
+							tpt += mVisMidPt;
+							cv::circle(tempVis, tpt, 4, cv::Scalar(0, 255, 255), -1);
+						}
+					}
 					{
 						std::map<int, cv::Mat> contentDatas;
 						if (mpSystem->TemporalDatas2.Count("marker"))
@@ -774,7 +793,7 @@ namespace EdgeSLAM {
 			//}
 			///////save image
 
-			imshow("Output::Display", mOutputImage);
+			imshow(strWindowName, mOutputImage);
 			auto key = cv::waitKey(10);
 			if (key == '1') {
 				std::cout << "1" << std::endl;

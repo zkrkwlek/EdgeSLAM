@@ -17,6 +17,7 @@ namespace EdgeSLAM {
 	enum class MapState {
 		NoImages, NotInitialized, Initialized, NeedNewKeyFrame
 	};
+	class Visualizer;
 	class MapPoint;
 	class TrackPoint;
 	class KeyFrame;
@@ -49,6 +50,8 @@ namespace EdgeSLAM {
 		int GetLastBigChangeIdx();
 
 	public:
+		std::atomic<bool> mbVisualized;
+		Visualizer* mpVisualizer;
 		std::vector<KeyFrame*> mvpKeyFrameOrigins;
 		DBoW3::Vocabulary* mpVoc;
 		bool mbAbortBA;

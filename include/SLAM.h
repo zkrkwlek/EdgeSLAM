@@ -28,6 +28,7 @@ namespace EdgeSLAM {
 		virtual ~SLAM();
 	public:
 		void Init();
+		void TrackOXR(int id, std::string user, double ts = 0.0);
 		void Track(int id, std::string user, double ts = 0.0);
 		void LoadVocabulary();
 		void InitVisualizer(std::string user,std::string name, int w, int h);
@@ -42,7 +43,7 @@ namespace EdgeSLAM {
 		LocalMapper* mpLocalMapper;
 		LoopCloser* mpLoopCloser;
 		FeatureTracker* mpFeatureTracker;
-		Visualizer* mpVisualizer;
+		//Visualizer* mpVisualizer;
 		DBoW3::Vocabulary* mpDBoWVoc;
 		//ORBVocabulary* mpDBoWVoc;
 	public:
@@ -66,7 +67,7 @@ namespace EdgeSLAM {
 		Map* GetMap(std::string name);
 		void RemoveMap(std::string name);
 
-		void VisualizeImage(cv::Mat src, int vid);
+		void VisualizeImage(std::string mapName, cv::Mat src, int vid);
 
 		ConcurrentMap<std::string, User*> Users;
 		ConcurrentMap<std::string, Map*> Maps;

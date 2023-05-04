@@ -12,11 +12,6 @@ namespace EdgeSLAM {
 		Camera(int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5);
 		virtual ~Camera();
 	public:
-		void Project();
-		void Projects();
-		void Unproject();
-		void UnProjects();
-
 		bool is_in_image(float x, float y, float z);
 	public:
 		int mnWidth, mnHeight;

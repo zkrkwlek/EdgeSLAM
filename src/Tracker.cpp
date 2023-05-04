@@ -2,6 +2,7 @@
 #include <SLAM.h>
 #include <Initializer.h>
 #include <LocalMapper.h>
+#include <LoopCloser.h>
 #include <Frame.h>
 #include <KeyFrame.h>
 #include <ObjectFrame.h>
@@ -19,6 +20,7 @@
 #include <Segmentator.h>
 #include <WebAPI.h>
 #include <Converter.h>
+#include <Utils.h>
 
 #include <chrono>
 namespace EdgeSLAM {
@@ -61,6 +63,7 @@ namespace EdgeSLAM {
 		fdata.release();
 		pUser->mnUsed--;
 	}
+
 	void Tracker::UpdateDeviceGyro(SLAM* system, std::string user, int id) {
 		auto pUser = system->GetUser(user);
 		if (!pUser)
@@ -78,6 +81,306 @@ namespace EdgeSLAM {
 		pUser->mnUsed--;
 		delete mpAPI;
 	}
+
+	KeyFrame* currKF = nullptr;
+	KeyFrame* prevKF = nullptr;
+	int oxrid = 1;
+	void Tracker::TrackWithKnownPose(ThreadPool::ThreadPool* pool, SLAM* system, int id, std::string user, double ts) {
+		auto pUser = system->GetUser(user);
+		if (!pUser)
+			return;
+
+		//ts
+		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+		long long tts = start.time_since_epoch().count();
+
+		//프레임을 만들고 항상 리로컬라이제이션을 함.
+		auto cam = pUser->mpCamera;
+		auto map = pUser->mpMap;
+
+		WebAPI API("143.248.6.143", 35005);
+		std::stringstream ss;
+		ss << "/Load?keyword=OXR::IMAGE" << "&id=" << id << "&src=" << user;
+		auto res = API.Send(ss.str(), "");
+		int n = res.size();
+		cv::Mat temp = cv::Mat(n, 1, CV_8UC1, (void*)res.data());
+		cv::Mat img = cv::imdecode(temp, cv::IMREAD_COLOR);
+		pUser->ImageDatas.Update(id, img);
+
+		ss.str("");
+		ss << "/Load?keyword=OXR::POSE" << "&id=" << id << "&src=" << user;
+		res = API.Send(ss.str(), "");
+		n = res.size();
+		cv::Mat T = cv::Mat(4,4,CV_32FC1, (void*)res.data());
+
+		Frame frame(img, cam, id, ts);
+		frame.SetPose(T);
+		frame.ComputeBoW();
+		pUser->UpdatePose(T, ts);
+		//키프레임 디비에서 후보 키프레임 찾기
+		std::vector<KeyFrame*> vpCandidateKFs = map->mpKeyFrameDB->DetectRelocalizationCandidates(&frame);
+
+		currKF = new KeyFrame(&frame, map);
+		currKF->reset_map_points();
+		currKF->ComputeBoW();
+		currKF->sourceName = pUser->userName;
+		currKF->mbSendLocalMap = pUser->mbBaseLocalMap;
+		pUser->mpRefKF = currKF;
+		pUser->mnLastKeyFrameID = frame.mnFrameID;
+		std::cout << "OXR = KF bow vector size = " << currKF->mBowVec.size() <<", candidate = "<< vpCandidateKFs.size() << std::endl;
+		
+		if (prevKF) {
+			std::vector<cv::Point2f> projPoints1, projPoints2;
+			cv::Mat MapPoints;
+			cv::Mat K = pUser->GetCameraMatrix();
+
+			cv::Mat R1 = prevKF->GetRotation();
+			cv::Mat t1 = prevKF->GetTranslation();
+			cv::Mat R2 = currKF->GetRotation();
+			cv::Mat t2 = currKF->GetTranslation();
+			cv::Mat F12 = Utils::ComputeF12(R1, t1, R2, t2, K,K);
+
+			// Search matches that fullfil epipolar constraint
+			std::vector<std::pair<size_t, size_t> > vMatchedIndices;
+
+			int nMatch = SearchPoints::SearchForTriangulation(prevKF, currKF, F12, vMatchedIndices);
+			std::cout << "OXR = match = " << vMatchedIndices.size()<<" "<< nMatch << std::endl;
+
+			cv::Mat prevImg = pUser->ImageDatas.Get(pUser->mnPrevFrameID);
+
+			if (nMatch > 50) {
+				std::map<int, cv::Mat> mapDatas;
+				if (system->TemporalDatas2.Count("OXRMAP"))
+					mapDatas = system->TemporalDatas2.Get("OXRMAP");
+				
+				for (int ikp = 0; ikp < nMatch; ikp++)
+				{
+					const int& idx1 = vMatchedIndices[ikp].first;
+					const int& idx2 = vMatchedIndices[ikp].second;
+
+					const cv::KeyPoint& kp1 = prevKF->mvKeysUn[idx1];
+					const cv::KeyPoint& kp2 = currKF->mvKeysUn[idx2];
+					projPoints1.push_back(kp1.pt);
+					projPoints2.push_back(kp2.pt);
+
+					cv::circle(prevImg, kp1.pt, 3, cv::Scalar(255, 0, 255), -1);
+					cv::circle(img, kp2.pt, 3, cv::Scalar(255, 0, 255), -1);
+				}
+
+				const float& fx1 = prevKF->fx;
+				const float& fy1 = prevKF->fy;
+				const float& cx1 = prevKF->cx;
+				const float& cy1 = prevKF->cy;
+				const float& invfx1 = prevKF->invfx;
+				const float& invfy1 = prevKF->invfy;
+
+				const float& fx2 = currKF->fx;
+				const float& fy2 = currKF->fy;
+				const float& cx2 = currKF->cx;
+				const float& cy2 = currKF->cy;
+				const float& invfx2 = currKF->invfx;
+				const float& invfy2 = currKF->invfy;
+
+				cv::Mat Rcw1 = prevKF->GetRotation();
+				cv::Mat Rwc1 = Rcw1.t();
+				cv::Mat tcw1 = prevKF->GetTranslation();
+				cv::Mat Tcw1(3, 4, CV_32F);
+				Rcw1.copyTo(Tcw1.colRange(0, 3));
+				tcw1.copyTo(Tcw1.col(3));
+
+				cv::Mat Rcw2 = currKF->GetRotation();
+				cv::Mat Rwc2 = Rcw2.t();
+				cv::Mat tcw2 = currKF->GetTranslation();
+				cv::Mat Tcw2(3, 4, CV_32F);
+				Rcw2.copyTo(Tcw2.colRange(0, 3));
+				tcw2.copyTo(Tcw2.col(3));
+
+				cv::Mat Ow1 = prevKF->GetCameraCenter();
+				cv::Mat Ow2 = currKF->GetCameraCenter();
+
+				// Triangulate each match
+				const int nmatches = vMatchedIndices.size();
+				for (int ikp = 0; ikp < nmatches; ikp++)
+
+				{
+					const int& idx1 = vMatchedIndices[ikp].first;
+					const int& idx2 = vMatchedIndices[ikp].second;
+
+					const cv::KeyPoint& kp1 = prevKF->mvKeysUn[idx1];
+					const cv::KeyPoint& kp2 = currKF->mvKeysUn[idx2];
+
+					// Check parallax between rays
+					cv::Mat xn1 = (cv::Mat_<float>(3, 1) << (kp1.pt.x - cx1) * invfx1, (kp1.pt.y - cy1) * invfy1, 1.0);
+					cv::Mat xn2 = (cv::Mat_<float>(3, 1) << (kp2.pt.x - cx2) * invfx2, (kp2.pt.y - cy2) * invfy2, 1.0);
+
+					cv::Mat ray1 = Rwc1 * xn1;
+					cv::Mat ray2 = Rwc2 * xn2;
+					const float cosParallaxRays = ray1.dot(ray2) / (cv::norm(ray1) * cv::norm(ray2));
+
+					cv::Mat x3D;
+					if (cosParallaxRays > 0 && cosParallaxRays < 0.9998)
+					{
+						// Linear Triangulation Method
+						cv::Mat A(4, 4, CV_32F);
+						A.row(0) = xn1.at<float>(0) * Tcw1.row(2) - Tcw1.row(0);
+						A.row(1) = xn1.at<float>(1) * Tcw1.row(2) - Tcw1.row(1);
+						A.row(2) = xn2.at<float>(0) * Tcw2.row(2) - Tcw2.row(0);
+						A.row(3) = xn2.at<float>(1) * Tcw2.row(2) - Tcw2.row(1);
+
+						cv::Mat w, u, vt;
+						cv::SVD::compute(A, w, u, vt, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
+
+						x3D = vt.row(3).t();
+
+						if (x3D.at<float>(3) == 0)
+							continue;
+
+						// Euclidean coordinates
+						x3D = x3D.rowRange(0, 3) / x3D.at<float>(3);
+
+					}
+					else
+						continue; //No stereo and very low parallax
+
+					cv::Mat x3Dt = x3D.t();
+
+					//Check triangulation in front of cameras
+					float z1 = Rcw1.row(2).dot(x3Dt) + tcw1.at<float>(2);
+					if (z1 <= 0)
+						continue;
+
+					float z2 = Rcw2.row(2).dot(x3Dt) + tcw2.at<float>(2);
+					if (z2 <= 0)
+						continue;
+
+					//Check reprojection error in first keyframe
+					const float& sigmaSquare1 = prevKF->mvLevelSigma2[kp1.octave];
+					const float x1 = Rcw1.row(0).dot(x3Dt) + tcw1.at<float>(0);
+					const float y1 = Rcw1.row(1).dot(x3Dt) + tcw1.at<float>(1);
+					const float invz1 = 1.0 / z1;
+
+					float u1 = fx1 * x1 * invz1 + cx1;
+					float v1 = fy1 * y1 * invz1 + cy1;
+					float errX1 = u1 - kp1.pt.x;
+					float errY1 = v1 - kp1.pt.y;
+					if ((errX1 * errX1 + errY1 * errY1) > 5.991 * sigmaSquare1)
+						continue;
+
+					//Check reprojection error in second keyframe
+					const float sigmaSquare2 = currKF->mvLevelSigma2[kp2.octave];
+					const float x2 = Rcw2.row(0).dot(x3Dt) + tcw2.at<float>(0);
+					const float y2 = Rcw2.row(1).dot(x3Dt) + tcw2.at<float>(1);
+					const float invz2 = 1.0 / z2;
+					float u2 = fx2 * x2 * invz2 + cx2;
+					float v2 = fy2 * y2 * invz2 + cy2;
+					float errX2 = u2 - kp2.pt.x;
+					float errY2 = v2 - kp2.pt.y;
+					if ((errX2 * errX2 + errY2 * errY2) > 5.991 * sigmaSquare2)
+						continue;
+
+					//Check scale consistency
+					cv::Mat normal1 = x3D - Ow1;
+					float dist1 = cv::norm(normal1);
+
+					cv::Mat normal2 = x3D - Ow2;
+					float dist2 = cv::norm(normal2);
+
+					if (dist1 == 0 || dist2 == 0)
+						continue;
+
+					cv::Point2f ptPrev(u1,v1);
+					cv::Point2f ptCurr(u2,v2);
+
+					cv::circle(prevImg, ptPrev, 5, cv::Scalar(255, 255, 0));
+					cv::circle(img, ptCurr, 5, cv::Scalar(255, 255, 0));
+
+					mapDatas[oxrid++] = x3D;
+
+					//const float ratioDist = dist2 / dist1;
+					//const float ratioOctave = targetKF->mvScaleFactors[kp1.octave] / pKF2->mvScaleFactors[kp2.octave];
+
+					///*if(fabs(ratioDist-ratioOctave)>ratioFactor)
+					//continue;*/
+					//if (ratioDist * ratioFactor<ratioOctave || ratioDist>ratioOctave * ratioFactor)
+					//	continue;
+
+					//// Triangulation is succesfull
+					MapPoint* pMP = new MapPoint(x3D, prevKF, map, tts);
+
+					pMP->AddObservation(prevKF, idx1);
+					pMP->AddObservation(currKF, idx2);
+
+					prevKF->AddMapPoint(pMP, idx1);
+					currKF->AddMapPoint(pMP, idx2);
+
+					pMP->ComputeDistinctiveDescriptors();
+
+					pMP->UpdateNormalAndDepth();
+
+					map->AddMapPoint(pMP);
+					map->mlpNewMPs.push_back(pMP);
+
+					//nnew++;
+
+
+				}
+
+				
+				/*std::cout << "OXR = asdf" << std::endl;
+				std::cout << prevKF->GetPose() << std::endl;
+				cv::Mat Tprev = prevKF->GetPose().rowRange(0,3);
+				cv::Mat Tcurr = T.rowRange(0,3);
+				std::cout << "OXR = " << K * Tprev << std::endl;
+
+				cv::Mat projPrev = K * Tprev;
+				cv::Mat projCurr = K * Tcurr;
+				cv::triangulatePoints(projPrev, projCurr, projPoints1, projPoints2, MapPoints);
+				
+				
+				
+				int nMap = 0;
+				for (int i = 0; i < MapPoints.cols; i++) {
+					auto var = MapPoints.col(i);
+					var /= var.at<float>(3);
+
+					cv::Mat prevPt = projPrev * var;
+					float prevDepth = prevPt.at<float>(2);
+
+					cv::Mat currPt = projCurr * var;
+					float currDepth = currPt.at<float>(2);
+
+					if (prevDepth < 0.0 || currDepth < 0.0)
+						continue;
+
+					prevPt /= prevDepth;
+					currPt /= currDepth;
+
+					cv::Point2f ptPrev(prevPt.at<float>(0), prevPt.at<float>(1));
+					cv::Point2f ptCurr(currPt.at<float>(0), currPt.at<float>(1));
+
+					cv::circle(prevImg, ptPrev, 5, cv::Scalar(255, 255, 0));
+					cv::circle(img, ptCurr, 5, cv::Scalar(255, 255, 0));
+
+					cv::Mat temp = (cv::Mat_<float>(3, 1) << var.at<float>(0),var.at<float>(1), var.at<float>(2));
+					mapDatas[oxrid++] = temp;
+					nMap++;
+				}*/
+				system->TemporalDatas2.Update("OXRMAP", mapDatas);
+				system->VisualizeImage(pUser->mapName, prevImg, pUser->GetVisID() + 5);
+			}
+			//매칭과 맵포인트 생성 테스트
+
+			//prevKF->AddConnection(currKF, 100);
+			//currKF->AddConnection(prevKF, 100);
+			pool->EnqueueJob(LocalMapper::OXRMapping, pool, system, map, currKF);
+		}
+		map->AddKeyFrame(currKF);
+		system->mpLoopCloser->DetectLoop(system, map, currKF);
+		system->VisualizeImage(pUser->mapName, img, pUser->GetVisID() + 4);
+		prevKF = currKF;
+		pUser->mnPrevFrameID = id;
+	}
+
 	void Tracker::Track(ThreadPool::ThreadPool* pool, SLAM* system, int id, std::string user, double ts) {
 		auto pUser = system->GetUser(user);
 		if (!pUser)
@@ -109,8 +412,9 @@ namespace EdgeSLAM {
 		ss << "/Load?keyword=Image" << "&id=" << id << "&src=" << user;
 		auto res = mpAPI->Send(ss.str(), "");
 		int n2 = res.size();
-		cv::Mat temp = cv::Mat::zeros(n2, 1, CV_8UC1);
-		std::memcpy(temp.data, res.data(), res.size());
+		cv::Mat temp = cv::Mat(n2, 1, CV_8UC1, (void*)res.data());
+		/*cv::Mat temp = cv::Mat::zeros(n2, 1, CV_8UC1);
+		std::memcpy(temp.data, res.data(), res.size());*/
 		cv::Mat img = cv::imdecode(temp, cv::IMREAD_COLOR);
 		
 		std::chrono::high_resolution_clock::time_point received = std::chrono::high_resolution_clock::now();
@@ -215,8 +519,8 @@ namespace EdgeSLAM {
 					auto du_init = std::chrono::duration_cast<std::chrono::milliseconds>(t_prev_start - received).count();
 					t_init = du_init / 1000.0;
 					if (!bTrack) {
-						std::cout << "track with reference frame :: start" << std::endl;
-						std::cout << "track with reference frame :: end" << std::endl;
+						/*std::cout << "track with reference frame :: start" << std::endl;
+						std::cout << "track with reference frame :: end" << std::endl;*/
 					}
 					else {
 						
@@ -328,9 +632,9 @@ namespace EdgeSLAM {
 				pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, pUser->userName, data, id, ts);
 			}
 
-			if (pUser->mbBaseLocalMap && pUser->mpRefKF) {
+			/*if (pUser->mbBaseLocalMap && pUser->mpRefKF) {
 				pool->EnqueueJob(Tracker::SendLocalMap, system, user, id);
-			}
+			}*/
 			//로컬 맵 키프레임 전송 중 에러.
 			//키프레임의 포즈까지 전송.
 			
@@ -444,11 +748,11 @@ namespace EdgeSLAM {
 
 			cv::Scalar color = Segmentator::mvObjectLabelColors[pUser->GetVisID()+1];
 
-			float hline = 92.31;
+			/*float hline = 92.31;
 			cv::Point2f pt1(0, hline);
 			cv::Point2f pt2(640, hline);
 			cv::Point2f pt3(0, 480- hline);
-			cv::Point2f pt4(640, 480 - hline);
+			cv::Point2f pt4(640, 480 - hline);*/
 
 			for (int i = 0; i < frame->mvKeys.size(); i++) {
 				auto pMP = frame->mvpMapPoints[i];
@@ -479,8 +783,9 @@ namespace EdgeSLAM {
 					cv::circle(img, pt, r, cv::Scalar(255,0,255), -1);
 				}
 			}
-			cv::line(img, pt1, pt2, cv::Scalar(255, 0, 0), 2);
-			cv::line(img, pt3, pt4, cv::Scalar(255, 0, 0), 2);
+			/*cv::line(img, pt1, pt2, cv::Scalar(255, 0, 0), 2);
+			cv::line(img, pt3, pt4, cv::Scalar(255, 0, 0), 2);*/
+
 			/*if (user->objFrames.Count(tempID)) {
 				ObjectFrame* objFrame = user->objFrames.Get(tempID);
 				for (auto iter = objFrame->mapObjects.begin(), iend = objFrame->mapObjects.end(); iter != iend; iter++) {
@@ -499,7 +804,7 @@ namespace EdgeSLAM {
 				std::cout << std::endl << std::endl << std::endl << std::endl;
 			}*/
 			
-			system->VisualizeImage(img, pUser->GetVisID()+4); 
+			system->VisualizeImage(pUser->mapName, img, pUser->GetVisID()+4); 
 			//system->mpVisualizer->ResizeImage(img, img);
 			//system->mpVisualizer->SetOutputImage(img, pUser->GetVisID());
 
@@ -601,6 +906,8 @@ namespace EdgeSLAM {
 		vbDiscarded.resize(nKFs);
 
 		//std::vector<int> vnGoods(nKFs,0);
+
+		
 
 		int nCandidates = 0;
 
@@ -705,7 +1012,7 @@ namespace EdgeSLAM {
 						}
 					}
 				}
-				std::cout << "relocalization=" << i << "=final::ngood=" << nGood << std::endl;
+				//std::cout << "relocalization=" << i << "=final::ngood=" << nGood << std::endl;
 				/*if (vnGoods[i] == nGood) {
 					vbDiscarded[i] = true;
 					nCandidates--;
