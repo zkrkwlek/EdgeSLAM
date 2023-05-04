@@ -14,7 +14,7 @@ namespace EdgeSLAM {
 	User::User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, int nskip, bool _b, bool _bTracking, bool _bBaseLocalMap, bool _bimu, bool _bGBA, bool _bReset, bool _bsave, bool _bAsync) : userName(_user), mapName(_map), mbMapping(_b), mState(UserState::NotEstimated),
 		Rgyro(cv::Mat::eye(3, 3, CV_32FC1)), tacc(cv::Mat::zeros(3, 1, CV_32FC1)), mbIMU(_bimu), mbDeviceTracking(_bTracking), mbBaseLocalMap(_bBaseLocalMap), mbSaveTrajectory(_bsave), mnQuality(q), mnSkip(nskip), mbAsyncTest(_bAsync), mbPlaneGBA(_bGBA), mbResetAR(_bReset),
 		mbProgress(false), mbRemoved(false), mpRefKF(nullptr), mnUsed(0), mnLastKeyFrameID(-1), mnPrevFrameID(-1), mnCurrFrameID(-1), mnLastRelocFrameId(-1), mbMotionModel(false), mnVisID(0),
-		mnDebugTrack(0), mnDebugSeg(0), mnDebugAR(0), mnDebugLabel(0), mnDebugPlane(0)
+		mnDebugTrack(0), mnDebugSeg(0), mnDebugAR(0), mnDebugLabel(0), mnDebugPlane(0), mnLastSendedTime(0)
 	{
 		mpMotionModel = new MotionModel();
 		mpCamPose = new CameraPose();

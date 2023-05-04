@@ -19,12 +19,13 @@ namespace EdgeSLAM {
 		LocalMapper();
 		virtual ~LocalMapper();
 	public:
+		static void OXRMapping(ThreadPool::ThreadPool* pool, SLAM* system, Map* map, KeyFrame* targetKF);
 		static void ProcessMapping(ThreadPool::ThreadPool* pool, SLAM* system, Map* map, KeyFrame* targetKF);
-		static void SendLocalMap(KeyFrame* targetKF);
+		static void SendLocalMap(SLAM* system, KeyFrame* targetKF, long long ts);
 		static void SendKeyFrameInformation(SLAM* system, std::string name, Map* map, KeyFrame* targetKF);
 		void ProcessNewKeyFrame(Map* map, KeyFrame* targetKF);
 		void MapPointCulling(Map* map, KeyFrame* targetKF);
-		void CreateNewMapPoints(Map* map, KeyFrame* targetKF);
+		void CreateNewMapPoints(Map* map, KeyFrame* targetKF, long long ts);
 		void SearchInNeighbors(Map* map, KeyFrame* targetKF);
 		void KeyFrameCulling(Map* map, KeyFrame* targetKF);
 		

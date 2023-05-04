@@ -34,7 +34,7 @@ namespace EdgeSLAM {
 	class MapPoint
 	{
 	public:
-		MapPoint(const cv::Mat &Pos, KeyFrame* pRefKF, Map* pMap);
+		MapPoint(const cv::Mat &Pos, KeyFrame* pRefKF, Map* pMap, long long _ts);
 		//MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF);
 		virtual ~MapPoint();
 
@@ -87,6 +87,7 @@ namespace EdgeSLAM {
 		std::atomic<int> mnLabelID;
 		std::atomic<int> mnPlaneID;
 		std::atomic<int> mnPlaneCount;
+		std::atomic<long long> mnLastUpdatedTime;
 
 		// Variables used by the tracking
 		/*float mTrackProjX;

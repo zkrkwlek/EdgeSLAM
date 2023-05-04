@@ -315,7 +315,7 @@ namespace EdgeSLAM {
 		return nInitialCorrespondences - nBad;
 	}
 
-	void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap)
+	void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap, long long ts)
 	{
 		// Local KeyFrames: First Breath Search from Current Keyframe
 		std::list<KeyFrame*> lLocalKeyFrames;
@@ -562,6 +562,7 @@ namespace EdgeSLAM {
 			g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMP->mnId + maxKFid + 1));
 			pMP->SetWorldPos(Converter::toCvMat(vPoint->estimate()));
 			pMP->UpdateNormalAndDepth();
+			pMP->mnLastUpdatedTime = ts;
 		}
 	}
 

@@ -21,15 +21,44 @@ namespace EdgeSLAM {
 	{}
 	LocalMapper::~LocalMapper(){}
 
+	void LocalMapper::OXRMapping(ThreadPool::ThreadPool* pool, SLAM* system, Map* map, KeyFrame* targetKF) {
+
+		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+		long long ts = start.time_since_epoch().count();
+
+		map->mnNumMappingFrames++;
+		auto pMapper = system->mpLocalMapper;
+		pMapper->ProcessNewKeyFrame(map, targetKF);
+		pMapper->MapPointCulling(map, targetKF);
+		pMapper->CreateNewMapPoints(map, targetKF, ts);
+		if (map->mnNumMappingFrames == 1)
+			pMapper->SearchInNeighbors(map, targetKF);
+
+		map->mbAbortBA = false;
+		if (map->mnNumMappingFrames == 1 && !map->stopRequested())
+		{
+			pMapper->KeyFrameCulling(map, targetKF);
+		}
+
+		//pool->EnqueueJob(LoopCloser::ProcessLoopClosing, system, map, targetKF);
+		map->mnNumMappingFrames--;
+	}
+
 	void LocalMapper::ProcessMapping(ThreadPool::ThreadPool* pool, SLAM* system, Map* map, KeyFrame* targetKF) {
 
 		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+		long long ts = start.time_since_epoch().count();
+
+		/*auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(start);
+		auto epoch = now_ms.time_since_epoch();
+		auto value = std::chrono::duration_cast<std::chrono::milliseconds>(epoch);
+		long duration = value.count();*/
 		
 		map->mnNumMappingFrames++;
 		auto pMapper = system->mpLocalMapper;
 		pMapper->ProcessNewKeyFrame(map, targetKF);
 		pMapper->MapPointCulling(map, targetKF);
-		pMapper->CreateNewMapPoints(map, targetKF);
+		pMapper->CreateNewMapPoints(map, targetKF, ts);
 		if(map->mnNumMappingFrames == 1)
 			pMapper->SearchInNeighbors(map, targetKF);
 		
@@ -40,7 +69,7 @@ namespace EdgeSLAM {
 		{
 			if (map->GetNumKeyFrames() > 2) {
 				//std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-				Optimizer::LocalBundleAdjustment(targetKF, &map->mbAbortBA, map);
+				Optimizer::LocalBundleAdjustment(targetKF, &map->mbAbortBA, map, ts);
 				/*std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 				auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 				float t_test1 = du_test1 / 1000.0;
@@ -49,6 +78,8 @@ namespace EdgeSLAM {
 			pMapper->KeyFrameCulling(map, targetKF);
 		}
 	
+		if(targetKF->mbSendLocalMap)
+			pool->EnqueueJob(LocalMapper::SendLocalMap, system, targetKF, ts);
 		pool->EnqueueJob(LoopCloser::ProcessLoopClosing, system, map, targetKF);
 		//pool->EnqueueJob(SendKeyFrameInformation, system, "SLAMServer", map, targetKF);
 		map->mnNumMappingFrames--;
@@ -61,8 +92,15 @@ namespace EdgeSLAM {
 			system->ProcessingTime.Get("mapping")[N]->add(t_test1);
 	}
 	
-	void LocalMapper::SendLocalMap(KeyFrame* targetKF) {
+	void LocalMapper::SendLocalMap(SLAM* system, KeyFrame* targetKF, long long ts) {
 		
+		std::string src = targetKF->sourceName;
+		if (!system->CheckUser(src))
+			return;
+		auto user = system->GetUser(src);
+		user->mnUsed++;
+		long long lastSendedTime = user->mnLastSendedTime;;
+
 		const int nn = 20;
 		const std::vector<KeyFrame*> vpNeighKFs = targetKF->GetBestCovisibilityKeyFrames(nn);
 
@@ -98,13 +136,16 @@ namespace EdgeSLAM {
 				temp.at<float>(1) = minDist;
 				temp.at<float>(2) = maxDist;
 
-				vpLocalMPs.push_back(pMPi);
-				spLocalMPs.insert(pMPi);
+				if (ts > lastSendedTime)
+				{
+					vpLocalMPs.push_back(pMPi);
+					spLocalMPs.insert(pMPi);
 
-				pts.push_back(temp);
-				pts.push_back(pMPi->GetWorldPos());
-				pts.push_back(pMPi->GetNormal());
-				desc.push_back(pMPi->GetDescriptor().t());
+					pts.push_back(temp);
+					pts.push_back(pMPi->GetWorldPos());
+					pts.push_back(pMPi->GetNormal());
+					desc.push_back(pMPi->GetDescriptor().t());
+				}
 
 				/*if (nInput == 0) {
 					nInputTemp += 52;
@@ -114,6 +155,10 @@ namespace EdgeSLAM {
 				nInput = nInputTemp;*/
 
 		}
+
+		user->mnLastSendedTime = ts;
+		user->mnUsed--;
+
 
 		//256 x 1비트라 8로 나누면 32 바이트로 표현이 가능함.
 		//4바이트 실수형에 강제로 복사하는 것이기 때문에 32 바이트 디스크립터는 8개의 실수로 표현이 가능함.
@@ -249,7 +294,7 @@ namespace EdgeSLAM {
 		}
 	}
 
-	void LocalMapper::CreateNewMapPoints(Map* map, KeyFrame* targetKF)
+	void LocalMapper::CreateNewMapPoints(Map* map, KeyFrame* targetKF, long long ts)
 	{
 		
 		// Retrieve neighbor keyframes in covisibility graph
@@ -422,7 +467,7 @@ namespace EdgeSLAM {
 					continue;
 
 				// Triangulation is succesfull
-				MapPoint* pMP = new MapPoint(x3D, targetKF, map);
+				MapPoint* pMP = new MapPoint(x3D, targetKF, map, ts);
 
 				pMP->AddObservation(targetKF, idx1);
 				pMP->AddObservation(pKF2, idx2);

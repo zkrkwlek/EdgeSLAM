@@ -11,11 +11,11 @@ namespace EdgeSLAM {
 	TrackPoint::TrackPoint(float x, float y, float angle, float scale): mbTrackInView(false),mTrackProjX(x), mTrackProjY(y), mTrackViewCos(angle), mnTrackScaleLevel(scale){}
 	TrackPoint::~TrackPoint(){}
 
-	MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF, Map* pMap) :
+	MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF, Map* pMap, long long ts) :
 		mnFirstKFid(pRefKF->mnId), mnFirstFrame(pRefKF->mnFrameId), nObs(0), //mnTrackReferenceForFrame(0), mnLastFrameSeen(0),
 		mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0), mnLabelID(0), mnPlaneID(0), mnPlaneCount(0),
 		mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(pRefKF), mnVisible(1), mnFound(1), mbBad(false),
-		mpReplaced(static_cast<MapPoint*>(NULL)), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap), mnId(pMap->mnNextMapPointID++)
+		mpReplaced(static_cast<MapPoint*>(NULL)), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap), mnId(pMap->mnNextMapPointID++), mnLastUpdatedTime(ts)
 	{
 		Pos.copyTo(mWorldPos);
 		mNormalVector = cv::Mat::zeros(3, 1, CV_32F);

@@ -30,7 +30,7 @@ namespace EdgeSLAM {
 			}
 		}
 		mFrameStack.push(pCur);
-		std::cout << "Initialize " << mpRef->mnFrameID << ", " << pCur->mnFrameID << std::endl;
+		//std::cout << "Initialize " << mpRef->mnFrameID << ", " << pCur->mnFrameID << std::endl;
 
 		if (pCur->N < mnMinFeatures || mpRef->N < mnMinFeatures)
 			return MapState::NotInitialized;
@@ -54,8 +54,13 @@ namespace EdgeSLAM {
 		int nTriangulatedPoints = cv::recoverPose(E12, pts1, pts2, mpRef->K, R1, t1, 50.0, vFInliers, Map3D);
 		R1.convertTo(R1, CV_32FC1);
 		t1.convertTo(t1, CV_32FC1);
-		
-		std::cout << "Map = " << nTriangulatedPoints <<", "<<pts1.size()<<" "<<idx1.size()<<", "<<Map3D.cols<<" "<<vFInliers.size()<< std::endl;
+
+		//ts
+		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+		long long ts = start.time_since_epoch().count();
+
+
+		//std::cout << "Map = " << nTriangulatedPoints <<", "<<pts1.size()<<" "<<idx1.size()<<", "<<Map3D.cols<<" "<<vFInliers.size()<< std::endl;
 		if (nTriangulatedPoints > mnMinTriangulatedPoints) {
 			cv::Mat Tref = cv::Mat::eye(4, 4, CV_32FC1);
 			cv::Mat Tcur = cv::Mat::eye(4,4,CV_32FC1);
@@ -109,7 +114,7 @@ namespace EdgeSLAM {
 				int i1 = idx1[i];
 				int i2 = idx2[i];
 				
-				auto pMP = new MapPoint(X3D, pCurKeyframe, pMap);
+				auto pMP = new MapPoint(X3D, pCurKeyframe, pMap, ts);
 				pRefKeyframe->AddMapPoint(pMP, i1);
 				pCurKeyframe->AddMapPoint(pMP, i2);
 
@@ -125,7 +130,7 @@ namespace EdgeSLAM {
 				pMap->AddMapPoint(pMP);
 			}
 
-			std::cout << "KF = " << pRefKeyframe->mnId << ", " << pCurKeyframe->mnId << std::endl;
+			//std::cout << "KF = " << pRefKeyframe->mnId << ", " << pCurKeyframe->mnId << std::endl;
 
 			pRefKeyframe->UpdateConnections();
 			pCurKeyframe->UpdateConnections();
@@ -142,6 +147,7 @@ namespace EdgeSLAM {
 				pMap->Delete();
 				return MapState::NotInitialized;
 			}
+			std::cout << "Map Initialization Success" << std::endl;
 
 			// Scale initial baseline
 			cv::Mat Tc2w = pCurKeyframe->GetPose();

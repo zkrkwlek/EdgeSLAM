@@ -80,6 +80,7 @@ namespace EdgeSLAM {
 		std::atomic<bool> mbProgress, mbRemoved;
 		std::atomic<int> mnUsed, mnLastKeyFrameID, mnPrevFrameID, mnCurrFrameID, mnLastRelocFrameId;
 		std::atomic<int> mnDebugTrack, mnDebugSeg, mnDebugAR, mnDebugLabel, mnDebugPlane;
+		std::atomic<long long> mnLastSendedTime;
 		ConcurrentMap<int, std::string> QueueNotiMsg;
 
 	public:
