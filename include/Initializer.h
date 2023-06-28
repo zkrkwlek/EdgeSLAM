@@ -30,6 +30,7 @@ namespace EdgeSLAM {
 		*/
 		void Reset();
 		void Init(Frame* pRef);
+		MapState InitializeOXR(Frame* pCur, Map* pMap);
 		MapState Initialize(Frame* pCur, Map* pMap);
 		void EstimatePose();
 	private:

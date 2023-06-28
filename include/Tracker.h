@@ -22,6 +22,8 @@ namespace EdgeSLAM {
 		virtual ~Tracker();
 	public:
 		static void TrackWithKnownPose(ThreadPool::ThreadPool* pool, SLAM* system, int id, std::string user, double ts);
+		static void CreatePointsOXR(KeyFrame* pRefKeyframe, KeyFrame* pCurKeyframe, Frame* pCurFrame, Map* pMap);
+
 		static void Track(ThreadPool::ThreadPool* pool, SLAM* system, int id, std::string , double ts);
 		static bool TrackWithPrevFrame(Frame* prev, Frame* cur, float thMaxDesc, float thMinDesc);
 		static int  TrackWithLocalMap(LocalMap* localMap, User* user, Frame* cur, float thMaxDesc, float thMinDesc);

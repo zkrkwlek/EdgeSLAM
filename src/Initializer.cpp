@@ -5,6 +5,8 @@
 #include <Optimizer.h>
 #include <Map.h>
 #include <MapPoint.h>
+#include <Utils.h>
+#include <SearchPoints.h>
 
 namespace EdgeSLAM {
 	Initializer::Initializer(int nMinFeatures, int nMinTriangulatedPoints, int nMaxIdDistBetweenIntializingFrames, int nNumOfFailuresAfterWichNumMinTriangulatedPointsIsHalved):
@@ -22,6 +24,215 @@ namespace EdgeSLAM {
 	void Initializer::EstimatePose(){
 	
 	}
+
+	MapState Initializer::InitializeOXR(Frame* pCur, Map* pMap) {
+		
+		if (mpRef) {
+			if (pCur->mnFrameID - mpRef->mnFrameID > mnMaxIdDistBetweenIntializingFrames) {
+				ReplaceReferenceFrame();
+			}
+		}
+		mFrameStack.push(pCur);
+
+		cv::Mat MapPoints;
+		cv::Mat K = mpRef->K.clone();
+		cv::Mat R1 = mpRef->GetRotation();
+		cv::Mat t1 = mpRef->GetTranslation();
+		cv::Mat R2 = pCur->GetRotation();
+		cv::Mat t2 = pCur->GetTranslation();
+		cv::Mat F12 = Utils::ComputeF12(R1, t1, R2, t2, K,K);
+
+		mpRef->reset_map_points();
+		pCur->reset_map_points();
+
+		auto pRefKeyframe = new KeyFrame(mpRef, pMap);
+		auto pCurKeyframe = new KeyFrame(pCur, pMap);
+
+		pRefKeyframe->ComputeBoW();
+		pCurKeyframe->ComputeBoW();
+
+		pMap->AddKeyFrame(pRefKeyframe);
+		pMap->AddKeyFrame(pCurKeyframe);
+
+		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+		long long ts = start.time_since_epoch().count();
+
+		//	// Search matches that fullfil epipolar constraint
+		std::vector<std::pair<size_t, size_t> > vMatchedIndices;
+
+		int nMatch = SearchPoints::SearchForTriangulation(pRefKeyframe, pCurKeyframe, F12, vMatchedIndices);
+		std::cout << "OXR = match = " << vMatchedIndices.size() << " " << nMatch << " " << mpRef->mnFrameID << " " << pCur->mnFrameID << std::endl;
+
+		std::vector<cv::Mat> vecMPs(nMatch);
+		std::vector<bool> vecInliers(nMatch, false);
+
+		if (nMatch > 100) {
+
+			const float& fx1 = pRefKeyframe->fx;
+			const float& fy1 = pRefKeyframe->fy;
+			const float& cx1 = pRefKeyframe->cx;
+			const float& cy1 = pRefKeyframe->cy;
+			const float& invfx1 = pRefKeyframe->invfx;
+			const float& invfy1 = pRefKeyframe->invfy;
+
+			const float& fx2 = pCurKeyframe->fx;
+			const float& fy2 = pCurKeyframe->fy;
+			const float& cx2 = pCurKeyframe->cx;
+			const float& cy2 = pCurKeyframe->cy;
+			const float& invfx2 = pCurKeyframe->invfx;
+			const float& invfy2 = pCurKeyframe->invfy;
+
+			cv::Mat Rcw1 = pRefKeyframe->GetRotation();
+			cv::Mat Rwc1 = Rcw1.t();
+			cv::Mat tcw1 = pRefKeyframe->GetTranslation();
+			cv::Mat Tcw1(3, 4, CV_32F);
+			Rcw1.copyTo(Tcw1.colRange(0, 3));
+			tcw1.copyTo(Tcw1.col(3));
+
+			cv::Mat Rcw2 = pCurKeyframe->GetRotation();
+			cv::Mat Rwc2 = Rcw2.t();
+			cv::Mat tcw2 = pCurKeyframe->GetTranslation();
+			cv::Mat Tcw2(3, 4, CV_32F);
+			Rcw2.copyTo(Tcw2.colRange(0, 3));
+			tcw2.copyTo(Tcw2.col(3));
+
+			cv::Mat Ow1 = pRefKeyframe->GetCameraCenter();
+			cv::Mat Ow2 = pCurKeyframe->GetCameraCenter();
+
+			// Triangulate each match
+			const int nmatches = vMatchedIndices.size();
+			int nMap = 0;
+			for (int ikp = 0; ikp < nmatches; ikp++)
+
+			{
+				const int& idx1 = vMatchedIndices[ikp].first;
+				const int& idx2 = vMatchedIndices[ikp].second;
+
+				const cv::KeyPoint& kp1 = pRefKeyframe->mvKeysUn[idx1];
+				const cv::KeyPoint& kp2 = pCurKeyframe->mvKeysUn[idx2];
+
+				// Check parallax between rays
+				cv::Mat xn1 = (cv::Mat_<float>(3, 1) << (kp1.pt.x - cx1) * invfx1, (kp1.pt.y - cy1) * invfy1, 1.0);
+				cv::Mat xn2 = (cv::Mat_<float>(3, 1) << (kp2.pt.x - cx2) * invfx2, (kp2.pt.y - cy2) * invfy2, 1.0);
+
+				cv::Mat ray1 = Rwc1 * xn1;
+				cv::Mat ray2 = Rwc2 * xn2;
+				const float cosParallaxRays = ray1.dot(ray2) / (cv::norm(ray1) * cv::norm(ray2));
+
+				cv::Mat x3D;
+				if (cosParallaxRays > 0 && cosParallaxRays < 0.9998)
+				{
+					// Linear Triangulation Method
+					cv::Mat A(4, 4, CV_32F);
+					A.row(0) = xn1.at<float>(0) * Tcw1.row(2) - Tcw1.row(0);
+					A.row(1) = xn1.at<float>(1) * Tcw1.row(2) - Tcw1.row(1);
+					A.row(2) = xn2.at<float>(0) * Tcw2.row(2) - Tcw2.row(0);
+					A.row(3) = xn2.at<float>(1) * Tcw2.row(2) - Tcw2.row(1);
+
+					cv::Mat w, u, vt;
+					cv::SVD::compute(A, w, u, vt, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
+
+					x3D = vt.row(3).t();
+
+					if (x3D.at<float>(3) == 0)
+						continue;
+
+					// Euclidean coordinates
+					x3D = x3D.rowRange(0, 3) / x3D.at<float>(3);
+
+				}
+				else
+					continue; //No stereo and very low parallax
+
+				cv::Mat x3Dt = x3D.t();
+
+				//Check triangulation in front of cameras
+				float z1 = Rcw1.row(2).dot(x3Dt) + tcw1.at<float>(2);
+				if (z1 <= 0)
+					continue;
+
+				float z2 = Rcw2.row(2).dot(x3Dt) + tcw2.at<float>(2);
+				if (z2 <= 0)
+					continue;
+
+				//Check reprojection error in first keyframe
+				const float& sigmaSquare1 = pRefKeyframe->mvLevelSigma2[kp1.octave];
+				const float x1 = Rcw1.row(0).dot(x3Dt) + tcw1.at<float>(0);
+				const float y1 = Rcw1.row(1).dot(x3Dt) + tcw1.at<float>(1);
+				const float invz1 = 1.0 / z1;
+
+				float u1 = fx1 * x1 * invz1 + cx1;
+				float v1 = fy1 * y1 * invz1 + cy1;
+				float errX1 = u1 - kp1.pt.x;
+				float errY1 = v1 - kp1.pt.y;
+				float err1 = errX1 * errX1 + errY1 * errY1;
+				/*if ((errX1 * errX1 + errY1 * errY1) > 5.991 * sigmaSquare1)
+					continue;*/
+
+				//Check reprojection error in second keyframe
+				const float sigmaSquare2 = pCurKeyframe->mvLevelSigma2[kp2.octave];
+				const float x2 = Rcw2.row(0).dot(x3Dt) + tcw2.at<float>(0);
+				const float y2 = Rcw2.row(1).dot(x3Dt) + tcw2.at<float>(1);
+				const float invz2 = 1.0 / z2;
+				float u2 = fx2 * x2 * invz2 + cx2;
+				float v2 = fy2 * y2 * invz2 + cy2;
+				float errX2 = u2 - kp2.pt.x;
+				float errY2 = v2 - kp2.pt.y;
+				float err2 = (errX2 * errX2 + errY2 * errY2);
+				/*if ((errX2 * errX2 + errY2 * errY2) > 5.991 * sigmaSquare2)
+					continue;*/
+				//std::cout << err1 << " " << err2 << std::endl;
+
+				if (err1 > 4.0 || err2 > 4.0)
+					continue;
+
+				//Check scale consistency
+				cv::Mat normal1 = x3D - Ow1;
+				float dist1 = cv::norm(normal1);
+
+				cv::Mat normal2 = x3D - Ow2;
+				float dist2 = cv::norm(normal2);
+
+				if (dist1 == 0 || dist2 == 0)
+					continue;
+				
+				vecInliers[ikp] = true;
+				vecMPs[ikp] = x3D.clone();
+				//// Triangulation is succesfull
+				MapPoint* pMP = new MapPoint(x3D, pCurKeyframe, pMap, ts);
+				pRefKeyframe->AddMapPoint(pMP, idx1);
+				pCurKeyframe->AddMapPoint(pMP, idx2);
+				pMP->AddObservation(pRefKeyframe, idx1);
+				pMP->AddObservation(pCurKeyframe, idx2);
+				pMP->ComputeDistinctiveDescriptors();
+				pMP->UpdateNormalAndDepth();
+				pCur->mvpMapPoints[idx2] = pMP;
+				pCur->mvbOutliers[idx2] = false;
+				pMap->AddMapPoint(pMP);
+				nMap++;
+			}//for
+
+			pRefKeyframe->UpdateConnections();
+			pCurKeyframe->UpdateConnections();
+
+			if (nMap < 100) {
+				//pMap->Delete();
+				std::cout << "Map Init fail = " << nMap << std::endl;
+				return MapState::NotInitialized;
+			}
+
+			
+			mpInitKeyFrame1 = pRefKeyframe;
+			mpInitKeyFrame2 = pCurKeyframe;
+			std::cout << "Map Initialization Success = " << nMap << std::endl;
+			return MapState::Initialized;
+		}
+		else {
+			//pMap->Delete();
+			return MapState::NotInitialized;
+		}
+	}
+
 	MapState Initializer::Initialize(Frame* pCur, Map* pMap){
 		
 		if (mpRef) {
@@ -58,7 +269,6 @@ namespace EdgeSLAM {
 		//ts
 		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 		long long ts = start.time_since_epoch().count();
-
 
 		//std::cout << "Map = " << nTriangulatedPoints <<", "<<pts1.size()<<" "<<idx1.size()<<", "<<Map3D.cols<<" "<<vFInliers.size()<< std::endl;
 		if (nTriangulatedPoints > mnMinTriangulatedPoints) {
