@@ -12,18 +12,22 @@
 #include <Visualizer.h>
 #include <Segmentator.h>
 #include <SearchPoints.h>
+#include <ObjectFrame.h>
 #include <Converter.h>
 #include <io.h>
 #include <direct.h>
 
 namespace EdgeSLAM {
+
 	SLAM::SLAM():pool(){
 	
 	}
 	SLAM::SLAM(ThreadPool::ThreadPool* _pool):pool(_pool){
 		Init();
 	}
-	SLAM::~SLAM(){}
+	SLAM::~SLAM(){
+		GraphMapPointAndBoundingBox.Release();
+	}
 	FeatureDetector* Frame::Detector;
 	FeatureDetector* Segmentator::Detector;
 	FeatureTracker* Segmentator::Matcher;
@@ -38,7 +42,7 @@ namespace EdgeSLAM {
 		LoadVocabulary();
 		
 		////이거 수정 필요
-		//LoadProcessingTime();
+		LoadProcessingTime();
 
 		Segmentator::Init();
 		
@@ -72,8 +76,8 @@ namespace EdgeSLAM {
 		pool->EnqueueJob(Tracker::TrackWithKnownPose, pool, this, id, user, ts);
 	}
 
-	void SLAM::Track(int id, std::string user, double ts) {
-		pool->EnqueueJob(Tracker::Track, pool, this, id, user, ts);
+	void SLAM::Track(int id, std::string user, const cv::Mat& img, double ts) {
+		//Tracker::Track(pool, this, id, user, img, ts);
 	}
 	
 	void SLAM::InitVisualizer(std::string user, std::string name, int w, int h) {
@@ -346,6 +350,20 @@ namespace EdgeSLAM {
 		{
 			std::ofstream file;
 			std::stringstream ss;
+			ss << "../bin/time/raw_timestamp.txt";
+			file.open(ss.str());
+			ss.str("");
+			auto vecDatas = EvaluationLatency.get();
+			for (int i = 0, N = vecDatas.size(); i < N; i++) {
+				ss << vecDatas[i];
+			}
+			file.write(ss.str().c_str(), ss.str().size());
+			file.close();
+		}
+		return;
+		{
+			std::ofstream file;
+			std::stringstream ss;
 			ss << "../bin/time/processtime.txt";
 			file.open(ss.str());
 			ss.str("");
@@ -479,7 +497,7 @@ namespace EdgeSLAM {
 			std::string s;
 
 			std::map<int, ProcessTime*> vec1;
-			for (int i = 1; i < 9; i++)
+			for (int i = 1; i < 21; i++)
 			{
 				auto p = new ProcessTime();
 				getline(file, s);
@@ -509,7 +527,7 @@ namespace EdgeSLAM {
 			ProcessingTime.Update("reloc", vec3);
 
 			std::map<int, ProcessTime*> vec4;
-			for (int i = 1; i < 9; i++)
+			for (int i = 1; i < 21; i++)
 			{
 				auto p = new ProcessTime();
 				getline(file, s);
@@ -519,7 +537,7 @@ namespace EdgeSLAM {
 			ProcessingTime.Update("download", vec4);
 
 			std::map<int, ProcessTime*> vec5;
-			for (int i = 1; i < 9; i++)
+			for (int i = 1; i < 21; i++)
 			{
 				auto p = new ProcessTime();
 				getline(file, s);

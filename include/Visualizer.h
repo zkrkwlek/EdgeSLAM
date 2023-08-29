@@ -45,6 +45,7 @@ namespace EdgeSLAM {
 		cv::Point2f mVisMidPt, mVisPrevPt;
 		cv::Size mSizeOutputImg;
 	private:
+		cv::Point2f ConvertVisPt(cv::Mat T, cv::Mat x3D);
 		std::vector<cv::Mat> mvOutputImgs;
 		std::vector<cv::Rect> mvRects;
 		cv::Mat mOutputImage;

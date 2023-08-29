@@ -615,8 +615,8 @@ namespace EdgeSLAM {
 		//auto KF = pUser->mapKeyFrames[F->mnKeyFrameId];
 		/*cv::Mat resized_test;
 		cv::resize(segcolor, resized_test, cv::Size(segcolor.cols / 2, segcolor.rows / 2));*/
-		system->mpVisualizer->ResizeImage(segcolor, segcolor);
-		system->mpVisualizer->SetOutputImage(segcolor, 1);
+		//system->mpVisualizer->ResizeImage(segcolor, segcolor);
+		//system->mpVisualizer->SetOutputImage(segcolor, 1);
 
 		////save image
 		/*std::stringstream ssa;
@@ -777,7 +777,7 @@ namespace EdgeSLAM {
 			cv::Mat depth;
 			cv::normalize(depthsrc, depth, 0, 255, cv::NORM_MINMAX, CV_8UC1);
 			cv::cvtColor(depth, depth, cv::COLOR_GRAY2BGR);
-			system->VisualizeImage(depth, 0);
+			//system->VisualizeImage(depth, 0);
 		}
 
 		//std::cout << depthsrc.type() << ", " <<depthsrc.size()<<" "<< depthsrc.channels()<<" "<<w<<" "<<h << std::endl;

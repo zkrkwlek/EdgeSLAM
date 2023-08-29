@@ -13,12 +13,14 @@ namespace EdgeSLAM {
 	class KeyFrame;
 	class MapPoint;
 	class TrackPoint;
+	class ObjectNode;
+	class ObjectBoundingBox;
 	class FeatureTracker;
 	class SearchPoints {
 	public:
 		static FeatureTracker* Matcher;
 		static const int HISTO_LENGTH;
-		static int SearchObject(cv::Mat obj, DBoW3::FeatureVector fvec, Frame* curr, std::vector<std::pair<int, int>>& matches, float thMaxDesc, float thMinDesc, float thProjection, bool bCheckOri);
+		//박스와 박스, 박스와 프레임 매칭 가능함.
 		static int SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint*> &vpMatches12, const float &s12, const cv::Mat &R12, const cv::Mat &t12, float thRadius = 7.5);
 		static int SearchKeyFrameByBoW(KeyFrame* pKF1, KeyFrame *pKF2, std::vector<MapPoint*> &vpMapPointMatches, float thMatchRatio, bool bCheckOri = true);
 		static int SearchFrameByBoW(KeyFrame* pKF, Frame *F, std::vector<MapPoint*> &vpMapPointMatches, float thMinDesc, float thMatchRatio, bool bCheckOri = true);

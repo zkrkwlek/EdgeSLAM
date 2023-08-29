@@ -108,13 +108,16 @@ namespace EdgeSLAM {
 					delete pKF;
 				}
 			}
+			
+			mspMapPoints.clear();
+			mmpKeyFrames.clear();
 
 			mvpKeyFrameOrigins.clear();
 			mnNextKeyFrameID = 0;
 			mnNextMapPointID = 0;
 			mlpNewMPs.clear();
 			mState = MapState::NoImages;
-
+			
 			//add variable
 		}
 	}

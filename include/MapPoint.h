@@ -14,6 +14,11 @@ namespace EdgeSLAM {
 	class Map;
 	class FeatureTracker;
 	class User;
+
+	class ObjectNode;
+	class ObjectBoundingBox;
+	class ObjectMapPoint;
+
 	class TrackPoint {
 	public:
 		TrackPoint();
@@ -78,16 +83,20 @@ namespace EdgeSLAM {
 		int PredictScale(const float &currentDist, Frame* pF);
 
 		ConcurrentSet<User*> mSetConnected;
-
+		//ConcurrentSet<ObjectBoundingBox*> mspBBs;
+		//ObjectNode* mpObjectNode;
 	public:
 		int mnId;
 		int mnFirstKFid;
 		int mnFirstFrame;
 		int nObs;
+		std::atomic<int> mnObjectID;
 		std::atomic<int> mnLabelID;
 		std::atomic<int> mnPlaneID;
 		std::atomic<int> mnPlaneCount;
 		std::atomic<long long> mnLastUpdatedTime;
+
+		ObjectMapPoint* mpObjectPoint;
 
 		// Variables used by the tracking
 		/*float mTrackProjX;

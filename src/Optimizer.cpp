@@ -5,6 +5,7 @@
 #include <MapPoint.h>
 #include <Converter.h>
 #include <LoopCloser.h>
+#include <ObjectFrame.h>
 
 #include "g2o/core/block_solver.h"
 #include "g2o/core/optimization_algorithm_levenberg.h"
@@ -178,7 +179,7 @@ namespace EdgeSLAM {
 		}
 
 	}
-
+	
 	int Optimizer::PoseOptimization(Frame *pFrame)
 	{
 		g2o::SparseOptimizer optimizer;
@@ -218,6 +219,12 @@ namespace EdgeSLAM {
 				MapPoint* pMP = pFrame->mvpMapPoints[i];
 				if (pMP)
 				{
+					////다이나믹 오브젝트는 포함 안함
+					//if (pMP->mnObjectID == 1 || pMP->mnObjectID == 57){
+					//	pFrame->mvbOutliers[i] = true;
+					//	continue;
+					//}
+
 					nInitialCorrespondences++;
 					pFrame->mvbOutliers[i] = false;
 
@@ -341,12 +348,15 @@ namespace EdgeSLAM {
 			{
 				MapPoint* pMP = *vit;
 				if (pMP)
-					if (!pMP->isBad())
+					if (!pMP->isBad()) {
+						/*if (pMP->mnObjectID == 1 || pMP->mnObjectID == 57)
+							continue;*/
 						if (pMP->mnBALocalForKF != pKF->mnId)
 						{
 							lLocalMapPoints.push_back(pMP);
 							pMP->mnBALocalForKF = pKF->mnId;
 						}
+					}
 			}
 		}
 

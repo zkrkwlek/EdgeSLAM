@@ -73,6 +73,12 @@ namespace EdgeSLAM {
 		KeyFrames.Release();
 		ImageDatas.Release();
 		QueueNotiMsg.Release();
+		PoseDatas.Release();
+		auto tempTrackingResults = mapObjectTrackingResult.Get();
+		for (auto mit = tempTrackingResults.begin(), mend = tempTrackingResults.end(); mit != mend; mit++)
+			delete mit->second;
+		
+		mapObjectTrackingResult.Release();
 		//delete mapFrames;
 	}
 

@@ -8,11 +8,12 @@
 #include <ThreadPool.h>
 #include <Evaluation.h>
 #include <ConcurrentMap.h>
+#include <ConcurrentSet.h>
+#include <ConcurrentVector.h>
 #include <atomic>
 //#include <ORBVocabulary.h>
 
 namespace EdgeSLAM {
-
 	class Initializer;
 	class Tracker;
 	class FeatureTracker;
@@ -21,6 +22,10 @@ namespace EdgeSLAM {
 	class User;
 	class Map;
 	class Visualizer;
+
+	class MapPoint;
+	class ObjectBoundingBox;
+	class ObjectNode;
 	class SLAM {
 	public:
 		SLAM();
@@ -29,7 +34,7 @@ namespace EdgeSLAM {
 	public:
 		void Init();
 		void TrackOXR(int id, std::string user, double ts = 0.0);
-		void Track(int id, std::string user, double ts = 0.0);
+		void Track(int id, std::string user, const cv::Mat& img, double ts = 0.0);
 		void LoadVocabulary();
 		void InitVisualizer(std::string user,std::string name, int w, int h);
 		void ProcessContentGeneration(std::string user, int id);
@@ -74,6 +79,9 @@ namespace EdgeSLAM {
 		ConcurrentMap<std::string, int> MapQuality;
 		ConcurrentMap<std::string, std::vector<cv::Mat>> TemporalDatas;
 		ConcurrentMap<std::string, std::map<int, cv::Mat>> TemporalDatas2;
+		ConcurrentSet<ObjectNode*> GlobalObjectMap;
+		////로우 데이터 기록용
+		ConcurrentVector<std::string>  EvaluationLatency;
 
 	private:
 		/*std::mutex mMutexUserList, mMutexMapList;
@@ -88,7 +96,12 @@ namespace EdgeSLAM {
 		std::mutex mMutexVisID;
 		int mnVisID;
 		std::map<User*, int> mapVisID;
-
+	
+	////Object Graph
+	public:
+		ConcurrentMap<EdgeSLAM::MapPoint*, std::set<EdgeSLAM::ObjectBoundingBox*>> GraphMapPointAndBoundingBox;
+		ConcurrentMap<EdgeSLAM::MapPoint*, std::set<EdgeSLAM::ObjectNode*>> GraphMapPointAndObjectNode;
+		ConcurrentMap<ObjectBoundingBox*, ObjectNode*> GraphBBoxAndObjectNode;
 	//////Save Data
 	public:
 		ConcurrentMap<std::string, std::map<int, ProcessTime*>> ProcessingTime;

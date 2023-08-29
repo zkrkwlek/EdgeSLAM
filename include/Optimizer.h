@@ -19,6 +19,8 @@ namespace EdgeSLAM {
 	class Frame;
 	class KeyFrame;
 	class Map;
+	class ObjectNode;
+	class ObjectBoundingBox;
 
 	class Optimizer {
 	public:
@@ -29,6 +31,7 @@ namespace EdgeSLAM {
 			const unsigned long nLoopKF = 0, const bool bRobust = true);
 		void static LocalBundleAdjustment(KeyFrame* pKF, bool *pbStopFlag, Map *pMap, long long ts);
 		int static PoseOptimization(Frame* pFrame);
+
 		int static OptimizeSim3(KeyFrame* pKF1, KeyFrame* pKF2, std::vector<MapPoint *> &vpMatches1,
 			g2o::Sim3 &g2oS12, const float th2, const bool bFixScale);
 		void static OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* pCurKF,

@@ -423,7 +423,7 @@ namespace EdgeSLAM {
 					continue;
 				//map->AddPlanarMP(x3D, 1);
 				//// Triangulation is succesfull
-				MapPoint* pMP = new MapPoint(x3D, targetKF, map);
+				/*MapPoint* pMP = new MapPoint(x3D, targetKF, map);
 
 				pMP->AddObservation(targetKF, idx1);
 				pMP->AddObservation(pKF2, idx2);
@@ -436,7 +436,7 @@ namespace EdgeSLAM {
 				pMP->UpdateNormalAndDepth();
 
 				map->AddMapPoint(pMP);
-				map->mlpNewMPs.push_back(pMP);
+				map->mlpNewMPs.push_back(pMP);*/
 			}
 		}
 	}

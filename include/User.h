@@ -24,6 +24,7 @@ namespace EdgeSLAM {
 	class CameraPose;
 	class Map;
 	class MapPoint;
+	class ObjectTrackingResult;
 
 	class User {
 	public:
@@ -49,6 +50,7 @@ namespace EdgeSLAM {
 		ConcurrentVector<cv::Mat> mvDeviceTrajectories;
 		ConcurrentVector<double> mvDeviceTimeStamps;
 		ConcurrentMap<int, KeyFrame*> KeyFrames; //Frame과 키프레임 연결
+		ConcurrentMap<int, ObjectTrackingResult*> mapObjectTrackingResult;
 
 		cv::Mat GetDevicePose();
 		void SetDevicePose(cv::Mat T);

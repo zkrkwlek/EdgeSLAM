@@ -39,8 +39,7 @@ namespace EdgeSLAM {
 		{
 			pMapper->KeyFrameCulling(map, targetKF);
 		}
-
-		//pool->EnqueueJob(LoopCloser::ProcessLoopClosing, system, map, targetKF);
+		system->mpLoopCloser->DetectLoop(system, map, targetKF);
 		map->mnNumMappingFrames--;
 	}
 
@@ -88,8 +87,8 @@ namespace EdgeSLAM {
 		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		float t_test1 = du_test1 / 1000.0;
 		int N = system->GetConnectedDevice();
-		if(N > 0)
-			system->ProcessingTime.Get("mapping")[N]->add(t_test1);
+		//if(N > 0)
+			//system->ProcessingTime.Get("mapping")[N]->add(t_test1);
 	}
 	
 	void LocalMapper::SendLocalMap(SLAM* system, KeyFrame* targetKF, long long ts) {
@@ -246,11 +245,11 @@ namespace EdgeSLAM {
 						pMP->UpdateNormalAndDepth();
 						pMP->ComputeDistinctiveDescriptors();
 					}
-					else 
-					{
-						// this can only happen for new stereo points inserted by the Tracking
-						map->mlpNewMPs.push_back(pMP);
-					}
+					//else 
+					//{
+					//	// this can only happen for new stereo points inserted by the Tracking
+					//	map->mlpNewMPs.push_back(pMP);
+					//}
 				}
 			}
 		}
@@ -485,6 +484,7 @@ namespace EdgeSLAM {
 				nnew++;
 			}
 		}
+		//std::cout << "OXR = New MPs = " << nnew << std::endl;
 	}
 
 	void LocalMapper::SearchInNeighbors(Map* map, KeyFrame* targetKF)
