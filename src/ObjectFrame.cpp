@@ -3,6 +3,8 @@
 #include <FeatureTracker.h>
 #include <KeyFrame.h>
 #include <Frame.h>
+#include <KalmanFilter.h>
+#include <CameraPose.h>
 //#include <ConcurrentMap.h>
 //#include <MapPoint.h>
 
@@ -203,7 +205,12 @@ namespace EdgeSLAM {
 	}
 	*/
 
-	ObjectNode::ObjectNode():mnId(++nNextObjNodeID), origin(cv::Mat::zeros(3, 1, CV_32FC1)),radius(0.0), desc(cv::Mat::zeros(0, 32, CV_8UC1)), matWorldPose(cv::Mat::eye(4, 4, CV_32FC1)), matObjPose(cv::Mat::eye(4, 4, CV_32FC1)) {
+	ObjectNode::ObjectNode():Node(),mnId(++nNextObjNodeID), origin(cv::Mat::zeros(3, 1, CV_32FC1)),radius(0.0), desc(cv::Mat::zeros(0, 32, CV_8UC1)), matWorldPose(cv::Mat::eye(4, 4, CV_32FC1)), matObjPose(cv::Mat::eye(4, 4, CV_32FC1)) {
+		int nStates = 18;            // the number of states
+		int nMeasurements = 6;       // the number of measured states
+		int nInputs = 0;             // the number of control actions
+		double dt = 0.125;           // time between measurements (1/FPS)
+		mpKalmanFilter = new KalmanFilter(nStates, nMeasurements, nInputs, dt);
 	}
 	ObjectNode::~ObjectNode() {
 		origin.release();
@@ -253,10 +260,50 @@ namespace EdgeSLAM {
 		return matObjPose.clone();
 	}
 
+	void ObjectNode::UpdateOrigin(std::vector<MapPoint*>& vecMPs) {
+		cv::Mat newOrigin = cv::Mat::zeros(3, 1, CV_32FC1);
+		float newRadius = 0.0;
+		float newx = 0.0;
+		float newy = 0.0;
+		float newz = 0.0;
+
+		int N = 0;
+		for (int i = 0, iend = vecMPs.size(); i < iend; i++) {
+			auto pOP = vecMPs[i];
+			if (pOP && !pOP->isBad()) {
+				N++;
+				newOrigin += pOP->GetWorldPos();
+			}
+		}
+		newOrigin /= N;
+		for (int i = 0, iend = vecMPs.size(); i < iend; i++) {
+			auto pOP = vecMPs[i];
+			if (pOP && !pOP->isBad()) {
+				cv::Mat temp = pOP->GetWorldPos() - newOrigin;
+				cv::Point3f pt(temp);
+				//newRadius+=sqrt(temp.dot(temp));
+				newx += abs(pt.x);
+				newy += abs(pt.y);
+				newz += abs(pt.z);
+			}
+		}
+		{
+			std::unique_lock<std::mutex> lock(mMutexOrigin);
+			origin = newOrigin.clone();
+			//radius = newRadius/N*0.8;
+			radius_x = newx / N * 1.1;
+			radius_y = newy / N * 1.1;
+			radius_z = newz / N * 1.1;
+		}
+	}
+
 	void ObjectNode::UpdateOrigin(){
 
 		cv::Mat newOrigin = cv::Mat::zeros(3,1,CV_32FC1);
 		float newRadius = 0.0;
+		float newx = 0.0;
+		float newy = 0.0;
+		float newz = 0.0;
 
 		auto vecMPs = mspMPs.ConvertVector();
 		int N = 0;
@@ -272,14 +319,20 @@ namespace EdgeSLAM {
 			auto pOP = vecMPs[i];
 			if(pOP && !pOP->isBad()){
 				cv::Mat temp = pOP->GetWorldPos() - newOrigin;
-				newRadius+=sqrt(temp.dot(temp));
+				cv::Point3f pt(temp);
+				//newRadius+=sqrt(temp.dot(temp));
+				newx += abs(pt.x);
+				newy += abs(pt.y);
+				newz += abs(pt.z);
 			}
 		}
-
 		{
 			std::unique_lock<std::mutex> lock(mMutexOrigin);
 			origin = newOrigin.clone();
-			radius = newRadius/N;
+			//radius = newRadius/N*0.8;
+			radius_x = newx / N * 1.1;
+			radius_y = newy / N * 1.1;
+			radius_z = newz / N * 1.1;
 		}
 	}
 	cv::Mat ObjectNode::GetOrigin(){
@@ -316,7 +369,7 @@ namespace EdgeSLAM {
 	}*/
 	ObjectBoundingBox::ObjectBoundingBox(Frame* _pF, int _label, float _conf, cv::Point2f pt1, cv::Point2f pt2): 
 		id(++nNextBBoxID), mpKF(nullptr), mpF(_pF), label(_label), confidence(_conf), rect(cv::Rect(pt1, pt2)),
-		desc(cv::Mat::zeros(0, 32, CV_8UC1)), mpNode(nullptr),
+		desc(cv::Mat::zeros(0, 32, CV_8UC1)), mpNode(nullptr), Pose(new CameraPose()),
 		fx(_pF->fx), fy(_pF->fy), cx(_pF->cx), cy(_pF->cy),
 		mnScaleLevels(_pF->mnScaleLevels), mfScaleFactor(_pF->mfScaleFactor),
 		mfLogScaleFactor(_pF->mfLogScaleFactor), mvScaleFactors(_pF->mvScaleFactors),
@@ -330,7 +383,7 @@ namespace EdgeSLAM {
 	}
 	ObjectBoundingBox::ObjectBoundingBox(KeyFrame* _pKF, int _label, float _conf, cv::Point2f pt1, cv::Point2f pt2):
 		id(++nNextBBoxID), mpKF(_pKF), mpF(nullptr),label(_label), confidence(_conf), rect(cv::Rect(pt1, pt2)),
-		desc(cv::Mat::zeros(0,32,CV_8UC1)), mpNode(nullptr),
+		desc(cv::Mat::zeros(0,32,CV_8UC1)), mpNode(nullptr), Pose(new CameraPose()),
 		fx(_pKF->fx), fy(_pKF->fy), cx(_pKF->cx), cy(_pKF->cy),
 		mnScaleLevels(_pKF->mnScaleLevels), mfScaleFactor(_pKF->mfScaleFactor),
 		mfLogScaleFactor(_pKF->mfLogScaleFactor), mvScaleFactors(_pKF->mvScaleFactors), 
@@ -342,7 +395,9 @@ namespace EdgeSLAM {
 		K.at<float>(0, 2) = cx;
 		K.at<float>(1, 2) = cy;
 	}
-	ObjectBoundingBox::~ObjectBoundingBox(){}
+	ObjectBoundingBox::~ObjectBoundingBox(){
+		delete Pose;
+	}
 
 	void ObjectBoundingBox::ComputeBow(DBoW3::Vocabulary* voc) {
 		std::vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(desc);

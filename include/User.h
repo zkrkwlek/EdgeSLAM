@@ -11,11 +11,13 @@
 #include <ConcurrentDeque.h>
 #include <NotificationMessage.h>
 
+class KalmanFilter;
 namespace EdgeSLAM {
 
 	enum class UserState {
 		NoImages, NotEstimated, Success, Failed
 	};
+	
 	class MotionModel;
 	class Frame;
 	class KeyFrame;
@@ -59,6 +61,8 @@ namespace EdgeSLAM {
 
 		////////////////
 	public:
+		ConcurrentMap<int, cv::Mat> MapServerTrajectories;
+		ConcurrentMap<int, cv::Mat> MapDeviceTrajectories;
 		std::string userName;
 		std::string mapName;
 		int mnQuality;
@@ -79,6 +83,7 @@ namespace EdgeSLAM {
 		////frame id와 키프레임 id의 대응이 필요함.
 		//std::map<int, KeyFrame*> mapKeyFrames;
 		KeyFrame* mpRefKF;
+		std::atomic<float> ScaleFactor;
 		std::atomic<bool> mbProgress, mbRemoved;
 		std::atomic<int> mnUsed, mnLastKeyFrameID, mnPrevFrameID, mnCurrFrameID, mnLastRelocFrameId;
 		std::atomic<int> mnDebugTrack, mnDebugSeg, mnDebugAR, mnDebugLabel, mnDebugPlane;
@@ -88,6 +93,7 @@ namespace EdgeSLAM {
 	public:
 		UserState GetState();
 		void SetState(UserState stat);
+		KalmanFilter* mpKalmanFilter;
 	private:
 		MotionModel* mpMotionModel;
 		UserState mState;

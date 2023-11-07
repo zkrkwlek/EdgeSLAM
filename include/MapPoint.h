@@ -6,7 +6,10 @@
 #include <opencv2/core.hpp>
 #include <mutex>
 #include <ConcurrentSet.h>
+#include <ConcurrentMap.h>
 #include <atomic>
+
+class Confidence;
 
 namespace EdgeSLAM {
 	class KeyFrame;
@@ -15,6 +18,7 @@ namespace EdgeSLAM {
 	class FeatureTracker;
 	class User;
 
+	class SemanticLabel;
 	class ObjectNode;
 	class ObjectBoundingBox;
 	class ObjectMapPoint;
@@ -49,14 +53,21 @@ namespace EdgeSLAM {
 		cv::Mat GetNormal();
 		KeyFrame* GetReferenceKeyFrame();
 
+		//MAP
 		std::map<KeyFrame*, size_t> GetObservations();
 		int Observations();
-
 		void AddObservation(KeyFrame* pKF, size_t idx);
 		void EraseObservation(KeyFrame* pKF);
-
 		int GetIndexInKeyFrame(KeyFrame* pKF);
 		bool IsInKeyFrame(KeyFrame* pKF);
+		//BOX
+		
+		int BoxObservations();
+		void AddBoxObservation(ObjectBoundingBox* pBB, size_t idx);
+		void EraseBoxObservation(ObjectBoundingBox* pBB);
+		std::map<ObjectBoundingBox*, size_t> GetBoxObservations();
+		int GetIndexInBox(ObjectBoundingBox* pBox);
+		bool IsInBox(ObjectBoundingBox* pKF);
 
 		void SetBadFlag();
 		bool isBad();
@@ -90,13 +101,16 @@ namespace EdgeSLAM {
 		int mnFirstKFid;
 		int mnFirstFrame;
 		int nObs;
+		std::atomic<int> nBoxObs;
 		std::atomic<int> mnObjectID;
 		std::atomic<int> mnLabelID;
 		std::atomic<int> mnPlaneID;
 		std::atomic<int> mnPlaneCount;
 		std::atomic<long long> mnLastUpdatedTime;
 
+		SemanticLabel* mpSemanticLabel;
 		ObjectMapPoint* mpObjectPoint;
+		Confidence* mpConfidence;
 
 		// Variables used by the tracking
 		/*float mTrackProjX;
@@ -128,6 +142,7 @@ namespace EdgeSLAM {
 
 		// Keyframes observing the point and associated index in keyframe
 		std::map<KeyFrame*, size_t> mObservations;
+		ConcurrentMap<ObjectBoundingBox*, size_t> mBoxObservations;
 
 		// Mean viewing direction
 		cv::Mat mNormalVector;

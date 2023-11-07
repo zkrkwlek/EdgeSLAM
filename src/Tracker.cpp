@@ -21,6 +21,7 @@
 #include <WebAPI.h>
 #include <Converter.h>
 #include <Utils.h>
+#include <KalmanFilter.h>
 
 #include <chrono>
 namespace EdgeSLAM{
@@ -662,63 +663,7 @@ namespace EdgeSLAM{
 				trackState = UserState::Success;
 			
 			cv::Mat T = frame->GetPose().clone();
-			{
-				////data
-				cv::Mat data = cv::Mat::zeros(13, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
-
-				int nDataIdx = 1;
-				data.at<float>(nDataIdx++) = T.at<float>(0, 0);
-				data.at<float>(nDataIdx++) = T.at<float>(0, 1);
-				data.at<float>(nDataIdx++) = T.at<float>(0, 2);
-				data.at<float>(nDataIdx++) = T.at<float>(1, 0);
-				data.at<float>(nDataIdx++) = T.at<float>(1, 1);
-				data.at<float>(nDataIdx++) = T.at<float>(1, 2);
-				data.at<float>(nDataIdx++) = T.at<float>(2, 0);
-				data.at<float>(nDataIdx++) = T.at<float>(2, 1);
-				data.at<float>(nDataIdx++) = T.at<float>(2, 2);
-				data.at<float>(nDataIdx++) = T.at<float>(0, 3);
-				data.at<float>(nDataIdx++) = T.at<float>(1, 3);
-				data.at<float>(nDataIdx++) = T.at<float>(2, 3);
-
-				if (nInliers > 0) {
-					int nres = 0;
-					for (int i = 0; i < frame->N; i++)
-					{
-						if (frame->mvpMapPoints[i])
-						{
-							if (!frame->mvbOutliers[i] && !frame->mvpMapPoints[i]->isBad())
-							{
-								int nDataIdx = 0;
-								auto kp = frame->mvKeys[i];
-								auto mp = frame->mvpMapPoints[i]->GetWorldPos();
-								int octave = kp.octave;
-								cv::Mat temp = cv::Mat::zeros(9, 1, CV_32FC1);
-								temp.at<float>(nDataIdx++) = kp.pt.x;
-								temp.at<float>(nDataIdx++) = kp.pt.y;
-								temp.at<float>(nDataIdx++) = (float)kp.octave;
-								temp.at<float>(nDataIdx++) = kp.angle;
-								temp.at<float>(nDataIdx++) = (float)frame->mvpMapPoints[i]->mnId;
-								temp.at<float>(nDataIdx++) = frame->mvpMapPoints[i]->mnPlaneID;// label or plane
-								temp.at<float>(nDataIdx++) = mp.at<float>(0);
-								temp.at<float>(nDataIdx++) = mp.at<float>(1);
-								temp.at<float>(nDataIdx++) = mp.at<float>(2);
-								data.push_back(temp);
-								nres++;
-							}
-						}
-					}
-					data.at<float>(0) = (float)nres;
-				}
-				else {
-					for (int i = 0; i < 500; i++) {
-						cv::Mat temp = cv::Mat::ones(9, 1, CV_32FC1);
-						data.push_back(temp);
-					}
-					data.at<float>(0) = 0.0;
-				}
-				//pool->EnqueueJob(Tracker::SendDeviceTrackingData, system, pUser->userName, data, id, ts);
-			}
-
+			
 			/*if (pUser->mbBaseLocalMap && pUser->mpRefKF) {
 				pool->EnqueueJob(Tracker::SendLocalMap, system, user, id);
 			}*/
@@ -735,8 +680,16 @@ namespace EdgeSLAM{
 			
 			//pose update
 			cv::Mat T = frame->GetPose();
+			cv::Mat R = T.rowRange(0, 3).colRange(0, 3);
+			cv::Mat t = T.rowRange(0, 3).col(3);
+			R.convertTo(R, CV_64FC1);
+			t.convertTo(t, CV_64FC1);
+			pUser->mpKalmanFilter->fillMeasurements(t,R);
+			pUser->mpKalmanFilter->updateKalmanFilter(t,R);
 			pUser->UpdatePose(T, ts);
 			pUser->PoseDatas.Update(id, T);
+
+			pUser->MapServerTrajectories.Update(id, T.inv());
 			//check keyframe
 			if (pUser->mbMapping && pUser->mpRefKF) {
 				if (Tracker::NeedNewKeyFrame(map, system->mpLocalMapper, frame, pUser->mpRefKF, nInliers, pUser->mnLastKeyFrameID.load(), pUser->mnLastRelocFrameId.load())) {
@@ -810,35 +763,35 @@ namespace EdgeSLAM{
 		////데이터 측정 코드
 
 		////visualization
-		if (mapState == MapState::Initialized  && pUser->GetVisID() <= 3 && userState != UserState::NotEstimated) {
+		//if (mapState == MapState::Initialized  && pUser->GetVisID() <= 3 && userState != UserState::NotEstimated) {
 
-			cv::Mat R = frame->GetRotation();
-			cv::Mat t = frame->GetTranslation();
-			cv::Mat K = pUser->GetCameraMatrix();
+		//	cv::Mat R = frame->GetRotation();
+		//	cv::Mat t = frame->GetTranslation();
+		//	cv::Mat K = pUser->GetCameraMatrix();
 
-			cv::Scalar color = Segmentator::mvObjectLabelColors[pUser->GetVisID()+1];
+		//	cv::Scalar color = Segmentator::mvObjectLabelColors[pUser->GetVisID()+1];
 
-			for (int i = 0; i < frame->mvKeys.size(); i++) {
-				auto pMP = frame->mvpMapPoints[i];
-				//cv::Scalar color = cv::Scalar(255, 0, 255);
-				int r = 2;
-				if (pMP && !pMP->isBad())
-				{
-					cv::circle(img, frame->mvKeys[i].pt, r, color, -1);
+		//	for (int i = 0; i < frame->mvKeys.size(); i++) {
+		//		auto pMP = frame->mvpMapPoints[i];
+		//		//cv::Scalar color = cv::Scalar(255, 0, 255);
+		//		int r = 2;
+		//		if (pMP && !pMP->isBad())
+		//		{
+		//			cv::circle(img, frame->mvKeys[i].pt, r, color, -1);
 
-					cv::Mat x3D = pMP->GetWorldPos();	
-					cv::Mat proj= K*(R*x3D + t);
-					float d = proj.at<float>(2);
-					cv::Point2f pt(proj.at<float>(0) / d, proj.at<float>(1) / d);
-					if(pMP->mnObjectID == 100)
-						cv::circle(img, pt, r+3, cv::Scalar(255, 255, 0));
-					else
-						cv::circle(img, pt, r, cv::Scalar(255,0,255), -1);
-				}
-			}
+		//			cv::Mat x3D = pMP->GetWorldPos();	
+		//			cv::Mat proj= K*(R*x3D + t);
+		//			float d = proj.at<float>(2);
+		//			cv::Point2f pt(proj.at<float>(0) / d, proj.at<float>(1) / d);
+		//			if(pMP->mnObjectID == 100)
+		//				cv::circle(img, pt, r+3, cv::Scalar(255, 255, 0));
+		//			else
+		//				cv::circle(img, pt, r, cv::Scalar(255,0,255), -1);
+		//		}
+		//	}
 
-			system->VisualizeImage(pUser->mapName, img, pUser->GetVisID()+4); 
-		}
+		//	system->VisualizeImage(pUser->mapName, img, pUser->GetVisID()+4); 
+		//}
 		pUser->mnDebugTrack--;
 		pUser->mnUsed--;
 		////visualization

@@ -26,6 +26,8 @@ namespace EdgeSLAM {
 	class MapPoint;
 	class ObjectBoundingBox;
 	class ObjectNode;
+	class Node;
+
 	class SLAM {
 	public:
 		SLAM();
@@ -80,6 +82,7 @@ namespace EdgeSLAM {
 		ConcurrentMap<std::string, std::vector<cv::Mat>> TemporalDatas;
 		ConcurrentMap<std::string, std::map<int, cv::Mat>> TemporalDatas2;
 		ConcurrentSet<ObjectNode*> GlobalObjectMap;
+		ConcurrentMap<int, Node*> GlobalNodes;
 		////로우 데이터 기록용
 		ConcurrentVector<std::string>  EvaluationLatency;
 

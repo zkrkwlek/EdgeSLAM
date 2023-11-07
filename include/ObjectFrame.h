@@ -8,7 +8,10 @@
 #include <ConcurrentSet.h>
 #include <ConcurrentMap.h>
 #include <MapPoint.h>
+#include <Node.h>
 #include <DBoW3.h>
+
+class KalmanFilter;
 
 namespace EdgeSLAM {
 	class FeatureTracker;
@@ -19,6 +22,7 @@ namespace EdgeSLAM {
 	class ObjectNode;
 	class ObjectMapPoint;
 	class ObjectLocalMap;
+	class CameraPose;
 
 	enum class ObjectTrackingState {
 		NotEstimated, Success, Failed
@@ -93,6 +97,7 @@ namespace EdgeSLAM {
 		DBoW3::BowVector mBowVec;
 		DBoW3::FeatureVector mFeatVec;
 
+		CameraPose* Pose;
 		ObjectNode* mpNode;
 		//이 안에 디스크립터와 피쳐 쓰기?
 	public:
@@ -167,19 +172,21 @@ namespace EdgeSLAM {
 		ConcurrentMap<ObjectBoundingBox*, size_t> mObservations;
 	};
 
-	class ObjectNode {
+	class ObjectNode : Node{
 	public:
 		ObjectNode();
 		virtual ~ObjectNode();
 		int mnId;
 		int mnLabel;
 		float radius;
+		float radius_x, radius_y, radius_z;
 		cv::Mat origin;
 	public:
 		void RemoveMapPoint(ObjectMapPoint* pMP);
 	public:
-
+		KalmanFilter* mpKalmanFilter;
 		void UpdateOrigin();
+		void UpdateOrigin(std::vector<MapPoint*>& vecMPs);
 		cv::Mat GetOrigin();
 
 		void UpdateObjectPos();

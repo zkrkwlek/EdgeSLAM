@@ -5,6 +5,7 @@
 #include <User.h>
 #include <FeatureTracker.h>
 #include <ObjectFrame.h>
+#include <SemanticLabel.h>
 
 namespace EdgeSLAM {
 	std::mutex MapPoint::mGlobalMutex;
@@ -13,9 +14,9 @@ namespace EdgeSLAM {
 	TrackPoint::~TrackPoint(){}
 
 	MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF, Map* pMap, long long ts) :
-		mnFirstKFid(pRefKF->mnId), mnFirstFrame(pRefKF->mnFrameId), nObs(0), //mnTrackReferenceForFrame(0), mnLastFrameSeen(0),
+		mnFirstKFid(pRefKF->mnId), mnFirstFrame(pRefKF->mnFrameId), nObs(0), nBoxObs(0), //mnTrackReferenceForFrame(0), mnLastFrameSeen(0),
 		mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0), mnLabelID(0), mnObjectID(0), mnPlaneID(0), mnPlaneCount(0),
-		mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(pRefKF), mnVisible(1), mnFound(1), mbBad(false), mpObjectPoint(nullptr),
+		mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(pRefKF), mnVisible(1), mnFound(1), mbBad(false), mpObjectPoint(nullptr), mpConfidence(nullptr), mpSemanticLabel(nullptr),
 		mpReplaced(static_cast<MapPoint*>(NULL)), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap), mnId(++pMap->mnNextMapPointID), mnLastUpdatedTime(ts)
 	{
 		Pos.copyTo(mWorldPos);
@@ -31,7 +32,7 @@ namespace EdgeSLAM {
 	}
 
 	cv::Mat MapPoint::GetWorldPos()
-	{
+	{  
 		std::unique_lock<std::mutex> lock(mMutexPos);
 		return mWorldPos.clone();
 	}
@@ -44,7 +45,7 @@ namespace EdgeSLAM {
 
 	KeyFrame* MapPoint::GetReferenceKeyFrame()
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
+		std::unique_lock<std::mutex> lock(mMutexFeatures); 
 		return mpRefKF;
 	}
 
@@ -99,6 +100,33 @@ namespace EdgeSLAM {
 	{
 		std::unique_lock<std::mutex> lock(mMutexFeatures);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
 		return nObs;
+	}
+
+	int MapPoint::BoxObservations(){
+		return nBoxObs;
+	}
+	void MapPoint::AddBoxObservation(ObjectBoundingBox* pBB, size_t idx){
+		if (mBoxObservations.Count(pBB))
+			return;
+		mBoxObservations.Update(pBB, idx);
+		nBoxObs++;
+	}
+	void MapPoint::EraseBoxObservation(ObjectBoundingBox* pBB){
+		if (mBoxObservations.Count(pBB)) {
+			nBoxObs--;
+			mBoxObservations.Erase(pBB);
+		}
+	}
+	std::map<ObjectBoundingBox*, size_t> MapPoint::GetBoxObservations(){
+		return mBoxObservations.Get();
+	}
+	int MapPoint::GetIndexInBox(ObjectBoundingBox* pBox){
+		if (mBoxObservations.Count(pBox))
+			return mBoxObservations.Get(pBox);
+		return -1;
+	}
+	bool MapPoint::IsInBox(ObjectBoundingBox* pKF){
+		return (mBoxObservations.Count(pKF));
 	}
 
 	void MapPoint::SetBadFlag()

@@ -6,15 +6,16 @@
 #include <MotionModel.h>
 #include <MapPoint.h>
 #include <KeyFrame.h>
+#include <KalmanFilter.h>
 
 namespace EdgeSLAM {
-	User::User():mbMotionModel(false), mpRefKF(nullptr), mnVisID(0), mnUsed(0){
+	User::User():mbMotionModel(false), mpRefKF(nullptr), mnVisID(0), mnUsed(0), ScaleFactor(0.0){
 
 	}
 	User::User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, int nskip, bool _b, bool _bTracking, bool _bBaseLocalMap, bool _bimu, bool _bGBA, bool _bReset, bool _bsave, bool _bAsync) : userName(_user), mapName(_map), mbMapping(_b), mState(UserState::NotEstimated),
 		Rgyro(cv::Mat::eye(3, 3, CV_32FC1)), tacc(cv::Mat::zeros(3, 1, CV_32FC1)), mbIMU(_bimu), mbDeviceTracking(_bTracking), mbBaseLocalMap(_bBaseLocalMap), mbSaveTrajectory(_bsave), mnQuality(q), mnSkip(nskip), mbAsyncTest(_bAsync), mbPlaneGBA(_bGBA), mbResetAR(_bReset),
 		mbProgress(false), mbRemoved(false), mpRefKF(nullptr), mnUsed(0), mnLastKeyFrameID(-1), mnPrevFrameID(-1), mnCurrFrameID(-1), mnLastRelocFrameId(-1), mbMotionModel(false), mnVisID(0),
-		mnDebugTrack(0), mnDebugSeg(0), mnDebugAR(0), mnDebugLabel(0), mnDebugPlane(0), mnLastSendedTime(0)
+		mnDebugTrack(0), mnDebugSeg(0), mnDebugAR(0), mnDebugLabel(0), mnDebugPlane(0), mnLastSendedTime(0), ScaleFactor(0.0)
 	{
 		mpMotionModel = new MotionModel();
 		mpCamPose = new CameraPose();
@@ -23,13 +24,21 @@ namespace EdgeSLAM {
 		/*mpLastFrame = nullptr;
 		SetPose(cv::Mat::eye(3, 3, CV_32FC1), cv::Mat::zeros(3, 1, CV_32FC1));*/
 		mpMap = nullptr;
+
+		int nStates = 18;            // the number of states
+		int nMeasurements = 6;       // the number of measured states
+		int nInputs = 0;             // the number of control actions
+		double dt = 0.125;           // time between measurements (1/FPS)
+		mpKalmanFilter = new KalmanFilter(nStates, nMeasurements, nInputs, dt);
 	}
 	User::~User() {
 		//delete mpCamera;
 		delete mpCamPose;
 		delete mpDevicePose;
 		delete mpMotionModel;
+		delete mpKalmanFilter;
 		mpMap = nullptr;
+		
 
 		/*auto vecFrames = mapFrames.Get();
 		for (auto iter = vecFrames.begin(), iend = vecFrames.end(); iter != iend; iter++) {
