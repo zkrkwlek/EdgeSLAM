@@ -51,14 +51,9 @@ namespace EdgeSLAM {
 
 	void MapPoint::AddObservation(KeyFrame* pKF, size_t idx)
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
-		if (mObservations.count(pKF))
+		if (mObservations.Count(pKF))
 			return;
-		mObservations[pKF] = idx;
-
-		/*if (pKF->mvuRight[idx] >= 0)
-			nObs += 2;
-		else*/
+		mObservations.Update(pKF, idx);
 		nObs++;
 	}
 
@@ -66,20 +61,20 @@ namespace EdgeSLAM {
 	{
 		bool bBad = false;
 		{
-			std::unique_lock<std::mutex> lock(mMutexFeatures);
-			if (mObservations.count(pKF))
+			if (mObservations.Count(pKF))
 			{
-				int idx = mObservations[pKF];
+				int idx = mObservations.Get(pKF);
 				/*if (pKF->mvuRight[idx] >= 0)
 					nObs -= 2;
 				else*/
 				nObs--;
 
-				mObservations.erase(pKF);
+				mObservations.Erase(pKF);
 
-				if (mpRefKF == pKF)
-					mpRefKF = mObservations.begin()->first;
-
+				if (mpRefKF == pKF) {
+					auto mapObservation = mObservations.Get();
+					mpRefKF = mapObservation.begin()->first;
+				}
 				// If only 2 observations or less, discard point
 				if (nObs <= 2)
 					bBad = true;
@@ -92,8 +87,7 @@ namespace EdgeSLAM {
 
 	std::map<KeyFrame*, size_t> MapPoint::GetObservations()
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
-		return mObservations;
+		return mObservations.Get();
 	}
 
 	int MapPoint::Observations()
@@ -133,11 +127,11 @@ namespace EdgeSLAM {
 	{
 		std::map<KeyFrame*, size_t> obs;
 		{
-			std::unique_lock<std::mutex> lock1(mMutexFeatures);
+			//std::unique_lock<std::mutex> lock1(mMutexFeatures);
 			std::unique_lock<std::mutex> lock2(mMutexPos);
 			mbBad = true;
-			obs = mObservations;
-			mObservations.clear();
+			obs = mObservations.Get();
+			mObservations.Clear();
 		}
 		for (std::map<KeyFrame*, size_t>::iterator mit = obs.begin(), mend = obs.end(); mit != mend; mit++)
 		{
@@ -172,10 +166,10 @@ namespace EdgeSLAM {
 		int nvisible, nfound;
 		std::map<KeyFrame*, size_t> obs;
 		{
-			std::unique_lock<std::mutex> lock1(mMutexFeatures);
+			//std::unique_lock<std::mutex> lock1(mMutexFeatures);
 			std::unique_lock<std::mutex> lock2(mMutexPos);
-			obs = mObservations;
-			mObservations.clear();
+			obs = mObservations.Get();
+			//mObservations.clear();
 			mbBad = true;
 			nvisible = mnVisible;
 			nfound = mnFound;
@@ -237,10 +231,10 @@ namespace EdgeSLAM {
 		std::map<KeyFrame*, size_t> observations;
 
 		{
-			std::unique_lock<std::mutex> lock(mMutexFeatures);
+			//std::unique_lock<std::mutex> lock(mMutexFeatures);
 			if (mbBad)
 				return;
-			observations = mObservations;
+			observations = mObservations.Get();
 		}
 
 		if (observations.empty())
@@ -305,17 +299,15 @@ namespace EdgeSLAM {
 
 	int MapPoint::GetIndexInKeyFrame(KeyFrame *pKF)
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
-		if (mObservations.count(pKF))
-			return mObservations[pKF];
+		if (mObservations.Count(pKF))
+			return mObservations.Get(pKF);
 		else
 			return -1;
 	}
 
 	bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
 	{
-		std::unique_lock<std::mutex> lock(mMutexFeatures);
-		return (mObservations.count(pKF));
+		return (mObservations.Count(pKF));
 	}
 
 	void MapPoint::UpdateNormalAndDepth()
@@ -324,11 +316,10 @@ namespace EdgeSLAM {
 		KeyFrame* pRefKF;
 		cv::Mat Pos;
 		{
-			std::unique_lock<std::mutex> lock(mMutexFeatures);
 			std::unique_lock<std::mutex> lock2(mMutexPos);
 			if (mbBad)
 				return;
-			observations = mObservations;
+			observations = mObservations.Get();
 			pRefKF = mpRefKF;
 			Pos = mWorldPos.clone();
 		}

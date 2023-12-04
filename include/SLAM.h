@@ -60,7 +60,7 @@ namespace EdgeSLAM {
 	/////Multi user and multi map
 	public:
 		void CreateMap(std::string name, int nq);
-		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, bool _b, bool _bTracking = false, bool _bBaseLocalMap = false, bool _bIMU = false, bool _bGBA = false, bool _bReset = false, bool _bsave = false, bool _basync = false);
+		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, int nkfs, bool _b, bool _bTracking = false, bool _bBaseLocalMap = false, bool _bCommu = false, bool _bIMU = false, bool _bGBA = false, bool _bReset = false, bool _bsave = false, bool _basync = false);
 		bool CheckMap(std::string str);
 		bool CheckUser(std::string str);
 		int  CountUser();
@@ -99,12 +99,13 @@ namespace EdgeSLAM {
 		std::mutex mMutexVisID;
 		int mnVisID;
 		std::map<User*, int> mapVisID;
-	
+		
 	////Object Graph
 	public:
 		ConcurrentMap<EdgeSLAM::MapPoint*, std::set<EdgeSLAM::ObjectBoundingBox*>> GraphMapPointAndBoundingBox;
 		ConcurrentMap<EdgeSLAM::MapPoint*, std::set<EdgeSLAM::ObjectNode*>> GraphMapPointAndObjectNode;
 		ConcurrentMap<ObjectBoundingBox*, ObjectNode*> GraphBBoxAndObjectNode;
+		std::atomic<int> mnNumLocalMapKFs;
 	//////Save Data
 	public:
 		ConcurrentMap<std::string, std::map<int, ProcessTime*>> ProcessingTime;

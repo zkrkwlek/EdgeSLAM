@@ -61,7 +61,6 @@ namespace EdgeSLAM {
 		int GetIndexInKeyFrame(KeyFrame* pKF);
 		bool IsInKeyFrame(KeyFrame* pKF);
 		//BOX
-		
 		int BoxObservations();
 		void AddBoxObservation(ObjectBoundingBox* pBB, size_t idx);
 		void EraseBoxObservation(ObjectBoundingBox* pBB);
@@ -141,7 +140,7 @@ namespace EdgeSLAM {
 		cv::Mat mWorldPos;
 
 		// Keyframes observing the point and associated index in keyframe
-		std::map<KeyFrame*, size_t> mObservations;
+		ConcurrentMap<KeyFrame*, size_t> mObservations;
 		ConcurrentMap<ObjectBoundingBox*, size_t> mBoxObservations;
 
 		// Mean viewing direction

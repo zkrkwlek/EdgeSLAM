@@ -31,7 +31,7 @@ namespace EdgeSLAM {
 	class User {
 	public:
 		User();
-		User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, int nskip, bool _b, bool bDeviceTracking = false, bool bBaseLocalMap = false, bool bimu = false, bool bGBA = false, bool bReset = false, bool bsave = false, bool bAsync = false);
+		User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, int nskip, int nKFs, bool _bMapping, bool bDeviceTracking = false, bool bBaseLocalMap = false, bool bCommuTest = false, bool bimu = false, bool bGBA = false, bool bReset = false, bool bsave = false, bool bAsync = false);
 		virtual ~User();
 	public:
 		bool mbMotionModel;
@@ -54,6 +54,11 @@ namespace EdgeSLAM {
 		ConcurrentMap<int, KeyFrame*> KeyFrames; //Frame과 키프레임 연결
 		ConcurrentMap<int, ObjectTrackingResult*> mapObjectTrackingResult;
 
+		ConcurrentMap<int, long long> mapLastSyncedMPs; //갱신 비교. 최근 전송된 시간과 마지막 갱신 시간
+		ConcurrentMap<int, long long> mapLastSyncedVOs; //갱신 비교. 최근 전송된 시간과 마지막 갱신 시간
+		ConcurrentMap<int, int> mapLastSendedMPs;		//전송 비교. 일정 프레임 전송 안되었으면 전체 데이터 전송
+		ConcurrentMap<int, int> mapLastSendedVOs;		//전송 비교. 일정 프레임 전송 안되었으면 전체 데이터 전송
+
 		cv::Mat GetDevicePose();
 		void SetDevicePose(cv::Mat T);
 		////////////////
@@ -67,11 +72,12 @@ namespace EdgeSLAM {
 		std::string mapName;
 		int mnQuality;
 		int mnSkip;
+		int mnContentKFs;
 		Map* mpMap;
 		Camera* mpCamera;
 		CameraPose* mpCamPose;
 		CameraPose* mpDevicePose;
-		bool mbMapping, mbIMU, mbDeviceTracking, mbBaseLocalMap, mbSaveTrajectory, mbAsyncTest, mbPlaneGBA, mbResetAR;
+		bool mbMapping, mbIMU, mbDeviceTracking, mbBaseLocalMap, mbCommuTest, mbSaveTrajectory, mbAsyncTest, mbPlaneGBA, mbResetAR;
 
 		Frame* prevFrame;
 		std::vector<cv::Mat> vecTrajectories;

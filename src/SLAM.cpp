@@ -116,8 +116,8 @@ namespace EdgeSLAM {
 		AddMap(name, pNewMap);
 		MapQuality.Update(name, nq);
 	}
-	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, bool _b, bool _bTracking, bool _bBaseLocalMap, bool _bimu, bool _bGBA, bool _bReset, bool _bsave, bool _basync){
-		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _d5, quality, nskip, _b, _bTracking, _bBaseLocalMap, _bimu, _bGBA, _bReset, _bsave, _basync);
+	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, int nkfs, bool _b, bool _bTracking, bool _bBaseLocalMap, bool _bCommu, bool _bimu, bool _bGBA, bool _bReset, bool _bsave, bool _basync){
+		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _d5, quality, nskip, nkfs, _b, _bTracking, _bBaseLocalMap, _bCommu, _bimu, _bGBA, _bReset, _bsave, _basync);
 		pNewUser->mpMap = GetMap(_map);
 		AddUser(_user, pNewUser);
 	}
@@ -345,13 +345,15 @@ namespace EdgeSLAM {
 		}
 		SuccessRatio.Update("skipframe", vec);
 	}
+
 	void SLAM::SaveProcessingTime() {
 		
 		{
 			std::ofstream file;
 			std::stringstream ss;
-			ss << "../bin/time/raw_timestamp.txt";
-			file.open(ss.str());
+			ss << "../bin/time/raw_timestamp.csv";
+			file.open(ss.str(), std::ios::app);
+
 			ss.str("");
 			auto vecDatas = EvaluationLatency.get();
 			for (int i = 0, N = vecDatas.size(); i < N; i++) {
@@ -360,6 +362,7 @@ namespace EdgeSLAM {
 			file.write(ss.str().c_str(), ss.str().size());
 			file.close();
 		}
+		EvaluationLatency.Clear();
 		return;
 		{
 			std::ofstream file;

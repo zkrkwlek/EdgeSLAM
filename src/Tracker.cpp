@@ -502,18 +502,18 @@ namespace EdgeSLAM{
 		auto cam = pUser->mpCamera;
 		auto map = pUser->mpMap;
 		
-		bool bSimulation = false;//url.find("SimImage") != std::string::npos;
-		bool bClient = false;
-		//simulation check
-		if (bSimulation){
-			if (map->GetState() == MapState::NotInitialized) {
-				pUser->mbProgress = false;
-				pUser->mnUsed--;
-				pUser->mnDebugTrack--;
-				return;
-			}
-			bClient = user.find("client_1") != std::string::npos;
-		}
+		//bool bSimulation = false;//url.find("SimImage") != std::string::npos;
+		//bool bClient = false;
+		////simulation check
+		//if (bSimulation){
+		//	if (map->GetState() == MapState::NotInitialized) {
+		//		pUser->mbProgress = false;
+		//		pUser->mnUsed--;
+		//		pUser->mnDebugTrack--;
+		//		return;
+		//	}
+		//	bClient = user.find("client_1") != std::string::npos;
+		//}
 
 		//time analysis
 		float t_local = 1000.0;
@@ -733,17 +733,17 @@ namespace EdgeSLAM{
 
 		delete pLocalMap;
 		
-		if (bSimulation) {
-			int N = system->GetConnectedDevice();
-			auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(start.time_since_epoch()).count();
-			std::stringstream ss;
-			ss <<strTimeStamp.str()<<" "<< id << " " << N << " " << t_test1 << " " << t_test2 << std::endl;
-			system->EvaluationLatency.push_back(ss.str());
-			
-			//system->ProcessingTime.Get("download")[N]->add(t_test1);
-			//system->ProcessingTime.Get("tracking")[N]->add(t_test2);
-			//std::cout << "simul test = " <<N<<"== "<< t_test1 << " " << t_test2 << std::endl;
-		}
+		//if (bSimulation) {
+		//	int N = system->GetConnectedDevice();
+		//	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(start.time_since_epoch()).count();
+		//	std::stringstream ss;
+		//	ss <<strTimeStamp.str()<<" "<< id << " " << N << " " << t_test1 << " " << t_test2 << std::endl;
+		//	system->EvaluationLatency.push_back(ss.str());
+		//	
+		//	//system->ProcessingTime.Get("download")[N]->add(t_test1);
+		//	//system->ProcessingTime.Get("tracking")[N]->add(t_test2);
+		//	//std::cout << "simul test = " <<N<<"== "<< t_test1 << " " << t_test2 << std::endl;
+		//}
 			
 
 		////데이터 측정 코드
@@ -1241,26 +1241,13 @@ namespace EdgeSLAM{
 	}
 
 	void Tracker::SendDeviceTrackingData(SLAM* system, std::string userName, const cv::Mat& data, int id, double ts) {
-		
-		
 		{
 			WebAPI* mpAPI = new WebAPI("143.248.6.143", 35005);
 			std::stringstream ss;
 			ss << "/Store?keyword=ReferenceFrame&id=" << id << "&src=" << userName <<"&ts="<<std::fixed<< std::setprecision(6) <<ts<< "&type2=" << userName;
-			std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
 			auto res = mpAPI->Send(ss.str(), data.data, data.rows * sizeof(float));
-			std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
-			
 			delete mpAPI;
-			
-			auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(e - s).count();
-			float t_test1 = du_test1 / 1000.0;
-			//int N = system->GetConnectedDevice();
-			//system->ProcessingTime.Get("upload")[N]->add(t_test1);
 		}
-	
-		////data
-		
 	}
 
 	void Tracker::SendLocalMap(EdgeSLAM::SLAM* SLAM, std::string user, int id) {
