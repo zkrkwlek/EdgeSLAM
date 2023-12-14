@@ -12,10 +12,34 @@ namespace EdgeSLAM {
 	User::User():mbMotionModel(false), mpRefKF(nullptr), mnVisID(0), mnUsed(0), ScaleFactor(0.0){
 
 	}
+	User::User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, int nskip, int nKFs, std::vector<bool> vbFlags):
+		userName(_user), mapName(_map), mState(UserState::NotEstimated),
+		Rgyro(cv::Mat::eye(3, 3, CV_32FC1)), tacc(cv::Mat::zeros(3, 1, CV_32FC1)),
+		mnQuality(q), mnSkip(nskip), mnContentKFs(nKFs),
+		mbProgress(false), mbRemoved(false), mpRefKF(nullptr), mnUsed(0), mnLastKeyFrameID(-1), mnPrevFrameID(-1), mnCurrFrameID(-1), mnLastRelocFrameId(-1), mbMotionModel(false), mnVisID(0),
+		mnDebugTrack(0), mnDebugSeg(0), mnDebugAR(0), mnDebugLabel(0), mnDebugPlane(0), mnLastSendedTime(0), ScaleFactor(0.0),
+		mbMapping(vbFlags[0]), mbDeviceTracking(vbFlags[1]), mbIMU(vbFlags[2]), mbResetAR(vbFlags[3]),
+		mbPlaneGBA(vbFlags[4]), mbBaseLocalMap(vbFlags[5]), mbCommuTest(vbFlags[6]), mbVOSyncTest(vbFlags[7]),
+		mbSaveTrajectory(false), mbAsyncTest(false)
+	{
+		mpMotionModel = new MotionModel();
+		mpCamPose = new CameraPose();
+		mpDevicePose = new CameraPose();
+		mpCamera = new Camera(_w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _d5);
+		/*mpLastFrame = nullptr;
+		SetPose(cv::Mat::eye(3, 3, CV_32FC1), cv::Mat::zeros(3, 1, CV_32FC1));*/
+		mpMap = nullptr;
+
+		int nStates = 18;            // the number of states
+		int nMeasurements = 6;       // the number of measured states
+		int nInputs = 0;             // the number of control actions
+		double dt = 0.125;           // time between measurements (1/FPS)
+		mpKalmanFilter = new KalmanFilter(nStates, nMeasurements, nInputs, dt);
+	}
 	User::User(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int q, int nskip, int nKFs, bool _bMapping, bool _bTracking, bool _bBaseLocalMap, bool _bCommu, bool _bimu, bool _bGBA, bool _bReset, bool _bsave, bool _bAsync):
 		userName(_user), mapName(_map), mbMapping(_bMapping), mState(UserState::NotEstimated),
 		Rgyro(cv::Mat::eye(3, 3, CV_32FC1)), tacc(cv::Mat::zeros(3, 1, CV_32FC1)), mbIMU(_bimu), mbDeviceTracking(_bTracking), mbBaseLocalMap(_bBaseLocalMap), mbCommuTest(_bCommu), mbSaveTrajectory(_bsave), 
-		mnQuality(q), mnSkip(nskip),mnContentKFs(nKFs), mbAsyncTest(_bAsync), mbPlaneGBA(_bGBA), mbResetAR(_bReset),
+		mnQuality(q), mnSkip(nskip),mnContentKFs(nKFs), mbAsyncTest(_bAsync), mbPlaneGBA(_bGBA), mbResetAR(_bReset), mbVOSyncTest(false),
 		mbProgress(false), mbRemoved(false), mpRefKF(nullptr), mnUsed(0), mnLastKeyFrameID(-1), mnPrevFrameID(-1), mnCurrFrameID(-1), mnLastRelocFrameId(-1), mbMotionModel(false), mnVisID(0),
 		mnDebugTrack(0), mnDebugSeg(0), mnDebugAR(0), mnDebugLabel(0), mnDebugPlane(0), mnLastSendedTime(0), ScaleFactor(0.0)
 	{

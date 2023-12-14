@@ -37,6 +37,8 @@ namespace EdgeSLAM {
 		static void SendFrameInformationForRecon(SLAM* system, int id, std::string userName, const cv::Mat& T, float fx, float fy, float cx, float cy, const std::vector<KeyFrame*>& kfs);
 		static void SendDeviceTrackingData(SLAM* system, std::string userName, const cv::Mat& data, int id, double ts);
 		static void SendLocalMap(EdgeSLAM::SLAM* SLAM, std::string user, int id);
+		static void GenerateReferenceFrameForSync(EdgeSLAM::SLAM* SLAM, EdgeSLAM::User *pUser, EdgeSLAM::Frame* frame, cv::Mat& data, int id, long long ts);
+		static void GenerateLocalMapForSync(EdgeSLAM::SLAM* SLAM, EdgeSLAM::User* pUser, cv::Mat& data, int id, long long ts);
 		//static void SendDeviceTrackingData(SLAM* system, std::string userName, Frame* frame, int nInlier, int id, double ts);
 
 	private:

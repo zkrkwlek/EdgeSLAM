@@ -60,6 +60,7 @@ namespace EdgeSLAM {
 	/////Multi user and multi map
 	public:
 		void CreateMap(std::string name, int nq);
+		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, int nkfs, std::vector<bool> vbFlags);
 		void CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, int nkfs, bool _b, bool _bTracking = false, bool _bBaseLocalMap = false, bool _bCommu = false, bool _bIMU = false, bool _bGBA = false, bool _bReset = false, bool _bsave = false, bool _basync = false);
 		bool CheckMap(std::string str);
 		bool CheckUser(std::string str);
@@ -84,7 +85,9 @@ namespace EdgeSLAM {
 		ConcurrentSet<ObjectNode*> GlobalObjectMap;
 		ConcurrentMap<int, Node*> GlobalNodes;
 		////로우 데이터 기록용
+		ConcurrentVector<std::string>  EvaluationVirtualObjectLatency;
 		ConcurrentVector<std::string>  EvaluationLatency;
+		ConcurrentVector<std::string>  EvaluationTraffic;
 
 	private:
 		/*std::mutex mMutexUserList, mMutexMapList;
@@ -108,8 +111,9 @@ namespace EdgeSLAM {
 		std::atomic<int> mnNumLocalMapKFs;
 	//////Save Data
 	public:
-		ConcurrentMap<std::string, std::map<int, ProcessTime*>> ProcessingTime;
-		ConcurrentMap<std::string, std::map<int, Ratio*>> SuccessRatio;
+		//ConcurrentMap<std::string, std::map<int, ProcessTime*>> ProcessingTime;
+		//ConcurrentMap<std::string, std::map<int, Ratio*>> SuccessRatio;
+		
 		//std::map<int, std::vector<ProcessTime*>> ProcessTime;
 		/*
 		int nTotalTrack, nTotalReloc, nTotalMapping, nTotalSeg, nTotalDepth;
@@ -120,9 +124,9 @@ namespace EdgeSLAM {
 		void UpdateRelocTime(float ts);
 		void UpdateMappingTime(float ts);
 		*/
-		void InitProcessingTime();
-		void SaveProcessingTime();
-		void LoadProcessingTime();
+		//void InitProcessingTime();
+		//void SaveProcessingTime();
+		//void LoadProcessingTime();
 		void SaveTrajectory(std::string user);
 	public:
 		ConcurrentMap<int, std::chrono::high_resolution_clock::time_point> RequestTime;

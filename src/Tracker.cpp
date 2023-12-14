@@ -488,6 +488,367 @@ namespace EdgeSLAM{
 		pUser->mnUsed--;
 	}
 
+	void Tracker::TrackSimulation(ThreadPool::ThreadPool* pool, SLAM* system, int id, std::string user, Frame* frame, const cv::Mat& img, double ts) {
+		auto pUser = system->GetUser(user);
+		if (!pUser)
+			return;
+		if (pUser->mbProgress)
+			return;
+		if (id < pUser->mnPrevFrameID)
+			return;
+		pUser->mnUsed++;
+		pUser->mnDebugTrack++;
+		pUser->mbProgress = true;
+		auto cam = pUser->mpCamera;
+		auto map = pUser->mpMap;
+
+		//time analysis
+		float t_local = 1000.0;
+		float t_send = 1000.0;
+		float t_prev = 1000.0;
+		float t_init = 1000.0;
+		float t_frame = 1000.0;
+		LocalMap* pLocalMap = new LocalCovisibilityMap();
+
+		//std::cout << "Frame = " << user->userName <<" "<<id<< "=start!!" << std::endl;
+		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+		auto strTimeStamp = Utils::GetTimeStamp();
+
+		////receive image
+		std::chrono::high_resolution_clock::time_point received = std::chrono::high_resolution_clock::now();
+
+		/////KP 여기도 플래그 추가하기
+		//Frame* frame = nullptr;
+		std::chrono::high_resolution_clock::time_point t_frame_s = std::chrono::high_resolution_clock::now();
+		//frame = new Frame(img, cam, id, ts);
+		std::chrono::high_resolution_clock::time_point t_frame_e = std::chrono::high_resolution_clock::now();
+		auto du_frame = std::chrono::duration_cast<std::chrono::milliseconds>(t_frame_e - t_frame_s).count();
+		t_frame = du_frame / 1000.0;
+
+		auto mapState = map->GetState();
+		auto userState = pUser->GetState();
+		auto trackState = UserState::NotEstimated;
+		int nInliers = 0;
+		if (mapState == MapState::NoImages) {
+			//set reference frame
+			map->SetState(MapState::NotInitialized);
+			system->mpInitializer->Init(frame);
+		}
+
+		bool bNeedKF = false;
+		if (mapState == MapState::NotInitialized) {
+
+			if (pUser->mbMapping)
+			{
+				//initialization
+				auto res = system->mpInitializer->Initialize(frame, map);
+				map->SetState(res);
+				if (res == MapState::Initialized) {
+					trackState = UserState::Success;
+					auto kf1 = system->mpInitializer->mpInitKeyFrame1;
+					auto kf2 = system->mpInitializer->mpInitKeyFrame2;
+
+					kf1->sourceName = user;
+					kf2->sourceName = user;
+
+					map->mvpKeyFrameOrigins.push_back(kf1);
+					/*user->mapKeyFrames[kf1->mnId] = kf1;
+					user->mapKeyFrames[kf2->mnId] = kf2;*/
+					pUser->mpRefKF = kf2;
+					pUser->mnLastKeyFrameID = frame->mnFrameID;
+					pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf1);
+					pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf2);
+
+					for (int i = 0; i < frame->N; i++)
+					{
+						if (frame->mvpMapPoints[i])
+						{
+							if (!frame->mvbOutliers[i])
+							{
+								nInliers++;
+							}
+						}
+					}
+				}
+			}
+		}
+		else if (mapState == MapState::Initialized) {
+			bool bTrack = false;
+			if (userState == UserState::NotEstimated || userState == UserState::Failed) {
+				//global localization
+				//set reference keyframe and last keyframe
+				frame->reset_map_points();
+				nInliers = Tracker::Relocalization(map, pUser, frame, system->mpFeatureTracker->min_descriptor_distance);
+				if (nInliers >= 50)
+				{
+					bTrack = true;
+					pUser->mnLastRelocFrameId = frame->mnFrameID;
+					//trackState = UserState::Success;
+				}
+				std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+				auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+				float t_test1 = du_test1 / 1000.0;
+
+				int N = system->GetConnectedDevice();
+				//system->ProcessingTime.Get("reloc")[N]->add(t_test1);
+			}
+			else {
+				if (userState == UserState::Success) {
+
+					//std::cout << "Tracker::Start" << std::endl;
+					//auto f_ref = user->mapFrames[user->mnPrevFrameID];
+					auto prevFrame = pUser->prevFrame;
+					prevFrame->check_replaced_map_points();
+
+					cv::Mat Tpredict;
+					if (pUser->mbIMU) {
+						auto Rgyro = pUser->GetGyro();
+						cv::Mat Tgyro = cv::Mat::eye(4, 4, CV_32FC1);
+						Rgyro.copyTo(Tgyro.rowRange(0, 3).colRange(0, 3));
+						Tpredict = Tgyro * pUser->GetPose();
+					}
+					else {
+						Tpredict = pUser->PredictPose();
+					}
+					frame->SetPose(Tpredict);
+					std::chrono::high_resolution_clock::time_point t_prev_start = std::chrono::high_resolution_clock::now();
+					bTrack = Tracker::TrackWithPrevFrame(prevFrame, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+					std::chrono::high_resolution_clock::time_point t_prev_end = std::chrono::high_resolution_clock::now();
+					auto du_prev = std::chrono::duration_cast<std::chrono::milliseconds>(t_prev_end - t_prev_start).count();
+					t_prev = du_prev / 1000.0;
+
+					auto du_init = std::chrono::duration_cast<std::chrono::milliseconds>(t_prev_start - received).count();
+					t_init = du_init / 1000.0;
+					if (!bTrack) {
+						/*std::cout << "track with reference frame :: start" << std::endl;
+						std::cout << "track with reference frame :: end" << std::endl;*/
+					}
+					else {
+
+					}
+				}
+
+			}
+
+			if (bTrack) {
+				std::chrono::high_resolution_clock::time_point t_local_start = std::chrono::high_resolution_clock::now();
+				nInliers = Tracker::TrackWithLocalMap(pLocalMap, pUser, frame, system->mpFeatureTracker->max_descriptor_distance, system->mpFeatureTracker->min_descriptor_distance);
+				std::chrono::high_resolution_clock::time_point t_local_end = std::chrono::high_resolution_clock::now();
+				auto du_local = std::chrono::duration_cast<std::chrono::milliseconds>(t_local_end - t_local_start).count();
+				t_local = du_local / 1000.0;
+				if (frame->mnFrameID < pUser->mnLastRelocFrameId + 30 && nInliers < 50) {
+					bTrack = false;
+				}
+				else if (nInliers < 30) {
+					bTrack = false;
+				}
+				else {
+					bTrack = true;
+				}
+			}
+			if (!bTrack) {
+				trackState = UserState::Failed;
+				nInliers = 0;
+				cv::Mat Rt = cv::Mat::eye(4, 4, CV_32FC1);
+				frame->SetPose(Rt);
+			}
+			if (bTrack)
+				trackState = UserState::Success;
+
+			cv::Mat T = frame->GetPose().clone();
+
+			/*if (pUser->mbBaseLocalMap && pUser->mpRefKF) {
+				pool->EnqueueJob(Tracker::SendLocalMap, system, user, id);
+			}*/
+			//로컬 맵 키프레임 전송 중 에러.
+			//키프레임의 포즈까지 전송.
+
+		}
+
+		pUser->SetState(trackState);
+		if (trackState == UserState::Success) {
+
+			////오브젝트 검출 요청
+			//Segmentator::RequestObjectDetection(user->userName, frame->mnFrameID);
+
+			//pose update
+			cv::Mat T = frame->GetPose();
+			cv::Mat R = T.rowRange(0, 3).colRange(0, 3);
+			cv::Mat t = T.rowRange(0, 3).col(3);
+			R.convertTo(R, CV_64FC1);
+			t.convertTo(t, CV_64FC1);
+			pUser->mpKalmanFilter->fillMeasurements(t, R);
+			pUser->mpKalmanFilter->updateKalmanFilter(t, R);
+			pUser->UpdatePose(T, ts);
+			pUser->PoseDatas.Update(id, T);
+
+			pUser->MapServerTrajectories.Update(id, T.inv());
+			//check keyframe
+			if (pUser->mbMapping && pUser->mpRefKF) {
+				if (Tracker::NeedNewKeyFrame(map, system->mpLocalMapper, frame, pUser->mpRefKF, nInliers, pUser->mnLastKeyFrameID.load(), pUser->mnLastRelocFrameId.load())) {
+					bNeedKF = true;
+					Tracker::CreateNewKeyFrame(pool, system, map, system->mpLocalMapper, frame, pUser);
+					//Segmentator::RequestSegmentation(pUser->userName, frame->mnFrameID);
+					//Segmentator::RequestObjectDetection(pUser->userName, frame->mnFrameID);
+					system->RequestTime.Update(id, std::chrono::high_resolution_clock::now());
+
+				}
+			}
+
+		}
+		else
+			pUser->PoseDatas.Update(id, cv::Mat());
+
+		//bool bSyncLocalMap = pUser->mbBaseLocalMap;
+		//auto mapSynchedMPs = pUser->mapLastSyncedMPs.Get();
+		//auto mapSendedMPs = pUser->mapLastSendedMPs.Get();
+
+		//int Nsize = 0;
+		//if (bSyncLocalMap && bNeedKF) {
+		//	int Nmp = 0;
+		//	int nQueueKFs = 8;
+		//	int kfid = pUser->mpRefKF->mnId;
+		//	for (int i = 0, N = pLocalMap->mvpLocalMPs.size(); i < N; i++) {
+		//		auto pMPi = pLocalMap->mvpLocalMPs[i];
+		//		if (!pMPi || pMPi->isBad())
+		//			continue;
+		//		bool bTrialSync = false;
+		//		long long lastUpdated = pMPi->mnLastUpdatedTime;
+		//		if (mapSynchedMPs.count(pMPi->mnId)) {
+		//			auto lastSynced = mapSynchedMPs[pMPi->mnId];
+		//			if (lastUpdated > lastSynced) {
+		//				bTrialSync = true;
+		//			}
+		//		}
+		//		else {
+		//			bTrialSync = true;
+		//		}
+
+		//		if (mapSendedMPs.count(pMPi->mnId)) {
+		//			auto lastSended = mapSendedMPs[pMPi->mnId];
+		//			int diff = kfid - lastSended;
+		//			if (diff >= nQueueKFs)
+		//				bTrialSync = true;
+		//		}
+		//		else {
+		//			bTrialSync = true;
+		//		}
+		//		Nsize += 8;//id & interaction
+
+		//		if (bTrialSync) {
+		//			//맵포인트 갱신 또는 추가.
+		//			Nmp++;
+		//			pUser->mapLastSyncedMPs.Update(pMPi->mnId, ts);
+		//			pUser->mapLastSendedMPs.Update(pMPi->mnId, kfid);
+
+		//			//id, pos, descriptor, normalvector, min ,max
+		//			Nsize += (4 + 12 + 12 + 8 + 32);
+		//		}
+		//	}
+		//	//total N
+		//	Nsize += 4;
+		//	
+		//}
+		//else if (trackState == EdgeSLAM::UserState::Success) {
+		//	int nQueueKFs = 8;
+		//	Nsize += 12 * 4; // 카메라 포즈
+		//	Nsize += 8; // 두 정보 개수 알려주는 것
+
+		//	for (int i = 0, N = frame->N; i < N; i++) {
+		//		auto pMPi = frame->mvpMapPoints[i];
+		//		if (!pMPi || pMPi->isBad() || frame->mvbOutliers[i]) {
+		//			continue;
+		//		}
+
+		//		//갱신으로 비교
+		//		bool bTrialSync = false;
+		//		long long lastUpdated = pMPi->mnLastUpdatedTime;
+		//		if (mapSynchedMPs.count(pMPi->mnId)) {
+		//			auto lastSynced = mapSynchedMPs[pMPi->mnId];
+		//			if (lastUpdated > lastSynced) {
+		//				bTrialSync = true;
+		//			}
+		//		}
+		//		else {
+		//			bTrialSync = true;
+		//		}
+
+		//		//전송으로 비교
+		//		if (mapSendedMPs.count(pMPi->mnId)) {
+		//			auto lastSended = mapSendedMPs[pMPi->mnId];
+		//			int diff = id - lastSended;
+		//			if (diff >= nQueueKFs)
+		//				bTrialSync = true;
+		//		}
+		//		else {
+		//			bTrialSync = true;
+		//		}
+
+		//		int nkfidx = 0;
+		//		auto kp = frame->mvKeys[i];
+		//		int octave = kp.octave;
+		//		float fID = (float)pMPi->mnId;
+		//		Nsize += 20;
+		//		//Nkf++;
+
+		//		if (bTrialSync) {
+		//			//맵포인트 갱신 또는 추가.
+		//			pUser->mapLastSyncedMPs.Update(pMPi->mnId, ts);
+		//			pUser->mapLastSendedMPs.Update(pMPi->mnId, id);
+
+		//			Nsize += 16;
+		//			//mpdata.push_back(temp2);
+		//			//Nmp++;
+		//		}
+		//	}//for
+		//}
+
+		//if (Nsize > 0) {
+		//	std::stringstream ss;
+		//	ss << user << ",out," << id << "," <<pUser->mnQuality<<"," << Nsize << std::endl;
+		//	system->EvaluationTraffic.push_back(ss.str());
+
+		//	{
+		//		//latency
+		//		cv::Mat data = cv::Mat::ones(Nsize, 1, CV_32FC1);
+		//		std::chrono::high_resolution_clock::time_point t_up_start = std::chrono::high_resolution_clock::now();
+		//		EdgeSLAM::Tracker::SendDeviceTrackingData(system, user, data, id, ts);
+		//		std::chrono::high_resolution_clock::time_point t_up_end = std::chrono::high_resolution_clock::now();
+
+		//		//auto du_track = std::chrono::duration_cast<std::chrono::milliseconds>(t_track_end - t_track_start).count();
+		//		//auto du_parsing = std::chrono::duration_cast<std::chrono::milliseconds>(t_parsing_end - t_parsing_start).count();
+		//		//auto du_down = std::chrono::duration_cast<std::chrono::milliseconds>(t_down_end - t_down_start).count();
+		//		auto du_up = std::chrono::duration_cast<std::chrono::milliseconds>(t_up_end - t_up_start).count();
+
+		//		//float t_track = du_track / 1000.0;
+		//		//float t_parsing = du_parsing / 1000.0;
+
+		//		std::stringstream ss;
+		//		ss << user << "," << id << "," <<du_up <<","<<Nsize << std::endl;
+		//		system->EvaluationLatency.push_back(ss.str());
+		//	}
+		//}
+		
+
+		//std::cout << "traffic = " << Nsize << std::endl;
+		//int tempID = user->mnPrevFrameID;
+
+		pUser->mnPrevFrameID = pUser->mnCurrFrameID.load();
+		pUser->mnCurrFrameID = frame->mnFrameID;
+
+		if (mapState == MapState::Initialized && pUser->prevFrame)
+			delete pUser->prevFrame;
+		pUser->prevFrame = frame;
+		pUser->mbProgress = false;
+
+		///결과 기록
+
+		delete pLocalMap;
+		pUser->mnDebugTrack--;
+		pUser->mnUsed--;
+		////visualization
+	}
+
 	void Tracker::Track(ThreadPool::ThreadPool* pool, SLAM* system, int id, std::string user, Frame* frame, const cv::Mat& img, double ts) {
 		auto pUser = system->GetUser(user);
 		if (!pUser)
@@ -502,19 +863,6 @@ namespace EdgeSLAM{
 		auto cam = pUser->mpCamera;
 		auto map = pUser->mpMap;
 		
-		//bool bSimulation = false;//url.find("SimImage") != std::string::npos;
-		//bool bClient = false;
-		////simulation check
-		//if (bSimulation){
-		//	if (map->GetState() == MapState::NotInitialized) {
-		//		pUser->mbProgress = false;
-		//		pUser->mnUsed--;
-		//		pUser->mnDebugTrack--;
-		//		return;
-		//	}
-		//	bClient = user.find("client_1") != std::string::npos;
-		//}
-
 		//time analysis
 		float t_local = 1000.0;
 		float t_send = 1000.0;
@@ -549,32 +897,35 @@ namespace EdgeSLAM{
 		}
 
 		if (mapState == MapState::NotInitialized) {
-			//initialization
-			auto res = system->mpInitializer->Initialize(frame, map);
-			map->SetState(res);
-			if (res == MapState::Initialized) {
-				trackState = UserState::Success;
-				auto kf1 = system->mpInitializer->mpInitKeyFrame1;
-				auto kf2 = system->mpInitializer->mpInitKeyFrame2;
+			
+			if (pUser->mbMapping) {
+				//initialization
+				auto res = system->mpInitializer->Initialize(frame, map);
+				map->SetState(res);
+				if (res == MapState::Initialized) {
+					trackState = UserState::Success;
+					auto kf1 = system->mpInitializer->mpInitKeyFrame1;
+					auto kf2 = system->mpInitializer->mpInitKeyFrame2;
 
-				kf1->sourceName = user;
-				kf2->sourceName = user;
+					kf1->sourceName = user;
+					kf2->sourceName = user;
 
-				map->mvpKeyFrameOrigins.push_back(kf1);
-				/*user->mapKeyFrames[kf1->mnId] = kf1;
-				user->mapKeyFrames[kf2->mnId] = kf2;*/
-				pUser->mpRefKF = kf2;
-				pUser->mnLastKeyFrameID = frame->mnFrameID;
-				pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf1);
-				pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf2);
+					map->mvpKeyFrameOrigins.push_back(kf1);
+					/*user->mapKeyFrames[kf1->mnId] = kf1;
+					user->mapKeyFrames[kf2->mnId] = kf2;*/
+					pUser->mpRefKF = kf2;
+					pUser->mnLastKeyFrameID = frame->mnFrameID;
+					pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf1);
+					pool->EnqueueJob(LocalMapper::ProcessMapping, pool, system, map, kf2);
 
-				for (int i = 0; i < frame->N; i++)
-				{
-					if (frame->mvpMapPoints[i])
+					for (int i = 0; i < frame->N; i++)
 					{
-						if (!frame->mvbOutliers[i])
+						if (frame->mvpMapPoints[i])
 						{
-							nInliers++;
+							if (!frame->mvbOutliers[i])
+							{
+								nInliers++;
+							}
 						}
 					}
 				}
@@ -698,15 +1049,6 @@ namespace EdgeSLAM{
 					Segmentator::RequestObjectDetection(pUser->userName, frame->mnFrameID);
 					system->RequestTime.Update(id, std::chrono::high_resolution_clock::now());
 
-					/*{
-						auto kfs = std::vector<KeyFrame*>(pLocalMap->mvpLocalKFs.begin(), pLocalMap->mvpLocalKFs.end());
-						float fx = frame->fx;
-						float fy = frame->fy;
-						float cx = frame->cx;
-						float cy = frame->cy;
-						pool->EnqueueJob(Tracker::SendFrameInformationForRecon, system, id, pUser->userName, T, fx, fy, cx, cy, kfs);
-					}*/
-
 				}
 			}
 			
@@ -724,74 +1066,8 @@ namespace EdgeSLAM{
 		pUser->prevFrame = frame;
 		pUser->mbProgress = false;
 		
-		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-		auto du_test1 = std::chrono::duration_cast<std::chrono::milliseconds>(received - start).count();
-		float t_test1 = du_test1 / 1000.0;
-
-		auto du_test2 = std::chrono::duration_cast<std::chrono::milliseconds>(end - received).count();
-		float t_test2 = du_test2 / 1000.0;
-
 		delete pLocalMap;
 		
-		//if (bSimulation) {
-		//	int N = system->GetConnectedDevice();
-		//	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(start.time_since_epoch()).count();
-		//	std::stringstream ss;
-		//	ss <<strTimeStamp.str()<<" "<< id << " " << N << " " << t_test1 << " " << t_test2 << std::endl;
-		//	system->EvaluationLatency.push_back(ss.str());
-		//	
-		//	//system->ProcessingTime.Get("download")[N]->add(t_test1);
-		//	//system->ProcessingTime.Get("tracking")[N]->add(t_test2);
-		//	//std::cout << "simul test = " <<N<<"== "<< t_test1 << " " << t_test2 << std::endl;
-		//}
-			
-
-		////데이터 측정 코드
-		/*int N = system->GetConnectedDevice();
-		system->ProcessingTime.Get("download")[N]->add(t_test1);
-		system->ProcessingTime.Get("tracking")[N]->add(t_test2);
-		if (mapState == MapState::Initialized && !pUser->mbMapping) {
-			int ntemp = userState == UserState::Success ? 1 : 0;
-			system->SuccessRatio.Get("skipframe")[pUser->mnSkip]->increase(ntemp);
-
-			if (pUser->mbAsyncTest) {
-				system->SuccessRatio.Get("async")[pUser->mnQuality]->increase(ntemp);
-			}
-
-		}*/
-		//system->UpdateTrackingTime(t_test1);
-		////데이터 측정 코드
-
-		////visualization
-		//if (mapState == MapState::Initialized  && pUser->GetVisID() <= 3 && userState != UserState::NotEstimated) {
-
-		//	cv::Mat R = frame->GetRotation();
-		//	cv::Mat t = frame->GetTranslation();
-		//	cv::Mat K = pUser->GetCameraMatrix();
-
-		//	cv::Scalar color = Segmentator::mvObjectLabelColors[pUser->GetVisID()+1];
-
-		//	for (int i = 0; i < frame->mvKeys.size(); i++) {
-		//		auto pMP = frame->mvpMapPoints[i];
-		//		//cv::Scalar color = cv::Scalar(255, 0, 255);
-		//		int r = 2;
-		//		if (pMP && !pMP->isBad())
-		//		{
-		//			cv::circle(img, frame->mvKeys[i].pt, r, color, -1);
-
-		//			cv::Mat x3D = pMP->GetWorldPos();	
-		//			cv::Mat proj= K*(R*x3D + t);
-		//			float d = proj.at<float>(2);
-		//			cv::Point2f pt(proj.at<float>(0) / d, proj.at<float>(1) / d);
-		//			if(pMP->mnObjectID == 100)
-		//				cv::circle(img, pt, r+3, cv::Scalar(255, 255, 0));
-		//			else
-		//				cv::circle(img, pt, r, cv::Scalar(255,0,255), -1);
-		//		}
-		//	}
-
-		//	system->VisualizeImage(pUser->mapName, img, pUser->GetVisID()+4); 
-		//}
 		pUser->mnDebugTrack--;
 		pUser->mnUsed--;
 		////visualization
@@ -1216,7 +1492,7 @@ namespace EdgeSLAM{
 			}
 			
 			cv::Mat kfPose = pKF->GetPose();
-			data.at<float>(nDataIdx++) = (float)pKF->mnFrameId;
+			data.at<float>(nDataIdx++) = (float)pKF->mnFrameId; 
 			data.at<float>(nDataIdx++) = kfPose.at<float>(0, 0);
 			data.at<float>(nDataIdx++) = kfPose.at<float>(0, 1);
 			data.at<float>(nDataIdx++) = kfPose.at<float>(0, 2);
@@ -1249,13 +1525,106 @@ namespace EdgeSLAM{
 			delete mpAPI;
 		}
 	}
+	void Tracker::GenerateReferenceFrameForSync(EdgeSLAM::SLAM* SLAM, EdgeSLAM::User* pUser, Frame* frame, cv::Mat& totaldata, int id, long long ts) {
+		
+		totaldata = cv::Mat::zeros(2, 1, CV_32FC1);
+		totaldata.at<float>(1) = 1.0;
+		totaldata.at<float>(0) = 2.0;
+		
+		auto mapSynchedMPs = pUser->mapLastSyncedMPs.Get();
+		auto mapSendedMPs = pUser->mapLastSendedMPs.Get();
 
-	void Tracker::SendLocalMap(EdgeSLAM::SLAM* SLAM, std::string user, int id) {
-		auto pUser = SLAM->GetUser(user);
-		if (!pUser)
-			return;
-		pUser->mnUsed++;
+		cv::Mat Pcw = frame->GetPose();
+		cv::Mat kfdata = cv::Mat::zeros(13, 1, CV_32FC1); //inlier, pose + point2f, octave, angle, point3f
+		cv::Mat mpdata = cv::Mat::zeros(1, 1, CV_32FC1);
+		int nTrackData = 1;
+		kfdata.at<float>(nTrackData++) = Pcw.at<float>(0, 0);
+		kfdata.at<float>(nTrackData++) = Pcw.at<float>(0, 1);
+		kfdata.at<float>(nTrackData++) = Pcw.at<float>(0, 2);
+		kfdata.at<float>(nTrackData++) = Pcw.at<float>(1, 0);
+		kfdata.at<float>(nTrackData++) = Pcw.at<float>(1, 1);
+		kfdata.at<float>(nTrackData++) = Pcw.at<float>(1, 2);
+		kfdata.at<float>(nTrackData++) = Pcw.at<float>(2, 0);
+		kfdata.at<float>(nTrackData++) = Pcw.at<float>(2, 1);
+		kfdata.at<float>(nTrackData++) = Pcw.at<float>(2, 2);
+		kfdata.at<float>(nTrackData++) = Pcw.at<float>(0, 3);
+		kfdata.at<float>(nTrackData++) = Pcw.at<float>(1, 3);
+		kfdata.at<float>(nTrackData++) = Pcw.at<float>(2, 3);
+		
+		int nQueueKFs = 8;
+		int Nkf = 0;
+		int Nmp = 0;
+		for (int i = 0, N = frame->N; i < N; i++) {
+			auto pMPi = frame->mvpMapPoints[i];
+			if (!pMPi || pMPi->isBad() || frame->mvbOutliers[i]) {
+				continue;
+			}
 
+			//갱신으로 비교
+			bool bTrialSync = false;
+			long long lastUpdated = pMPi->mnLastUpdatedTime;
+			if (mapSynchedMPs.count(pMPi->mnId)) {
+				auto lastSynced = mapSynchedMPs[pMPi->mnId];
+				if (lastUpdated > lastSynced) {
+					bTrialSync = true;
+				}
+			}
+			else {
+				bTrialSync = true;
+			}
+
+			//전송으로 비교
+			if (mapSendedMPs.count(pMPi->mnId)) {
+				auto lastSended = mapSendedMPs[pMPi->mnId];
+				int diff = id - lastSended;
+				if (diff >= nQueueKFs)
+					bTrialSync = true;
+			}
+			else {
+				bTrialSync = true;
+			}
+
+			int nkfidx = 0;
+			auto kp = frame->mvKeys[i];
+			int octave = kp.octave;
+			float fID = (float)pMPi->mnId;
+			cv::Mat temp1 = cv::Mat::zeros(5, 1, CV_32FC1);
+			temp1.at<float>(nkfidx++) = fID;
+			temp1.at<float>(nkfidx++) = kp.pt.x;
+			temp1.at<float>(nkfidx++) = kp.pt.y;
+			temp1.at<float>(nkfidx++) = (float)kp.octave;
+			temp1.at<float>(nkfidx++) = kp.angle;
+			kfdata.push_back(temp1);
+			Nkf++;
+
+			if (bTrialSync) {
+				//맵포인트 갱신 또는 추가.
+				pUser->mapLastSyncedMPs.Update(pMPi->mnId, ts);
+				pUser->mapLastSendedMPs.Update(pMPi->mnId, id);
+
+				auto mp = pMPi->GetWorldPos();
+				cv::Mat temp2 = cv::Mat::zeros(5, 1, CV_32FC1);
+				int nmpidx = 0;
+				temp2.at<float>(nmpidx++) = fID;
+				temp2.at<float>(nmpidx++) = pMPi->mnPlaneID;// label or plane
+				temp2.at<float>(nmpidx++) = mp.at<float>(0);
+				temp2.at<float>(nmpidx++) = mp.at<float>(1);
+				temp2.at<float>(nmpidx++) = mp.at<float>(2);
+				mpdata.push_back(temp2);
+				Nmp++;
+			}
+		}//for
+
+		kfdata.at<float>(0) = (float)Nkf;
+		mpdata.at<float>(0) = (float)Nmp;
+
+		totaldata.at<float>(0) = (float)(kfdata.rows + mpdata.rows + 2);
+		totaldata.push_back(kfdata);
+		totaldata.push_back(mpdata);
+	}
+	void Tracker::GenerateLocalMapForSync(EdgeSLAM::SLAM* SLAM, EdgeSLAM::User* pUser, cv::Mat& totaldata, int id, long long ts){
+
+		auto mapSynchedMPs = pUser->mapLastSyncedMPs.Get();
 		auto spLocalKFs = pUser->mSetLocalKeyFrames.Get();
 		auto vpLocalKFs = std::vector<EdgeSLAM::KeyFrame*>(spLocalKFs.begin(), spLocalKFs.end());
 		std::set<EdgeSLAM::MapPoint*> spMPs;
@@ -1263,10 +1632,12 @@ namespace EdgeSLAM{
 
 		//pts에 맵포인트 id와 3차원 위치, 민, 맥스, 노말 추가
 		//4 + 12 + 4 + 4 + 12 = 36바이트가 필요함.(디스크립터 제외), 디스크립터는 32바이트임.
-		cv::Mat pts = cv::Mat::zeros(0, 1, CV_32FC1);
-		cv::Mat desc = cv::Mat::zeros(0, 1, CV_8UC1);
+		totaldata = cv::Mat::zeros(2, 1, CV_32FC1);
+		cv::Mat obs = cv::Mat::zeros(1, 1, CV_32FC1);
+		cv::Mat data = cv::Mat::zeros(1, 1, CV_32FC1);
 
-		int nInput = 0;
+		int nLocalMap = 0;
+		int nUpdated = 0;
 
 		for (std::vector<EdgeSLAM::KeyFrame*>::const_iterator itKF = vpLocalKFs.begin(), itEndKF = vpLocalKFs.end(); itKF != itEndKF; itKF++)
 		{
@@ -1275,41 +1646,150 @@ namespace EdgeSLAM{
 				continue;
 			const std::vector<EdgeSLAM::MapPoint*> vpMPs = pKFi->GetMapPointMatches();
 
-			int nInputTemp = 0;
 			for (std::vector<EdgeSLAM::MapPoint*>::const_iterator itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
 			{
 				EdgeSLAM::MapPoint* pMPi = *itMP;
 				if (!pMPi || pMPi->isBad() || spMPs.count(pMPi))
 					continue;
-				vpLocalMPs.push_back(pMPi);
-				spMPs.insert(pMPi);
+
+				//갱신 시간 비교
+				bool bTrialSync = false;
+				long long lastUpdated = pMPi->mnLastUpdatedTime;
+				if (mapSynchedMPs.count(pMPi->mnId)) {
+					auto lastSynced = mapSynchedMPs[pMPi->mnId];
+					if (lastUpdated > lastSynced) {
+						bTrialSync = true;
+					}
+				}
+				else {
+					bTrialSync = true;
+				}
 
 				///추가 데이터
 				float id = (float)pMPi->mnId;
-				float minDist = pMPi->GetMinDistanceInvariance() / 0.8;
-				float maxDist = pMPi->GetMaxDistanceInvariance() / 1.2;
-				cv::Mat temp = cv::Mat::zeros(3, 1, CV_32FC1);
-				temp.at<float>(0) = id;
-				temp.at<float>(1) = minDist;
-				temp.at<float>(2) = maxDist;
+				cv::Mat tempa = cv::Mat::zeros(1, 1, CV_32FC1);
+				tempa.at<float>(0) = id;
+				obs.push_back(tempa);
+				nLocalMap++;
 
-				pts.push_back(temp);
-				pts.push_back(pMPi->GetWorldPos());
-				pts.push_back(pMPi->GetNormal());
-				desc.push_back(pMPi->GetDescriptor().t());
+				if (bTrialSync) {
+					pUser->mapLastSyncedMPs.Update(pMPi->mnId, ts);
+					float minDist = pMPi->GetMinDistanceInvariance() / 0.8;
+					float maxDist = pMPi->GetMaxDistanceInvariance() / 1.2;
+					cv::Mat converted(8, 1, CV_32FC1, pMPi->GetDescriptor().data);
+					cv::Mat temp = cv::Mat::zeros(3, 1, CV_32FC1);
+					temp.at<float>(0) = id;
+					temp.at<float>(1) = minDist;
+					temp.at<float>(2) = maxDist;
+					data.push_back(temp);
+					data.push_back(pMPi->GetWorldPos());
+					data.push_back(pMPi->GetNormal());
+					data.push_back(converted);
+					nUpdated++;
+				}
+
+				vpLocalMPs.push_back(pMPi);
+				spMPs.insert(pMPi);
+			}
+		}
+		obs.at<float>(0) = (float)nLocalMap;
+		data.at<float>(0) = (float)nUpdated;
+
+		totaldata.at<float>(0) = (float)(obs.rows + data.rows + 2);
+		totaldata.at<float>(1) = 2;
+		totaldata.push_back(obs);
+		totaldata.push_back(data);
+	}
+
+	void Tracker::SendLocalMap(EdgeSLAM::SLAM* SLAM, std::string user, int id) {
+		auto pUser = SLAM->GetUser(user);
+		if (!pUser)
+			return;
+		pUser->mnUsed++;
+
+		//갱신 시간과 비교를 위한 타임 획득
+		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+		long long ts = start.time_since_epoch().count();
+		auto mapSynchedMPs = pUser->mapLastSyncedMPs.Get();
+		
+		auto spLocalKFs = pUser->mSetLocalKeyFrames.Get();
+		auto vpLocalKFs = std::vector<EdgeSLAM::KeyFrame*>(spLocalKFs.begin(), spLocalKFs.end());
+		std::set<EdgeSLAM::MapPoint*> spMPs;
+		std::vector<EdgeSLAM::MapPoint*> vpLocalMPs;
+
+		//pts에 맵포인트 id와 3차원 위치, 민, 맥스, 노말 추가
+		//4 + 12 + 4 + 4 + 12 = 36바이트가 필요함.(디스크립터 제외), 디스크립터는 32바이트임.
+		cv::Mat obs = cv::Mat::zeros(1, 1, CV_32FC1);
+		cv::Mat data = cv::Mat::zeros(1, 1, CV_32FC1);
+
+		int nLocalMap = 0;
+		int nUpdated = 0;
+
+		for (std::vector<EdgeSLAM::KeyFrame*>::const_iterator itKF = vpLocalKFs.begin(), itEndKF = vpLocalKFs.end(); itKF != itEndKF; itKF++)
+		{
+			EdgeSLAM::KeyFrame* pKFi = *itKF;
+			if (!pKFi)
+				continue;
+			const std::vector<EdgeSLAM::MapPoint*> vpMPs = pKFi->GetMapPointMatches();
+
+			for (std::vector<EdgeSLAM::MapPoint*>::const_iterator itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
+			{
+				EdgeSLAM::MapPoint* pMPi = *itMP;
+				if (!pMPi || pMPi->isBad() || spMPs.count(pMPi))
+					continue;
+
+				//갱신 시간 비교
+				bool bTrialSync = false;
+				long long lastUpdated = pMPi->mnLastUpdatedTime;
+				if (mapSynchedMPs.count(pMPi->mnId)) {
+					auto lastSynced = mapSynchedMPs[pMPi->mnId];
+					if (lastUpdated > lastSynced) {
+						bTrialSync = true;
+					}
+				}
+				else {
+					bTrialSync = true;
+				}
+
+				///추가 데이터
+				float id = (float)pMPi->mnId;
+				cv::Mat tempa = cv::Mat::zeros(1, 1, CV_32FC1);
+				tempa.at<float>(0) = id;
+				obs.push_back(tempa);
+				nLocalMap++;
+
+				if (bTrialSync) {
+					pUser->mapLastSyncedMPs.Update(pMPi->mnId, ts);
+					float minDist = pMPi->GetMinDistanceInvariance() / 0.8;
+					float maxDist = pMPi->GetMaxDistanceInvariance() / 1.2;
+					cv::Mat converted(8, 1, CV_32FC1, pMPi->GetDescriptor().data);
+					cv::Mat temp = cv::Mat::zeros(3, 1, CV_32FC1);
+					temp.at<float>(0) = id;
+					temp.at<float>(1) = minDist;
+					temp.at<float>(2) = maxDist;
+					data.push_back(temp);
+					data.push_back(pMPi->GetWorldPos());
+					data.push_back(pMPi->GetNormal());
+					data.push_back(converted);
+					nUpdated++;
+				}
+		
+				vpLocalMPs.push_back(pMPi);
+				spMPs.insert(pMPi);
 			}
 		}
 		pUser->mnUsed--;
+		obs.at<float>(0) = (float)nLocalMap;
+		data.at<float>(0) = (float)nUpdated;
 
-		cv::Mat converted_desc = cv::Mat::zeros(vpLocalMPs.size() * 8, 1, CV_32FC1);
-		std::memcpy(converted_desc.data, desc.data, desc.rows);
-		pts.push_back(converted_desc);
-		
+		std::cout << "update local map test = " << nLocalMap << " " << nUpdated << std::endl;
+
+		obs.push_back(data);
 		{
 			WebAPI API("143.248.6.143", 35005);
 			std::stringstream ss;
 			ss << "/Store?keyword=UpdatedLocalMap&id=" << id << "&src=" << user;
-			auto res = API.Send(ss.str(), pts.data, pts.rows * sizeof(float));
+			auto res = API.Send(ss.str(), obs.data, obs.rows * sizeof(float));
 		}
 	}
 }

@@ -42,7 +42,7 @@ namespace EdgeSLAM {
 		LoadVocabulary();
 		
 		////이거 수정 필요
-		LoadProcessingTime();
+		//LoadProcessingTime();
 
 		Segmentator::Init();
 		
@@ -115,6 +115,11 @@ namespace EdgeSLAM {
 		auto pNewMap = new Map(mpDBoWVoc);
 		AddMap(name, pNewMap);
 		MapQuality.Update(name, nq);
+	}
+	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, int nkfs, std::vector<bool> vbFlags) {
+		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _d5, quality, nskip, nkfs, vbFlags);
+		pNewUser->mpMap = GetMap(_map);
+		AddUser(_user, pNewUser);
 	}
 	void SLAM::CreateUser(std::string _user, std::string _map, int _w, int _h, float _fx, float _fy, float _cx, float _cy, float _d1, float _d2, float _d3, float _d4, float _d5, int quality, int nskip, int nkfs, bool _b, bool _bTracking, bool _bBaseLocalMap, bool _bCommu, bool _bimu, bool _bGBA, bool _bReset, bool _bsave, bool _basync){
 		auto pNewUser = new User(_user, _map, _w, _h, _fx, _fy, _cx, _cy, _d1, _d2, _d3, _d4, _d5, quality, nskip, nkfs, _b, _bTracking, _bBaseLocalMap, _bCommu, _bimu, _bGBA, _bReset, _bsave, _basync);
@@ -351,7 +356,22 @@ namespace EdgeSLAM {
 		{
 			std::ofstream file;
 			std::stringstream ss;
-			ss << "../bin/time/raw_timestamp.csv";
+			ss << "../bin/time/volatency.csv";
+			file.open(ss.str(), std::ios::app);
+
+			ss.str("");
+			auto vecDatas = EvaluationVirtualObjectLatency.get();
+			for (int i = 0, N = vecDatas.size(); i < N; i++) {
+				ss << vecDatas[i];
+			}
+			file.write(ss.str().c_str(), ss.str().size());
+			file.close();
+			EvaluationVirtualObjectLatency.Clear();
+		}
+		{
+			std::ofstream file;
+			std::stringstream ss;
+			ss << "../bin/time/latency.csv";
 			file.open(ss.str(), std::ios::app);
 
 			ss.str("");
@@ -361,8 +381,23 @@ namespace EdgeSLAM {
 			}
 			file.write(ss.str().c_str(), ss.str().size());
 			file.close();
+			EvaluationLatency.Clear();
 		}
-		EvaluationLatency.Clear();
+		{
+			std::ofstream file;
+			std::stringstream ss;
+			ss << "../bin/time/traffic.csv";
+			file.open(ss.str(), std::ios::app);
+
+			ss.str("");
+			auto vecDatas = EvaluationTraffic.get();
+			for (int i = 0, N = vecDatas.size(); i < N; i++) {
+				ss << vecDatas[i];
+			}
+			file.write(ss.str().c_str(), ss.str().size());
+			file.close();
+			EvaluationTraffic.Clear();
+		}
 		return;
 		{
 			std::ofstream file;
