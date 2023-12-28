@@ -768,8 +768,8 @@ namespace EdgeSLAM {
 
 		cv::Mat temp = cv::Mat::zeros(n2, 1, CV_8UC1);
 		std::memcpy(temp.data, res.data(), res.size());
-		cv::Mat depthsrc= cv::imdecode(temp, cv::IMREAD_UNCHANGED);
-		flip(depthsrc, depthsrc, 0);
+		cv::Mat depthsrc= cv::imdecode(temp, cv::IMREAD_ANYDEPTH);
+		//flip(depthsrc, depthsrc, 0);
 		//cv::Mat depthImg = cv::Mat(h, w, CV_32FC1, depthsrc.data)*0.0001;
 
 		{
@@ -777,7 +777,9 @@ namespace EdgeSLAM {
 			cv::Mat depth;
 			cv::normalize(depthsrc, depth, 0, 255, cv::NORM_MINMAX, CV_8UC1);
 			cv::cvtColor(depth, depth, cv::COLOR_GRAY2BGR);
-			//system->VisualizeImage(depth, 0);
+			int nVisID = pUser->GetVisID() + 5;
+			std::string mapName = pUser->mapName;
+			system->VisualizeImage(mapName, depth, nVisID);
 		}
 
 		//std::cout << depthsrc.type() << ", " <<depthsrc.size()<<" "<< depthsrc.channels()<<" "<<w<<" "<<h << std::endl;

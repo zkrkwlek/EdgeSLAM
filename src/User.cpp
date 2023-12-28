@@ -20,7 +20,7 @@ namespace EdgeSLAM {
 		mnDebugTrack(0), mnDebugSeg(0), mnDebugAR(0), mnDebugLabel(0), mnDebugPlane(0), mnLastSendedTime(0), ScaleFactor(0.0),
 		mbMapping(vbFlags[0]), mbDeviceTracking(vbFlags[1]), mbIMU(vbFlags[2]), mbResetAR(vbFlags[3]),
 		mbPlaneGBA(vbFlags[4]), mbBaseLocalMap(vbFlags[5]), mbCommuTest(vbFlags[6]), mbVOSyncTest(vbFlags[7]),
-		mbSaveTrajectory(false), mbAsyncTest(false)
+		mbSaveTrajectory(false), mbAsyncTest(false), mbNewKF(false)
 	{
 		mpMotionModel = new MotionModel();
 		mpCamPose = new CameraPose();
@@ -41,7 +41,7 @@ namespace EdgeSLAM {
 		Rgyro(cv::Mat::eye(3, 3, CV_32FC1)), tacc(cv::Mat::zeros(3, 1, CV_32FC1)), mbIMU(_bimu), mbDeviceTracking(_bTracking), mbBaseLocalMap(_bBaseLocalMap), mbCommuTest(_bCommu), mbSaveTrajectory(_bsave), 
 		mnQuality(q), mnSkip(nskip),mnContentKFs(nKFs), mbAsyncTest(_bAsync), mbPlaneGBA(_bGBA), mbResetAR(_bReset), mbVOSyncTest(false),
 		mbProgress(false), mbRemoved(false), mpRefKF(nullptr), mnUsed(0), mnLastKeyFrameID(-1), mnPrevFrameID(-1), mnCurrFrameID(-1), mnLastRelocFrameId(-1), mbMotionModel(false), mnVisID(0),
-		mnDebugTrack(0), mnDebugSeg(0), mnDebugAR(0), mnDebugLabel(0), mnDebugPlane(0), mnLastSendedTime(0), ScaleFactor(0.0)
+		mnDebugTrack(0), mnDebugSeg(0), mnDebugAR(0), mnDebugLabel(0), mnDebugPlane(0), mnLastSendedTime(0), ScaleFactor(0.0), mbNewKF(false)
 	{
 		mpMotionModel = new MotionModel();
 		mpCamPose = new CameraPose();

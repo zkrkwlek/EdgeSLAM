@@ -91,7 +91,7 @@ namespace EdgeSLAM {
 		//std::map<int, KeyFrame*> mapKeyFrames;
 		KeyFrame* mpRefKF;
 		std::atomic<float> ScaleFactor;
-		std::atomic<bool> mbProgress, mbRemoved;
+		std::atomic<bool> mbProgress, mbRemoved, mbNewKF;
 		std::atomic<int> mnUsed, mnLastKeyFrameID, mnPrevFrameID, mnCurrFrameID, mnLastRelocFrameId;
 		std::atomic<int> mnDebugTrack, mnDebugSeg, mnDebugAR, mnDebugLabel, mnDebugPlane;
 		std::atomic<long long> mnLastSendedTime;

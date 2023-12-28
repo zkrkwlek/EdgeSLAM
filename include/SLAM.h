@@ -125,11 +125,11 @@ namespace EdgeSLAM {
 		void UpdateMappingTime(float ts);
 		*/
 		//void InitProcessingTime();
-		//void SaveProcessingTime();
 		//void LoadProcessingTime();
-		void SaveTrajectory(std::string user);
-	public:
-		ConcurrentMap<int, std::chrono::high_resolution_clock::time_point> RequestTime;
+		void Save(std::string path, ConcurrentVector<std::string>& data, std::string header);
+		void SaveProcessingTime();
+		void SaveTrajectory(std::string path, std::string mapname);
+	
 	private:
 		std::mutex mMutexTrackingTime, mMutexRelocTime, mMutexMappingTime;
 	};

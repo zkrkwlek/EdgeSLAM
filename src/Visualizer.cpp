@@ -273,7 +273,6 @@ namespace EdgeSLAM {
 		userColors[4] = cv::Scalar(0, 255, 0);
 		userColors[5] = cv::Scalar(0, 0, 255);
 		
-
 		while (true) {
 			if (bSaveMap) {
 				//auto vpUsers = GetUsers();
@@ -1001,7 +1000,7 @@ namespace EdgeSLAM {
 					if(user->mbMapping)
 						cv::circle(tempVis, pt1, 4, cv::Scalar(0, 0, 255), -1);
 					else {
-						cv::circle(tempVis, pt1, 4, userColors[i], -1);
+						cv::circle(tempVis, pt1, 4, userColors[i%6], -1);
 					}
 					//auto vecTrajectories = user->mvDeviceTrajectories.get();
 					//for (int j = 0; j < vecTrajectories.size(); j += 1) {
@@ -1064,7 +1063,7 @@ namespace EdgeSLAM {
 			//cv::resize(mOutputImage, tempVisImage, mOutputImage.size()/2);
 			cv::resize(mOutputImage, tempVisImage, cv::Size(mOutputImage.cols*0.75, mOutputImage.rows*0.75));
 			imshow(strWindowName, tempVisImage);
-			auto key = cv::waitKey(10);
+			auto key = cv::waitKey(500);
 			if (key == '1') {
 				std::cout << "1" << std::endl;
 			}

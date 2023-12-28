@@ -16,12 +16,12 @@ namespace EdgeSLAM {
 		mnScaleLevels(frame.mnScaleLevels), mfScaleFactor(frame.mfScaleFactor),
 		mfLogScaleFactor(frame.mfLogScaleFactor),
 		mvScaleFactors(frame.mvScaleFactors), mvInvScaleFactors(frame.mvInvScaleFactors),
-		mvLevelSigma2(frame.mvLevelSigma2), mvInvLevelSigma2(frame.mvInvLevelSigma2)
+		mvLevelSigma2(frame.mvLevelSigma2), mvInvLevelSigma2(frame.mvInvLevelSigma2), mnShared(0)
 	{
 		
 	}
 
-	Frame::Frame(cv::Mat img, cv::Mat data, Camera* pCam, int id, double time_stamp) :mnFrameID(id), mdTimeStamp(time_stamp), mpCamera(pCam),
+	Frame::Frame(cv::Mat img, cv::Mat data, Camera* pCam, int id, double time_stamp) :mnFrameID(id), mdTimeStamp(time_stamp), mpCamera(pCam), mnShared(0),
 		K(pCam->K), D(pCam->D), InvK(pCam->Kinv), fx(pCam->fx), fy(pCam->fy), cx(pCam->cx), cy(pCam->cy), invfx(pCam->invfx), invfy(pCam->invfy), mnMinX(pCam->u_min), mnMaxX(pCam->u_max), mnMinY(pCam->v_min), mnMaxY(pCam->v_max), mfGridElementWidthInv(pCam->mfGridElementWidthInv), mfGridElementHeightInv(pCam->mfGridElementHeightInv), FRAME_GRID_COLS(pCam->mnGridCols), FRAME_GRID_ROWS(pCam->mnGridRows), mbDistorted(pCam->bDistorted),
 		mnScaleLevels(Detector->mnScaleLevels), mfScaleFactor(Detector->mfScaleFactor), mfLogScaleFactor(Detector->mfLogScaleFactor), mvScaleFactors(Detector->mvScaleFactors), mvInvScaleFactors(Detector->mvInvScaleFactors), mvLevelSigma2(Detector->mvLevelSigma2), mvInvLevelSigma2(Detector->mvInvLevelSigma2)
 	{

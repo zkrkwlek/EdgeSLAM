@@ -38,6 +38,7 @@ namespace EdgeSLAM {
 		void reset_map_points();
 		void check_replaced_map_points();
 	public:
+		std::atomic<int> mnShared;
 		int mnKeyFrameId;
 		int N;
 		cv::Mat K, D, InvK;
